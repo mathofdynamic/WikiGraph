@@ -149,11 +149,11 @@ export const SettingsPage: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       
       {/* Header */}
-      <div className="pb-3 border-b border-zinc-800">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+      <div className="pb-3 border-b border-[var(--border)]">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
           {t('settings.title')}
         </h1>
-        <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+        <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
           {t('settings.subtitle')}
         </p>
       </div>
@@ -164,7 +164,7 @@ export const SettingsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setImportStatus(null)}
-            className="text-zinc-400 hover:text-zinc-100"
+            className="text-[var(--muted)] hover:text-[var(--foreground)]"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -172,28 +172,28 @@ export const SettingsPage: React.FC = () => {
       )}
 
       {/* Grouped Section 1: Localization & Language */}
-      <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-[var(--border)] flex items-center gap-2">
           <Languages className="w-4 h-4 text-blue-400" />
-          <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
             {t('settings.languageSection')}
           </h2>
         </div>
 
         <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <span className="text-xs font-medium text-zinc-200 block">Workspace Language</span>
-            <span className="text-[11px] text-zinc-500">Select interface language and text direction (LTR / RTL)</span>
+            <span className="text-xs font-medium text-[var(--foreground)] block">Workspace Language</span>
+            <span className="text-[11px] text-[var(--muted)]">Select interface language and text direction (LTR / RTL)</span>
           </div>
 
-          <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-900 border border-zinc-800 shrink-0">
+          <div className="inline-flex items-center p-0.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] shrink-0">
             <button
               type="button"
               onClick={() => setLocale('en')}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
                 locale === 'en'
-                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs'
+                  : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
               English
@@ -203,8 +203,8 @@ export const SettingsPage: React.FC = () => {
               onClick={() => setLocale('fa')}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
                 locale === 'fa'
-                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs'
+                  : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
               فارسی (Persian)
@@ -214,39 +214,39 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Grouped Section 2: Research Collections Management */}
-      <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+            <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
               Research Domains & Collections
             </h2>
           </div>
           <button
             type="button"
             onClick={() => setNewColOpen(true)}
-            className="heroui-btn-primary text-xs py-1"
+            className="ui-button ui-button-primary text-xs py-1"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Collection</span>
           </button>
         </div>
 
-        <div className="divide-y divide-zinc-800">
+        <div className="divide-y divide-[var(--separator)]">
           {collections.map((col) => (
             <div
               key={col.id}
-              className="p-3.5 flex items-center justify-between gap-3 hover:bg-zinc-850/40 transition-colors"
+              className="p-3.5 flex items-center justify-between gap-3 hover:bg-[var(--surface-secondary)]/40 transition-colors"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-zinc-100">{col.name}</span>
+                  <span className="text-xs font-semibold text-[var(--foreground)]">{col.name}</span>
                   {col.nameFa && col.nameFa !== col.name && (
-                    <span className="text-xs text-zinc-400 font-normal">({col.nameFa})</span>
+                    <span className="text-xs text-[var(--muted)] font-normal">({col.nameFa})</span>
                   )}
                 </div>
                 {col.description && (
-                  <p className="text-[11px] text-zinc-400 truncate max-w-md mt-0.5">
+                  <p className="text-[11px] text-[var(--muted)] truncate max-w-md mt-0.5">
                     {col.description}
                   </p>
                 )}
@@ -255,7 +255,7 @@ export const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDeleteColId(col.id)}
-                className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                className="text-[var(--muted)] hover:text-rose-400 p-1 cursor-pointer"
                 title="Delete Collection"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -266,32 +266,32 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Grouped Section 3: Storage & Workspace Hygiene */}
-      <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-[var(--border)] flex items-center gap-2">
           <Database className="w-4 h-4 text-blue-400" />
-          <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">
             {t('settings.storageSection')}
           </h2>
         </div>
 
-        <div className="p-4 space-y-4 divide-y divide-zinc-800">
+        <div className="p-4 space-y-4 divide-y divide-[var(--separator)]">
           {/* Storage Description */}
-          <div className="text-xs text-zinc-400 leading-relaxed">
+          <div className="text-xs text-[var(--muted)] leading-relaxed">
             {t('settings.storageDesc')}
           </div>
 
           {/* Backup & Restore Controls */}
           <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-xs font-medium text-zinc-200 block">Workspace Backup</span>
-              <span className="text-[11px] text-zinc-500">Download snapshot or restore from a JSON backup file</span>
+              <span className="text-xs font-medium text-[var(--foreground)] block">Workspace Backup</span>
+              <span className="text-[11px] text-[var(--muted)]">Download snapshot or restore from a JSON backup file</span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleExportBackup}
-                className="heroui-btn-secondary text-xs"
+                className="ui-button ui-button-secondary text-xs"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export (.json)</span>
@@ -300,7 +300,7 @@ export const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="heroui-btn-secondary text-xs"
+                className="ui-button ui-button-secondary text-xs"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Restore</span>
@@ -319,7 +319,7 @@ export const SettingsPage: React.FC = () => {
           <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span className="text-xs font-medium text-rose-400 block">{t('settings.btnReset')}</span>
-              <span className="text-[11px] text-zinc-500">Reset all documents and knowledge back to clean fixtures</span>
+              <span className="text-[11px] text-[var(--muted)]">Reset all documents and knowledge back to clean fixtures</span>
             </div>
 
             <button
@@ -337,13 +337,13 @@ export const SettingsPage: React.FC = () => {
       {/* New Collection Modal */}
       {newColOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
-          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <h3 className="text-sm font-semibold text-zinc-100">Add Collection</h3>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">Add Collection</h3>
               <button
                 type="button"
                 onClick={() => setNewColOpen(false)}
-                className="text-zinc-400 hover:text-zinc-100 p-1"
+                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -351,7 +351,7 @@ export const SettingsPage: React.FC = () => {
 
             <form onSubmit={handleCreateCollection} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Name (English) *
                 </label>
                 <input
@@ -360,12 +360,12 @@ export const SettingsPage: React.FC = () => {
                   value={newColName}
                   onChange={(e) => setNewColName(e.target.value)}
                   placeholder="e.g. LLM Reasoning Heuristics"
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Name (Persian / Alternate)
                 </label>
                 <input
@@ -373,12 +373,12 @@ export const SettingsPage: React.FC = () => {
                   value={newColNameFa}
                   onChange={(e) => setNewColNameFa(e.target.value)}
                   placeholder="e.g. روش‌های استدلال مدل‌های زبانی"
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Description
                 </label>
                 <textarea
@@ -386,21 +386,21 @@ export const SettingsPage: React.FC = () => {
                   value={newColDesc}
                   onChange={(e) => setNewColDesc(e.target.value)}
                   placeholder="Scope and purpose..."
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setNewColOpen(false)}
-                  className="heroui-btn-secondary"
+                  className="ui-button ui-button-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="heroui-btn-primary"
+                  className="ui-button ui-button-primary"
                 >
                   {t('common.save')}
                 </button>

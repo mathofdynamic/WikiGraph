@@ -199,12 +199,12 @@ export const ContextPage: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
             {t('context.title')}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
             {t('context.subtitle')}
           </p>
         </div>
@@ -213,7 +213,7 @@ export const ContextPage: React.FC = () => {
           <button
             type="button"
             onClick={handleCopy}
-            className="heroui-btn-secondary text-xs"
+            className="ui-button ui-button-secondary text-xs"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? t('common.copied') : t('common.copy')}</span>
@@ -221,7 +221,7 @@ export const ContextPage: React.FC = () => {
           <button
             type="button"
             onClick={handleDownload}
-            className="heroui-btn-primary text-xs"
+            className="ui-button ui-button-primary text-xs"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{t('common.download')}</span>
@@ -236,8 +236,8 @@ export const ContextPage: React.FC = () => {
         <div className="lg:col-span-7 space-y-4">
           
           {/* Task Goal Input */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2">
-            <label className="block text-xs font-semibold text-zinc-300">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2">
+            <label className="block text-xs font-semibold text-[var(--foreground)]">
               Task Objective / Downstream Purpose
             </label>
             <input
@@ -245,14 +245,14 @@ export const ContextPage: React.FC = () => {
               value={taskGoal}
               onChange={(e) => setTaskGoal(e.target.value)}
               placeholder="e.g. Table Extraction Heuristics for Financial Filings"
-              className="heroui-input"
+              className="ui-input"
             />
           </div>
 
           {/* Selected Knowledge Items in Packet */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-blue-400" />
                 <span>Assembled Knowledge Sequence</span>
               </span>
@@ -262,7 +262,7 @@ export const ContextPage: React.FC = () => {
             </div>
 
             {selectedItems.length === 0 ? (
-              <p className="text-xs text-zinc-500 py-3 text-center italic">
+              <p className="text-xs text-[var(--muted)] py-3 text-center italic">
                 No items selected yet. Choose items below to assemble your context packet.
               </p>
             ) : (
@@ -270,7 +270,7 @@ export const ContextPage: React.FC = () => {
                 {selectedItems.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/70 space-y-1.5 group"
+                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/70 space-y-1.5 group"
                   >
                     {item.sourceHasChanged && (
                       <div className="flex items-center gap-1 text-[11px] text-amber-400 font-medium">
@@ -281,9 +281,9 @@ export const ContextPage: React.FC = () => {
 
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs text-zinc-500 font-mono">#{idx + 1}</span>
+                        <span className="text-xs text-[var(--muted)] font-mono">#{idx + 1}</span>
                         <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <h4 dir="auto" className="text-xs font-medium text-zinc-200 truncate">
+                        <h4 dir="auto" className="text-xs font-medium text-[var(--foreground)] truncate">
                           {item.title}
                         </h4>
                       </div>
@@ -293,7 +293,7 @@ export const ContextPage: React.FC = () => {
                           type="button"
                           disabled={idx === 0}
                           onClick={() => moveItem(idx, 'up')}
-                          className="p-1 rounded text-zinc-400 hover:text-zinc-100 disabled:opacity-20 cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-20 cursor-pointer"
                         >
                           <MoveUp className="w-3.5 h-3.5" />
                         </button>
@@ -301,21 +301,21 @@ export const ContextPage: React.FC = () => {
                           type="button"
                           disabled={idx === selectedItems.length - 1}
                           onClick={() => moveItem(idx, 'down')}
-                          className="p-1 rounded text-zinc-400 hover:text-zinc-100 disabled:opacity-20 cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-20 cursor-pointer"
                         >
                           <MoveDown className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
-                          className="p-1 rounded text-zinc-400 hover:text-rose-400 cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-rose-400 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
-                    <p dir="auto" className="text-[11px] text-zinc-400 line-clamp-1">
+                    <p dir="auto" className="text-[11px] text-[var(--muted)] line-clamp-1">
                       {item.summary}
                     </p>
                   </div>
@@ -325,29 +325,29 @@ export const ContextPage: React.FC = () => {
           </div>
 
           {/* Available Knowledge Picker */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-300 block">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground)] block">
               Available Knowledge Units
             </span>
 
             {/* Filter Inputs */}
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-zinc-500 absolute start-2.5 top-2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-2.5 top-2 pointer-events-none" />
                 <input
                   type="text"
                   dir="auto"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter available knowledge..."
-                  className="heroui-input ps-8 py-1 text-xs"
+                  className="ui-input ps-8 py-1 text-xs"
                 />
               </div>
 
               <select
                 value={selectedCollection}
                 onChange={(e) => setSelectedCollection(e.target.value)}
-                className="heroui-select text-xs py-1"
+                className="ui-select text-xs py-1"
               >
                 <option value="all">All Collections</option>
                 {collections.map((c) => (
@@ -359,9 +359,9 @@ export const ContextPage: React.FC = () => {
             </div>
 
             {/* List of Available Items */}
-            <div className="max-h-64 overflow-y-auto space-y-1.5 divide-y divide-zinc-800">
+            <div className="max-h-64 overflow-y-auto space-y-1.5 divide-y divide-[var(--separator)]">
               {availableItems.length === 0 ? (
-                <p className="text-xs text-zinc-500 py-3 text-center italic">
+                <p className="text-xs text-[var(--muted)] py-3 text-center italic">
                   No additional units match filter.
                 </p>
               ) : (
@@ -370,11 +370,11 @@ export const ContextPage: React.FC = () => {
                     <div className="min-w-0 pr-2">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <span dir="auto" className="text-xs font-medium text-zinc-200 truncate">
+                        <span dir="auto" className="text-xs font-medium text-[var(--foreground)] truncate">
                           {item.title}
                         </span>
                       </div>
-                      <p dir="auto" className="text-[11px] text-zinc-400 line-clamp-1">
+                      <p dir="auto" className="text-[11px] text-[var(--muted)] line-clamp-1">
                         {item.summary}
                       </p>
                     </div>
@@ -382,7 +382,7 @@ export const ContextPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => addItem(item.id)}
-                      className="heroui-btn-secondary text-xs px-2.5 py-1 shrink-0"
+                      className="ui-button ui-button-secondary text-xs px-2.5 py-1 shrink-0"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add</span>
@@ -397,16 +397,16 @@ export const ContextPage: React.FC = () => {
 
         {/* Right: Output Format & Assembled Live Preview (5 cols) */}
         <div className="lg:col-span-5 space-y-4 sticky top-20">
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3 shadow-xs">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3 shadow-xs">
             
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <span className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
                 <FileCode className="w-3.5 h-3.5 text-blue-400" />
                 <span>Assembled Context Preview</span>
               </span>
 
               {/* Segmented Format Switch */}
-              <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
+              <div className="inline-flex items-center p-0.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)]">
                 {(['markdown', 'json', 'briefing'] as OutputFormat[]).map((fmt) => (
                   <button
                     key={fmt}
@@ -414,8 +414,8 @@ export const ContextPage: React.FC = () => {
                     onClick={() => setFormat(fmt)}
                     className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                       format === fmt
-                        ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                        : 'text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs'
+                        : 'text-[var(--muted)] hover:text-[var(--foreground)]'
                     }`}
                   >
                     {fmt.toUpperCase()}
@@ -425,11 +425,11 @@ export const ContextPage: React.FC = () => {
             </div>
 
             {/* Assembled Output Code Box */}
-            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-zinc-300 max-h-[550px] overflow-y-auto leading-relaxed">
+            <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] font-mono text-xs text-[var(--foreground)] max-h-[550px] overflow-y-auto leading-relaxed">
               <pre className="whitespace-pre-wrap">{assembledPayload}</pre>
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
+            <div className="flex items-center justify-between text-[11px] text-[var(--muted)] pt-1">
               <span>{assembledPayload.length} characters</span>
               <button
                 type="button"

@@ -233,12 +233,12 @@ export const ImportPage: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[var(--border)]">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
             {t('import.title')}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
             {t('import.subtitle')}
           </p>
         </div>
@@ -248,7 +248,7 @@ export const ImportPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setQueue([])}
-              className="heroui-btn-secondary text-xs"
+              className="ui-button ui-button-secondary text-xs"
             >
               {t('common.reset')}
             </button>
@@ -256,7 +256,7 @@ export const ImportPage: React.FC = () => {
               type="button"
               disabled={importing || queue.every((q) => q.status === 'completed')}
               onClick={startProcessingQueue}
-              className="heroui-btn-primary text-xs"
+              className="ui-button ui-button-primary text-xs"
             >
               <UploadCloud className="w-4 h-4" />
               <span>{importing ? t('common.saving') : `${t('import.btnStartImport')} (${queue.length})`}</span>
@@ -266,26 +266,26 @@ export const ImportPage: React.FC = () => {
       </div>
 
       {/* Stage Progression Indicator */}
-      <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs">
-        <div className={`p-2 rounded-lg text-center font-medium ${queue.length === 0 ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
-          <span className="font-mono text-[11px] block text-zinc-500">Stage 01</span>
+      <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-[var(--surface-secondary)]/60 border border-[var(--border)] text-xs">
+        <div className={`p-2 rounded-lg text-center font-medium ${queue.length === 0 ? 'bg-[var(--surface-tertiary)] text-blue-400' : 'text-[var(--muted)]'}`}>
+          <span className="font-mono text-[11px] block text-[var(--muted)]">Stage 01</span>
           <span>1. Select Files</span>
         </div>
-        <div className={`p-2 rounded-lg text-center font-medium ${queue.length > 0 && !importedCount ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
-          <span className="font-mono text-[11px] block text-zinc-500">Stage 02</span>
+        <div className={`p-2 rounded-lg text-center font-medium ${queue.length > 0 && !importedCount ? 'bg-[var(--surface-tertiary)] text-blue-400' : 'text-[var(--muted)]'}`}>
+          <span className="font-mono text-[11px] block text-[var(--muted)]">Stage 02</span>
           <span>2. Review Queue ({queue.length})</span>
         </div>
-        <div className={`p-2 rounded-lg text-center font-medium ${importedCount ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40' : 'text-zinc-400'}`}>
-          <span className="font-mono text-[11px] block text-zinc-500">Stage 03</span>
+        <div className={`p-2 rounded-lg text-center font-medium ${importedCount ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40' : 'text-[var(--muted)]'}`}>
+          <span className="font-mono text-[11px] block text-[var(--muted)]">Stage 03</span>
           <span>3. Complete</span>
         </div>
       </div>
 
       {/* Ingestion limits notification */}
-      <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181b] text-xs text-zinc-400 flex items-start gap-3">
+      <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs text-[var(--muted)] flex items-start gap-3">
         <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
         <div>
-          <span className="font-semibold text-zinc-200 me-1">
+          <span className="font-semibold text-[var(--foreground)] me-1">
             {t('import.limitsTitle')}:
           </span>
           <span>{t('import.limitsDesc')}</span>
@@ -302,7 +302,7 @@ export const ImportPage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/library?tab=sources')}
-            className="heroui-btn-primary text-xs"
+            className="ui-button ui-button-primary text-xs"
           >
             <span>View Source Documents</span>
             <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
@@ -319,14 +319,14 @@ export const ImportPage: React.FC = () => {
       )}
 
       {/* Segmented Switch: Upload Files vs Paste Markdown */}
-      <div className="inline-flex items-center p-1 rounded-lg bg-zinc-900 border border-zinc-800">
+      <div className="inline-flex items-center p-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)]">
         <button
           type="button"
           onClick={() => setActiveTab('files')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             activeTab === 'files'
-              ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60 shadow-xs'
-              : 'text-zinc-400 hover:text-zinc-200'
+              ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] border border-[var(--border)] shadow-xs'
+              : 'text-[var(--muted)] hover:text-[var(--foreground)]'
           }`}
         >
           <FileText className="w-3.5 h-3.5 text-blue-400" />
@@ -337,8 +337,8 @@ export const ImportPage: React.FC = () => {
           onClick={() => setActiveTab('paste')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             activeTab === 'paste'
-              ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60 shadow-xs'
-              : 'text-zinc-400 hover:text-zinc-200'
+              ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] border border-[var(--border)] shadow-xs'
+              : 'text-[var(--muted)] hover:text-[var(--foreground)]'
           }`}
         >
           <FileCode className="w-3.5 h-3.5 text-blue-400" />
@@ -359,7 +359,7 @@ export const ImportPage: React.FC = () => {
           className={`p-6 sm:p-8 rounded-xl border border-dashed text-center transition-all cursor-pointer ${
             dragOver
               ? 'border-blue-500 bg-blue-950/15'
-              : 'border-zinc-700/80 hover:border-zinc-600 bg-[#18181b]'
+              : 'border-[var(--border)] hover:border-[var(--border)] bg-[var(--surface)]'
           }`}
         >
           <input
@@ -370,22 +370,22 @@ export const ImportPage: React.FC = () => {
             onChange={(e) => handleFiles(e.target.files)}
             className="hidden"
           />
-          <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 text-blue-400 flex items-center justify-center mx-auto mb-2.5">
+          <div className="w-10 h-10 rounded-lg bg-[var(--surface-tertiary)] border border-[var(--border)] text-blue-400 flex items-center justify-center mx-auto mb-2.5">
             <UploadCloud className="w-5 h-5" />
           </div>
-          <h3 className="text-sm font-semibold text-zinc-100 mb-0.5">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] mb-0.5">
             {t('import.dropzoneTitle')}
           </h3>
-          <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+          <p className="text-xs text-[var(--muted)] max-w-sm mx-auto">
             {t('import.dropzoneSubtitle')}
           </p>
         </div>
       ) : (
         /* Paste Markdown Form */
-        <form onSubmit={handleAddPasted} className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3.5">
+        <form onSubmit={handleAddPasted} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3.5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('import.pasteFilename')}
               </label>
               <input
@@ -394,17 +394,17 @@ export const ImportPage: React.FC = () => {
                 value={pasteFilename}
                 onChange={(e) => setPasteFilename(e.target.value)}
                 placeholder="research_report.md"
-                className="heroui-input"
+                className="ui-input"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('import.pasteCollection')}
               </label>
               <select
                 value={pasteCollectionId}
                 onChange={(e) => setPasteCollectionId(e.target.value)}
-                className="heroui-select w-full"
+                className="ui-select w-full"
               >
                 {collections.map((col) => (
                   <option key={col.id} value={col.id}>
@@ -416,7 +416,7 @@ export const ImportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1">
               Markdown Text
             </label>
             <textarea
@@ -426,14 +426,14 @@ export const ImportPage: React.FC = () => {
               value={pasteContent}
               onChange={(e) => setPasteContent(e.target.value)}
               placeholder="# Research Report Title..."
-              className="heroui-input font-mono text-xs"
+              className="ui-input font-mono text-xs"
             />
           </div>
 
           <div className="flex justify-end pt-1">
             <button
               type="submit"
-              className="heroui-btn-primary"
+              className="ui-button ui-button-primary"
             >
               <span>Add to Queue</span>
             </button>
@@ -443,16 +443,16 @@ export const ImportPage: React.FC = () => {
 
       {/* Queue Table */}
       {queue.length > 0 && (
-        <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs space-y-0">
-          <div className="p-3.5 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-xs font-semibold text-zinc-300">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-xs space-y-0">
+          <div className="p-3.5 bg-[var(--surface-secondary)]/80 border-b border-[var(--border)] flex items-center justify-between text-xs font-semibold text-[var(--foreground)]">
             <span>Import Queue ({queue.length} files)</span>
-            <span className="text-[11px] text-zinc-500 font-mono">Max 128 KiB per file</span>
+            <span className="text-[11px] text-[var(--muted)] font-mono">Max 128 KiB per file</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left rtl:text-right border-collapse text-xs">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/40 text-zinc-400">
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-secondary)]/40 text-[var(--muted)]">
                   <th className="p-3 font-medium">{t('import.colFile')}</th>
                   <th className="p-3 font-medium">{t('import.colSize')}</th>
                   <th className="p-3 font-medium">{t('import.colCollection')}</th>
@@ -461,21 +461,21 @@ export const ImportPage: React.FC = () => {
                   <th className="p-3 font-medium text-end">{t('common.actions')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
+              <tbody className="divide-y divide-[var(--separator)]">
                 {queue.map((item) => (
-                  <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
+                  <tr key={item.id} className="hover:bg-[var(--surface-tertiary)]/30 transition-colors">
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                         <div>
-                          <div className="font-semibold text-zinc-200">{item.filename}</div>
-                          <div className="text-[11px] text-zinc-500 font-mono">
+                          <div className="font-semibold text-[var(--foreground)]">{item.filename}</div>
+                          <div className="text-[11px] text-[var(--muted)] font-mono">
                             {item.headings.length} headings detected
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="p-3 font-mono text-zinc-400">
+                    <td className="p-3 font-mono text-[var(--muted)]">
                       {Math.round(item.rawSize / 1024)} KiB
                     </td>
                     <td className="p-3">
@@ -483,7 +483,7 @@ export const ImportPage: React.FC = () => {
                         value={item.collectionId}
                         onChange={(e) => handleUpdateItem(item.id, { collectionId: e.target.value })}
                         disabled={item.status !== 'pending'}
-                        className="heroui-select text-xs py-1"
+                        className="ui-select text-xs py-1"
                       >
                         {collections.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -501,7 +501,7 @@ export const ImportPage: React.FC = () => {
                           })
                         }
                         disabled={item.status !== 'pending'}
-                        className="heroui-select text-xs py-1"
+                        className="ui-select text-xs py-1"
                       >
                         <option value="copy">{t('import.dupCopy')}</option>
                         <option value="skip">{t('import.dupSkip')}</option>
@@ -510,7 +510,7 @@ export const ImportPage: React.FC = () => {
                     </td>
                     <td className="p-3">
                       {item.status === 'pending' && (
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-zinc-800 text-zinc-400 border border-zinc-700">
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-[var(--surface-tertiary)] text-[var(--muted)] border border-[var(--border)]">
                           Pending
                         </span>
                       )}
@@ -547,7 +547,7 @@ export const ImportPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(item.id)}
-                        className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                        className="text-[var(--muted)] hover:text-rose-400 p-1 cursor-pointer"
                         title="Remove"
                       >
                         <X className="w-3.5 h-3.5" />

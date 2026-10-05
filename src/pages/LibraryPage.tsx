@@ -2,24 +2,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
-  Filter,
   Layers,
   FileText,
   Clock,
   ExternalLink,
   ChevronRight,
   Plus,
-  RefreshCw,
-  AlertCircle,
   X,
   Check,
-  Bot,
-  AlertTriangle,
-  UploadCloud,
-  FileCode,
-  ArrowRight,
+  AlertCircle,
+  Copy,
   Tag,
   ShieldCheck,
+  ArrowRight,
+  FileCode,
+  FolderOpen,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -51,7 +48,6 @@ export const LibraryPage: React.FC = () => {
   const [selectedReview, setSelectedReview] = useState<ReviewStatus | 'all'>('all');
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceLevel | 'all'>('all');
   const [selectedFreshness, setSelectedFreshness] = useState<'all' | 'needs_review' | 'fresh' | 'stale'>('all');
-  const [selectedLanguage, setSelectedLanguage] = useState<'all' | 'en' | 'fa'>('all');
 
   // Data state
   const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
@@ -59,6 +55,9 @@ export const LibraryPage: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Inspector selected item state
+  const [activeKnowledgeId, setActiveKnowledgeId] = useState<string | null>(selectedKnowledgeId);
 
   // Quick copied feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -74,7 +73,6 @@ export const LibraryPage: React.FC = () => {
   const [newApplicability, setNewApplicability] = useState('');
   const [newExclusions, setNewExclusions] = useState('');
   const [newRequirements, setNewRequirements] = useState('');
-  const [newSourceExcerpt, setNewSourceExcerpt] = useState('');
 
   // Fetch data
   const fetchData = async () => {
@@ -122,33 +120,29 @@ export const LibraryPage: React.FC = () => {
       if (selectedEvidence !== 'all') {
         filtered = filtered.filter((k) => k.evidenceLevel === selectedEvidence);
       }
-      if (selectedLanguage !== 'all') {
-        filtered = filtered.filter((k) => k.language === selectedLanguage);
-      }
-      if (selectedFreshness === 'needs_review') {
-        filtered = filtered.filter((k) => k.sourceHasChanged);
-      } else if (selectedFreshness === 'fresh') {
-        filtered = filtered.filter((k) => !k.sourceHasChanged && k.reviewStatus === 'reviewed');
-      } else if (selectedFreshness === 'stale') {
-        filtered = filtered.filter((k) => k.reviewStatus === 'deprecated');
+      if (selectedFreshness !== 'all') {
+        if (selectedFreshness === 'needs_review') {
+          filtered = filtered.filter((k) => k.sourceHasChanged || k.reviewStatus === 'draft');
+        } else if (selectedFreshness === 'fresh') {
+          filtered = filtered.filter((k) => !k.sourceHasChanged && k.reviewStatus === 'reviewed');
+        } else if (selectedFreshness === 'stale') {
+          filtered = filtered.filter((k) => k.reviewStatus === 'deprecated' || k.sourceHasChanged);
+        }
       }
 
       setKnowledgeList(filtered);
 
-      // Auto-select first item if none selected or current selection missing
+      // Set default active knowledge item for inspector
       if (filtered.length > 0) {
-        const hasSelection = filtered.some((k) => k.id === selectedKnowledgeId);
-        if (!hasSelection) {
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.set('id', filtered[0].id);
-            return next;
-          }, { replace: true });
+        if (!activeKnowledgeId || !filtered.some((k) => k.id === activeKnowledgeId)) {
+          setActiveKnowledgeId(filtered[0].id);
         }
+      } else {
+        setActiveKnowledgeId(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError(t('common.errorOccurred'));
+      setError(err.message || 'Failed to load library data');
     } finally {
       setLoading(false);
     }
@@ -165,7 +159,6 @@ export const LibraryPage: React.FC = () => {
     selectedReview,
     selectedEvidence,
     selectedFreshness,
-    selectedLanguage,
   ]);
 
   const setTab = (tab: 'knowledge' | 'sources') => {
@@ -176,95 +169,14 @@ export const LibraryPage: React.FC = () => {
     });
   };
 
-  const setSelectedId = (id: string) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('id', id);
-      return next;
-    }, { replace: true });
+  const handleSelectKnowledge = (item: KnowledgeItem) => {
+    setActiveKnowledgeId(item.id);
   };
 
-  // Selected knowledge for inspector
-  const inspectorItem = useMemo(() => {
-    return knowledgeList.find((k) => k.id === selectedKnowledgeId) || knowledgeList[0] || null;
-  }, [knowledgeList, selectedKnowledgeId]);
-
-  // Active filter chips
-  const activeChips = useMemo(() => {
-    const chips: { label: string; onRemove: () => void }[] = [];
-    if (selectedCollection !== 'all') {
-      const col = collections.find((c) => c.id === selectedCollection);
-      chips.push({
-        label: `${t('library.filterCollection')}: ${col ? (locale === 'fa' ? col.nameFa : col.name) : selectedCollection}`,
-        onRemove: () => setSelectedCollection('all'),
-      });
-    }
-    if (selectedType !== 'all') {
-      chips.push({
-        label: `${t('library.filterType')}: ${t(`types.${selectedType}`)}`,
-        onRemove: () => setSelectedType('all'),
-      });
-    }
-    if (selectedReview !== 'all') {
-      chips.push({
-        label: `${t('library.filterReview')}: ${t(`reviewStatus.${selectedReview}`)}`,
-        onRemove: () => setSelectedReview('all'),
-      });
-    }
-    if (selectedEvidence !== 'all') {
-      chips.push({
-        label: `${t('library.filterEvidence')}: ${t(`evidenceLevel.${selectedEvidence}`)}`,
-        onRemove: () => setSelectedEvidence('all'),
-      });
-    }
-    if (selectedFreshness !== 'all') {
-      chips.push({
-        label: `${t('library.filterFreshness')}: ${
-          selectedFreshness === 'needs_review'
-            ? t('library.needsReview')
-            : selectedFreshness === 'fresh'
-            ? t('library.fresh')
-            : t('library.stale')
-        }`,
-        onRemove: () => setSelectedFreshness('all'),
-      });
-    }
-    if (selectedLanguage !== 'all') {
-      chips.push({
-        label: `${t('library.filterLanguage')}: ${selectedLanguage === 'fa' ? 'فارسی' : 'English'}`,
-        onRemove: () => setSelectedLanguage('all'),
-      });
-    }
-    return chips;
-  }, [selectedCollection, selectedType, selectedReview, selectedEvidence, selectedFreshness, selectedLanguage, collections, locale, t]);
-
-  const clearAllFilters = () => {
-    setSearchQuery('');
-    setSelectedCollection('all');
-    setSelectedType('all');
-    setSelectedReview('all');
-    setSelectedEvidence('all');
-    setSelectedFreshness('all');
-    setSelectedLanguage('all');
-  };
-
-  const handleCopyAgentPrompt = (e: React.MouseEvent, item: KnowledgeItem) => {
+  const handleCopyKnowledge = (item: KnowledgeItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    const promptXml = `<agent_skill id="${item.id}" type="${item.type}" evidence="${item.evidenceLevel}">
-<title>${item.title}</title>
-<summary>${item.summary}</summary>
-<applicability>${item.applicability || 'General'}</applicability>
-<exclusions>${item.exclusions || 'None'}</exclusions>
-<requirements>${item.requirements.join(', ')}</requirements>
-<procedure>
-${item.body || item.summary}
-</procedure>
-<citation_grounding>
-${item.sourceExcerpt || ''}
-</citation_grounding>
-</agent_skill>`;
-
-    navigator.clipboard.writeText(promptXml);
+    const textToCopy = `## ${item.title} (${item.type})\n${item.summary}\n\nApplicability: ${item.applicability || 'General'}\nRequirements: ${item.requirements.join(', ')}`;
+    navigator.clipboard.writeText(textToCopy);
     setCopiedId(item.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -274,9 +186,8 @@ ${item.sourceExcerpt || ''}
     if (!newTitle.trim() || !newSummary.trim()) return;
 
     try {
-      const sourceId = sourcesList[0]?.id || 'src-table-extract-01';
-      const requirements = newRequirements
-        .split(',')
+      const reqArray = newRequirements
+        .split('\n')
         .map((r) => r.trim())
         .filter(Boolean);
 
@@ -285,16 +196,16 @@ ${item.sourceExcerpt || ''}
         summary: newSummary.trim(),
         body: newBody.trim() || '',
         type: newType,
-        collectionId: newCollectionId || collections[0]?.id || 'col-data-extraction',
-        sourceId,
-        sourceRevisionId: sourcesList[0]?.revisions?.[0]?.revisionId || 'rev-01',
-        reviewStatus: 'reviewed',
+        collectionId: newCollectionId || collections[0]?.id || 'col-01',
         evidenceLevel: newEvidenceLevel,
+        reviewStatus: 'draft',
         applicability: newApplicability.trim() || '',
         exclusions: newExclusions.trim() || '',
-        requirements,
-        sourceExcerpt: newSourceExcerpt.trim() || '',
-        language: (locale as any) || 'en',
+        requirements: reqArray,
+        sourceId: '',
+        sourceExcerpt: '',
+        sourceRevisionId: '',
+        language: locale,
       });
 
       setCreateModalOpen(false);
@@ -304,42 +215,59 @@ ${item.sourceExcerpt || ''}
       setNewApplicability('');
       setNewExclusions('');
       setNewRequirements('');
-      setNewSourceExcerpt('');
       notifyMutation();
-
-      navigate(`/knowledge/${created.id}`);
+      setActiveKnowledgeId(created.id);
     } catch (err) {
       console.error(err);
     }
   };
 
+  // Currently active knowledge item for the inspector panel
+  const activeItem = useMemo(() => {
+    if (!activeKnowledgeId) return knowledgeList[0] || null;
+    return knowledgeList.find((k) => k.id === activeKnowledgeId) || knowledgeList[0] || null;
+  }, [activeKnowledgeId, knowledgeList]);
+
+  // Find collection name for an item
+  const getCollectionName = (colId: string) => {
+    const col = collections.find((c) => c.id === colId);
+    if (!col) return colId;
+    return locale === 'fa' ? col.nameFa : col.name;
+  };
+
+  // Find source document for an item
+  const getSourceDoc = (sourceId?: string) => {
+    if (!sourceId) return null;
+    return sourcesList.find((s) => s.id === sourceId) || null;
+  };
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5">
-      {/* Top Section: Page Title + Description with Aligned Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+    <div className="p-6 sm:p-8 space-y-6 min-h-full flex flex-col">
+      {/* Top Section: Page Title + Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)]">
             {t('library.title')}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+          <p className="text-[13px] text-[var(--muted)] mt-1">
             {t('library.subtitle')}
           </p>
         </div>
 
-        {/* Primary Workspace Actions */}
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => navigate('/import')}
-            className="heroui-btn-secondary"
+            className="ui-button ui-button-secondary"
           >
-            <UploadCloud className="w-4 h-4 text-zinc-400" />
+            <FolderOpen className="w-4 h-4 text-[var(--muted)]" />
             <span>{t('library.importResearch')}</span>
           </button>
+
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
-            className="heroui-btn-primary"
+            className="ui-button ui-button-primary"
           >
             <Plus className="w-4 h-4" />
             <span>{t('library.newKnowledge')}</span>
@@ -347,39 +275,30 @@ ${item.sourceExcerpt || ''}
         </div>
       </div>
 
-      {/* Controls Bar: Segmented Switch, Integrated Search, and Compact Filters */}
-      <div className="space-y-3 p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/60">
+      {/* Unified Control Surface: Segmented Switch, Search, and Filters */}
+      <div className="ui-panel p-3.5 space-y-3 shrink-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          
           {/* Segmented Knowledge / Sources Switch */}
-          <div className="inline-flex items-center p-1 rounded-lg bg-zinc-900 border border-zinc-800 shrink-0">
+          <div className="ui-segment shrink-0">
             <button
               type="button"
               onClick={() => setTab('knowledge')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'knowledge'
-                  ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/60'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              className={`ui-segment-item ${activeTab === 'knowledge' ? 'active' : ''}`}
             >
-              <Layers className="w-3.5 h-3.5 text-blue-400" />
+              <Layers className="w-3.5 h-3.5" />
               <span>{t('library.tabKnowledge')}</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+              <span className="text-[11px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)]">
                 {knowledgeList.length}
               </span>
             </button>
             <button
               type="button"
               onClick={() => setTab('sources')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'sources'
-                  ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/60'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              className={`ui-segment-item ${activeTab === 'sources' ? 'active' : ''}`}
             >
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <FileText className="w-3.5 h-3.5" />
               <span>{t('library.tabSources')}</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+              <span className="text-[11px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)]">
                 {sourcesList.length}
               </span>
             </button>
@@ -387,20 +306,20 @@ ${item.sourceExcerpt || ''}
 
           {/* Integrated Search Input */}
           <div className="relative flex-1 max-w-md">
-            <Search className="w-3.5 h-3.5 text-zinc-500 absolute start-3 top-2.5 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-3 top-3 pointer-events-none" />
             <input
               type="text"
               dir="auto"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('common.searchPlaceholder')}
-              className="heroui-input ps-9 pe-8"
+              className="ui-input ps-9 pe-8"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute end-2.5 top-2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                className="absolute end-2.5 top-2.5 text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -408,14 +327,14 @@ ${item.sourceExcerpt || ''}
           </div>
         </div>
 
-        {/* Compact Filters (for Knowledge tab) */}
+        {/* Compact Filters Bar (for Knowledge tab) */}
         {activeTab === 'knowledge' && (
-          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-zinc-800/80">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--separator)]">
             {/* Collection Filter */}
             <select
               value={selectedCollection}
               onChange={(e) => setSelectedCollection(e.target.value)}
-              className="heroui-select"
+              className="ui-select text-xs py-1"
             >
               <option value="all">{t('library.allCollections')}</option>
               {collections.map((c) => (
@@ -429,12 +348,12 @@ ${item.sourceExcerpt || ''}
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value as any)}
-              className="heroui-select"
+              className="ui-select text-xs py-1"
             >
               <option value="all">{t('library.allTypes')}</option>
+              <option value="procedure">{t('types.procedure')}</option>
               <option value="research_finding">{t('types.research_finding')}</option>
               <option value="tip">{t('types.tip')}</option>
-              <option value="procedure">{t('types.procedure')}</option>
               <option value="skill">{t('types.skill')}</option>
               <option value="example">{t('types.example')}</option>
               <option value="failure">{t('types.failure')}</option>
@@ -445,7 +364,7 @@ ${item.sourceExcerpt || ''}
             <select
               value={selectedReview}
               onChange={(e) => setSelectedReview(e.target.value as any)}
-              className="heroui-select"
+              className="ui-select text-xs py-1"
             >
               <option value="all">{t('library.allReview')}</option>
               <option value="reviewed">{t('reviewStatus.reviewed')}</option>
@@ -457,7 +376,7 @@ ${item.sourceExcerpt || ''}
             <select
               value={selectedEvidence}
               onChange={(e) => setSelectedEvidence(e.target.value as any)}
-              className="heroui-select"
+              className="ui-select text-xs py-1"
             >
               <option value="all">{t('library.allEvidence')}</option>
               <option value="tested">{t('evidenceLevel.tested')}</option>
@@ -469,539 +388,553 @@ ${item.sourceExcerpt || ''}
             <select
               value={selectedFreshness}
               onChange={(e) => setSelectedFreshness(e.target.value as any)}
-              className="heroui-select"
+              className="ui-select text-xs py-1"
             >
               <option value="all">{t('library.allFreshness')}</option>
-              <option value="needs_review">{t('library.needsReview')}</option>
               <option value="fresh">{t('library.fresh')}</option>
+              <option value="needs_review">{t('library.needsReview')}</option>
               <option value="stale">{t('library.stale')}</option>
             </select>
 
-            {/* Language Filter */}
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value as any)}
-              className="heroui-select"
-            >
-              <option value="all">{t('library.filterLanguage')}: {t('common.all')}</option>
-              <option value="en">English</option>
-              <option value="fa">فارسی</option>
-            </select>
-          </div>
-        )}
-
-        {/* Quiet Filter Chips */}
-        {activeChips.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-[11px] text-zinc-500 flex items-center gap-1">
-              <Filter className="w-3 h-3" />
-            </span>
-            {activeChips.map((chip, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-zinc-800 text-zinc-300 border border-zinc-700"
+            {(searchQuery ||
+              selectedCollection !== 'all' ||
+              selectedType !== 'all' ||
+              selectedReview !== 'all' ||
+              selectedEvidence !== 'all' ||
+              selectedFreshness !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCollection('all');
+                  setSelectedType('all');
+                  setSelectedReview('all');
+                  setSelectedEvidence('all');
+                  setSelectedFreshness('all');
+                }}
+                className="text-xs text-[var(--accent)] hover:underline ms-auto cursor-pointer"
               >
-                <span>{chip.label}</span>
-                <button
-                  type="button"
-                  onClick={chip.onRemove}
-                  className="hover:text-white p-0.5 rounded cursor-pointer"
-                >
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="text-[11px] text-zinc-400 hover:text-zinc-200 underline ps-1 cursor-pointer"
-            >
-              {t('library.clearFilters')}
-            </button>
+                {t('library.clearFilters')}
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Loading & Error States */}
-      {loading && (
-        <div className="py-16 text-center text-zinc-500 text-xs">
-          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
-          <span>{t('common.loading')}</span>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="p-4 rounded-xl border border-rose-900/50 bg-rose-950/20 flex items-center justify-between text-xs text-rose-300">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+      {/* Main Content Workspace */}
+      <div className="flex-1 min-h-0">
+        {loading ? (
+          <div className="p-16 text-center text-xs text-[var(--muted)]">
+            <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+            <span>{t('common.loading')}</span>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-xs text-[var(--danger)] ui-card">
+            <AlertCircle className="w-5 h-5 mx-auto mb-2" />
             <span>{error}</span>
           </div>
-          <button
-            type="button"
-            onClick={fetchData}
-            className="px-3 py-1 rounded bg-rose-600 text-white font-medium hover:bg-rose-500 cursor-pointer"
-          >
-            {t('common.retry')}
-          </button>
-        </div>
-      )}
+        ) : activeTab === 'knowledge' ? (
+          /* Master-Detail Layout (70-75% list / 25-30% inspector) */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Knowledge List (8 cols on lg ~ 67-70%, 9 cols on xl ~ 75%) */}
+            <div className="lg:col-span-8 xl:col-span-8 space-y-2">
+              {knowledgeList.length === 0 ? (
+                <EmptyState
+                  title={t('library.noKnowledgeFound')}
+                  description={t('common.emptyDesc')}
+                  actionLabel={t('library.newKnowledge')}
+                  onAction={() => setCreateModalOpen(true)}
+                />
+              ) : (
+                knowledgeList.map((item) => {
+                  const isSelected = item.id === activeItem?.id;
+                  const sourceDoc = getSourceDoc(item.sourceId);
 
-      {/* Main Workspace Area */}
-      {!loading && !error && (
-        <>
-          {activeTab === 'knowledge' ? (
-            knowledgeList.length === 0 ? (
-              <EmptyState
-                title={t('library.noKnowledgeFound')}
-                description={t('common.emptyDesc')}
-                actionLabel={t('library.clearFilters')}
-                onAction={clearAllFilters}
-              />
-            ) : (
-              /* Master/Detail Model (Left knowledge list, Right inspector) */
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-                
-                {/* Left/Main Knowledge List (7 or 8 cols) */}
-                <div className="lg:col-span-7 xl:col-span-8 space-y-2">
-                  {knowledgeList.map((item) => {
-                    const isSelected = item.id === (inspectorItem?.id || selectedKnowledgeId);
-                    const col = collections.find((c) => c.id === item.collectionId);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectKnowledge(item)}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer relative group ${
+                        isSelected
+                          ? 'bg-[var(--surface-secondary)] border-[var(--border)] ring-1 ring-[var(--accent)]/40'
+                          : 'bg-[var(--surface)] border-[var(--border)] hover:bg-[var(--surface-secondary)]/50'
+                      }`}
+                    >
+                      {/* Left subtle accent indicator line for selected item */}
+                      {isSelected && (
+                        <div className="absolute start-0 top-3 bottom-3 w-1 bg-[var(--accent)] rounded-e" />
+                      )}
 
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => setSelectedId(item.id)}
-                        className={`p-3.5 rounded-xl border transition-all cursor-pointer relative ${
-                          isSelected
-                            ? 'bg-zinc-800/80 border-blue-500 shadow-sm ring-1 ring-blue-500/30'
-                            : 'bg-[#18181b] border-zinc-800/90 hover:border-zinc-700 hover:bg-zinc-850'
-                        }`}
-                      >
-                        {/* Source Changed Warning Alert */}
-                        {item.sourceHasChanged && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-amber-400 font-medium mb-1.5 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-800/30 w-fit">
-                            <Clock className="w-3 h-3" />
-                            <span>{t('knowledgeDetail.sourceChangedWarning')}</span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          {/* Row title (14-15px / 600) */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2
+                              dir="auto"
+                              className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight leading-snug group-hover:text-[var(--accent)] transition-colors"
+                            >
+                              {item.title}
+                            </h2>
+                            {item.sourceHasChanged && (
+                              <span className="text-[11px] font-medium text-[var(--warning)] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 border border-[var(--warning)]/20">
+                                Source Updated
+                              </span>
+                            )}
                           </div>
-                        )}
 
-                        {/* Title & Open Action */}
-                        <div className="flex items-start justify-between gap-3 mb-1">
-                          <h3
+                          {/* Short summary (13-14px) */}
+                          <p
                             dir="auto"
-                            className={`text-sm font-semibold leading-snug tracking-tight ${
-                              isSelected ? 'text-white' : 'text-zinc-200 hover:text-blue-400'
-                            }`}
+                            className="text-[13px] text-[var(--muted)] line-clamp-2 leading-relaxed"
                           >
-                            {item.title}
-                          </h3>
+                            {item.summary}
+                          </p>
+
+                          {/* Metadata row: Badges + collection + source */}
+                          <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-[var(--muted)]">
+                            <Badge type="knowledgeType" value={item.type} size="sm" />
+                            <Badge type="evidence" value={item.evidenceLevel} size="sm" />
+                            <Badge type="review" value={item.reviewStatus} size="sm" />
+
+                            <span className="text-[var(--separator)]">•</span>
+                            <span className="truncate">{getCollectionName(item.collectionId)}</span>
+
+                            {sourceDoc && (
+                              <>
+                                <span className="text-[var(--separator)]">•</span>
+                                <span className="font-mono truncate">{sourceDoc.filename}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions aligned opposite */}
+                        <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyKnowledge(item, e)}
+                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] transition-colors cursor-pointer"
+                            title="Copy Summary"
+                          >
+                            {copiedId === item.id ? (
+                              <Check className="w-3.5 h-3.5 text-[var(--success)]" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/knowledge/${item.id}`);
                             }}
-                            title={t('common.openDetail')}
-                            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 shrink-0 cursor-pointer"
+                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] transition-colors cursor-pointer"
+                            title="Open Detail Page"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </button>
                         </div>
-
-                        {/* Short Summary (2 lines) */}
-                        <p
-                          dir="auto"
-                          className="text-xs text-zinc-400 line-clamp-2 mb-2.5 leading-relaxed"
-                        >
-                          {item.summary}
-                        </p>
-
-                        {/* Metadata / Badges & Source / Freshness Info */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2 border-t border-zinc-800/60">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge type="knowledgeType" value={item.type} size="sm" />
-                            <Badge type="evidence" value={item.evidenceLevel} size="sm" />
-                            <Badge type="review" value={item.reviewStatus} size="sm" />
-                          </div>
-
-                          {col && (
-                            <span className="text-[11px] text-zinc-500 font-medium truncate max-w-[150px]">
-                              {locale === 'fa' ? col.nameFa : col.name}
-                            </span>
-                          )}
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-                {/* Right Inspector (5 or 4 cols) - Holdings Style Side Panel */}
-                <div className="hidden lg:block lg:col-span-5 xl:col-span-4 sticky top-20">
-                  {inspectorItem && (
-                    <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-4 shadow-sm">
-                      
-                      {/* Inspector Header */}
-                      <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                          {t('library.selectedItem')}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/knowledge/${inspectorItem.id}`)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 cursor-pointer"
-                        >
-                          <span>{t('common.openDetail')}</span>
-                          <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                        </button>
+            {/* Right Inspector Panel (Holding side panel model: coherent, dense, sticky) */}
+            <div className="hidden lg:block lg:col-span-4 xl:col-span-4 sticky top-6">
+              {activeItem ? (
+                <div className="ui-panel p-5 space-y-4 shadow-sm">
+                  {/* Inspector Header: Title + open button */}
+                  <div className="space-y-2 pb-3 border-b border-[var(--separator)]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--muted)]">
+                        {t('library.selectedItem')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/knowledge/${activeItem.id}`)}
+                        className="ui-button ui-button-ghost text-xs p-1 text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>{t('common.openDetail')}</span>
+                        <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
+                      </button>
+                    </div>
+
+                    <h3
+                      dir="auto"
+                      className="text-[16px] font-semibold text-[var(--foreground)] leading-snug tracking-tight"
+                    >
+                      {activeItem.title}
+                    </h3>
+
+                    {/* Metadata tags */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <Badge type="knowledgeType" value={activeItem.type} size="sm" />
+                      <Badge type="evidence" value={activeItem.evidenceLevel} size="sm" />
+                      <Badge type="review" value={activeItem.reviewStatus} size="sm" />
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                      Summary
+                    </div>
+                    <p
+                      dir="auto"
+                      className="text-[13px] text-[var(--foreground)] leading-relaxed"
+                    >
+                      {activeItem.summary}
+                    </p>
+                  </div>
+
+                  {/* Applicability */}
+                  {activeItem.applicability && (
+                    <div className="space-y-1">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                        Applicability
                       </div>
-
-                      {/* Item Badges & Title */}
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge type="knowledgeType" value={inspectorItem.type} size="sm" />
-                          <Badge type="evidence" value={inspectorItem.evidenceLevel} size="sm" />
-                          <Badge type="review" value={inspectorItem.reviewStatus} size="sm" />
-                        </div>
-                        <h4
-                          dir="auto"
-                          className="text-sm font-bold text-zinc-100 leading-snug"
-                        >
-                          {inspectorItem.title}
-                        </h4>
-                      </div>
-
-                      {/* Summary Panel */}
-                      <div className="text-xs text-zinc-300 leading-relaxed bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                        <div className="font-semibold text-zinc-500 text-[10px] uppercase tracking-wider mb-1">
-                          {t('knowledgeDetail.fieldSummary')}
-                        </div>
-                        <p dir="auto">{inspectorItem.summary}</p>
-                      </div>
-
-                      {/* Applicability */}
-                      {inspectorItem.applicability && (
-                        <div className="text-xs">
-                          <span className="font-semibold text-zinc-400 block mb-0.5 text-[11px]">
-                            {t('knowledgeDetail.fieldApplicability')}:
-                          </span>
-                          <span dir="auto" className="text-zinc-300">
-                            {inspectorItem.applicability}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Exclusions */}
-                      {inspectorItem.exclusions && (
-                        <div className="text-xs">
-                          <span className="font-semibold text-rose-400 block mb-0.5 text-[11px]">
-                            {t('knowledgeDetail.fieldExclusions')}:
-                          </span>
-                          <span dir="auto" className="text-zinc-300">
-                            {inspectorItem.exclusions}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Requirements */}
-                      {inspectorItem.requirements && inspectorItem.requirements.length > 0 && (
-                        <div className="text-xs">
-                          <span className="font-semibold text-zinc-400 block mb-1 text-[11px]">
-                            {t('knowledgeDetail.fieldRequirements')}:
-                          </span>
-                          <div className="flex flex-wrap gap-1">
-                            {inspectorItem.requirements.map((req, i) => (
-                              <span
-                                key={i}
-                                className="px-2 py-0.5 rounded text-[10px] bg-zinc-900 text-zinc-300 border border-zinc-800 font-mono"
-                              >
-                                {req}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Citation Excerpt */}
-                      {inspectorItem.sourceExcerpt && (
-                        <div className="p-3 rounded-lg border-s-2 border-s-blue-500 bg-zinc-900/60 border border-zinc-800 text-xs">
-                          <div className="font-semibold text-blue-400 text-[10px] uppercase tracking-wider mb-1">
-                            {t('knowledgeDetail.fieldSourceExcerpt')}
-                          </div>
-                          <blockquote dir="auto" className="italic text-zinc-400 font-mono text-[11px] leading-relaxed">
-                            "{inspectorItem.sourceExcerpt}"
-                          </blockquote>
-                        </div>
-                      )}
-
-                      {/* Bottom Inspector Actions */}
-                      <div className="pt-3 border-t border-zinc-800 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => handleCopyAgentPrompt(e, inspectorItem)}
-                          className="heroui-btn-secondary text-xs flex-1 justify-center"
-                        >
-                          {copiedId === inspectorItem.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <Bot className="w-3.5 h-3.5 text-blue-400" />
-                          )}
-                          <span>{copiedId === inspectorItem.id ? t('common.copied') : t('marketplace.copyForAgent')}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/knowledge/${inspectorItem.id}`)}
-                          className="heroui-btn-primary text-xs flex-1 justify-center"
-                        >
-                          <span>{t('common.openDetail')}</span>
-                          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                        </button>
-                      </div>
-
+                      <p
+                        dir="auto"
+                        className="text-[12px] text-[var(--foreground)] leading-relaxed"
+                      >
+                        {activeItem.applicability}
+                      </p>
                     </div>
                   )}
-                </div>
 
-              </div>
-            )
-          ) : (
-            /* SOURCE VIEW: Refined Table/List Interface (HeroUI Transaction Style) */
-            <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left rtl:text-right border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900/90 text-zinc-400">
-                      <th className="p-3.5 font-medium">{t('sourceDetail.filename')}</th>
-                      <th className="p-3.5 font-medium">{t('common.collection')}</th>
-                      <th className="p-3.5 font-medium">{t('sourceDetail.revisions')}</th>
-                      <th className="p-3.5 font-medium">{t('sourceDetail.rawSize')}</th>
-                      <th className="p-3.5 font-medium">{t('library.colUpdated')}</th>
-                      <th className="p-3.5 font-medium text-end">{t('common.actions')}</th>
+                  {/* Exclusions */}
+                  {activeItem.exclusions && (
+                    <div className="space-y-1">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                        Exclusions
+                      </div>
+                      <p
+                        dir="auto"
+                        className="text-[12px] text-[var(--muted)] leading-relaxed"
+                      >
+                        {activeItem.exclusions}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Requirements */}
+                  {activeItem.requirements && activeItem.requirements.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                        Prerequisites & Requirements ({activeItem.requirements.length})
+                      </div>
+                      <ul className="space-y-1 text-[12px] text-[var(--foreground)] list-disc list-inside ps-1">
+                        {activeItem.requirements.map((r, i) => (
+                          <li key={i} dir="auto" className="leading-snug">
+                            {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Source Citation */}
+                  {activeItem.sourceExcerpt && (
+                    <div className="space-y-1 pt-1 border-t border-[var(--separator)]">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                        Grounding Citation
+                      </div>
+                      <blockquote
+                        dir="auto"
+                        className="text-[12px] text-[var(--muted)] italic ps-2.5 border-s-2 border-[var(--border)] leading-relaxed"
+                      >
+                        "{activeItem.sourceExcerpt}"
+                      </blockquote>
+                    </div>
+                  )}
+
+                  {/* Inspector Footer Actions */}
+                  <div className="pt-3 border-t border-[var(--separator)] flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/knowledge/${activeItem.id}`)}
+                      className="flex-1 ui-button ui-button-primary text-xs"
+                    >
+                      <span>Open Full Knowledge Node</span>
+                      <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="ui-panel p-8 text-center text-xs text-[var(--muted)]">
+                  Select a knowledge item to inspect details.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* SOURCE VIEW: Refined Transaction-Style Table */
+          <div className="ui-panel overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-start text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--separator)] bg-[var(--surface-secondary)]/40 text-[var(--muted)] text-[11px] uppercase tracking-wider font-semibold">
+                    <th className="py-3 px-4 text-start font-medium">{t('library.colTitle')}</th>
+                    <th className="py-3 px-4 text-start font-medium">{t('library.colCollection')}</th>
+                    <th className="py-3 px-4 text-start font-medium">Revisions</th>
+                    <th className="py-3 px-4 text-start font-medium">File Size</th>
+                    <th className="py-3 px-4 text-start font-medium">Imported</th>
+                    <th className="py-3 px-4 text-end font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--separator)]">
+                  {sourcesList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-[var(--muted)]">
+                        {t('library.noSourcesFound')}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
-                    {sourcesList.map((doc) => {
+                  ) : (
+                    sourcesList.map((doc) => {
                       const col = collections.find((c) => c.id === doc.collectionId);
+                      const colName = col ? (locale === 'fa' ? col.nameFa : col.name) : '-';
+
                       return (
                         <tr
                           key={doc.id}
                           onClick={() => navigate(`/documents/${doc.id}`)}
-                          className="hover:bg-zinc-800/40 transition-colors cursor-pointer group"
+                          className="hover:bg-[var(--surface-secondary)]/60 transition-colors cursor-pointer group"
                         >
-                          <td className="p-3.5">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                              <div>
-                                <span className="font-semibold text-zinc-100 group-hover:text-blue-400 transition-colors block">
+                          <td className="py-3.5 px-4 min-w-[220px]">
+                            <div className="flex items-center gap-2.5">
+                              <FileText className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                              <div className="min-w-0">
+                                <span
+                                  dir="auto"
+                                  className="text-[13px] font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors block truncate"
+                                >
                                   {doc.title}
                                 </span>
-                                <span className="font-mono text-[11px] text-zinc-500">
+                                <span className="font-mono text-[11px] text-[var(--muted)] block truncate">
                                   {doc.filename}
                                 </span>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3.5 whitespace-nowrap text-zinc-400">
-                            {col ? (locale === 'fa' ? col.nameFa : col.name) : '-'}
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded text-[11px] bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
-                              v{doc.revisions.length}
+
+                          <td className="py-3.5 px-4 text-[var(--foreground)] whitespace-nowrap">
+                            <span className="ui-badge text-[11px] font-normal">
+                              {colName}
                             </span>
                           </td>
-                          <td className="p-3.5 whitespace-nowrap font-mono text-zinc-400">
-                            {Math.round((doc.rawSize || 0) / 1024)} KiB
+
+                          <td className="py-3.5 px-4 text-[var(--muted)] font-mono whitespace-nowrap">
+                            {doc.revisions.length} rev{doc.revisions.length > 1 ? 's' : ''}
                           </td>
-                          <td className="p-3.5 whitespace-nowrap text-zinc-500">
-                            {new Date(doc.updatedAt).toLocaleDateString()}
+
+                          <td className="py-3.5 px-4 text-[var(--muted)] font-mono whitespace-nowrap">
+                            {((doc.rawSize || 0) / 1024).toFixed(1)} KiB
                           </td>
-                          <td className="p-3.5 text-end whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1 font-medium text-blue-400 group-hover:underline">
-                              <span>{t('common.openDetail')}</span>
+
+                          <td className="py-3.5 px-4 text-[var(--muted)] whitespace-nowrap">
+                            {new Date(doc.importedAt || doc.createdAt).toLocaleDateString()}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-end whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/documents/${doc.id}`);
+                              }}
+                              className="ui-button ui-button-secondary text-xs py-1 px-2.5"
+                            >
+                              <span>Inspect</span>
                               <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                            </span>
+                            </button>
                           </td>
                         </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* New Knowledge Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
-          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-semibold text-zinc-100">
-                  {t('library.newKnowledge')}
-                </h3>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="ui-card max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--separator)]">
+              <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[var(--accent)]" />
+                <span>{t('library.newKnowledge')}</span>
+              </h3>
               <button
                 type="button"
                 onClick={() => setCreateModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-100 p-1 rounded-md cursor-pointer"
+                className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateKnowledge} className="p-4 sm:p-5 overflow-y-auto space-y-3.5 flex-1">
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  {t('knowledgeDetail.fieldTitle')} *
+            <form onSubmit={handleCreateKnowledge} className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[var(--foreground)]">
+                  Title (Imperative or Claim)
                 </label>
                 <input
                   type="text"
                   dir="auto"
-                  required
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Dual-Pass Bounding Box Alignment for Tables"
-                  className="heroui-input"
+                  placeholder="e.g. Always normalize vector dimensions before dot-product scoring"
+                  className="ui-input"
+                  required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    {t('knowledgeDetail.fieldType')}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[var(--foreground)]">
+                    Knowledge Type
                   </label>
                   <select
                     value={newType}
-                    onChange={(e) => setNewType(e.target.value as KnowledgeType)}
-                    className="heroui-select w-full"
+                    onChange={(e) => setNewType(e.target.value as any)}
+                    className="ui-select w-full"
                   >
-                    <option value="procedure">{t('types.procedure')}</option>
-                    <option value="skill">{t('types.skill')}</option>
-                    <option value="research_finding">{t('types.research_finding')}</option>
-                    <option value="tip">{t('types.tip')}</option>
-                    <option value="example">{t('types.example')}</option>
-                    <option value="failure">{t('types.failure')}</option>
-                    <option value="lesson">{t('types.lesson')}</option>
+                    <option value="procedure">Procedure</option>
+                    <option value="research_finding">Research Finding</option>
+                    <option value="tip">Tip</option>
+                    <option value="skill">Skill</option>
+                    <option value="example">Example</option>
+                    <option value="failure">Failure</option>
+                    <option value="lesson">Lesson</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    {t('knowledgeDetail.fieldCollection')}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[var(--foreground)]">
+                    Evidence Level
                   </label>
                   <select
-                    value={newCollectionId}
-                    onChange={(e) => setNewCollectionId(e.target.value)}
-                    className="heroui-select w-full"
+                    value={newEvidenceLevel}
+                    onChange={(e) => setNewEvidenceLevel(e.target.value as any)}
+                    className="ui-select w-full"
                   >
-                    {collections.map((col) => (
-                      <option key={col.id} value={col.id}>
-                        {locale === 'fa' ? col.nameFa : col.name}
-                      </option>
-                    ))}
+                    <option value="tested">Empirically Tested</option>
+                    <option value="observed">Observed</option>
+                    <option value="unverified">Unverified</option>
                   </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  {t('knowledgeDetail.fieldSummary')} *
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[var(--foreground)]">
+                  Collection
+                </label>
+                <select
+                  value={newCollectionId}
+                  onChange={(e) => setNewCollectionId(e.target.value)}
+                  className="ui-select w-full"
+                >
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {locale === 'fa' ? c.nameFa : c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[var(--foreground)]">
+                  Executive Summary
                 </label>
                 <textarea
                   dir="auto"
-                  required
-                  rows={2}
+                  rows={3}
                   value={newSummary}
                   onChange={(e) => setNewSummary(e.target.value)}
-                  placeholder="Concise 1-2 sentence core takeaway..."
-                  className="heroui-input"
+                  placeholder="Concise 1-2 sentence explanation of the finding or rule..."
+                  className="ui-input"
+                  required
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  {t('knowledgeDetail.fieldBody')}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[var(--foreground)]">
+                  Full Technical Body (Markdown)
                 </label>
                 <textarea
                   dir="auto"
                   rows={4}
                   value={newBody}
                   onChange={(e) => setNewBody(e.target.value)}
-                  placeholder="Technical procedure steps or markdown details..."
-                  className="heroui-input"
+                  placeholder="Detailed markdown specification, execution steps, or code..."
+                  className="ui-input font-mono text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    {t('knowledgeDetail.fieldApplicability')}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[var(--foreground)]">
+                    Applicability Scope
                   </label>
                   <input
                     type="text"
                     dir="auto"
                     value={newApplicability}
                     onChange={(e) => setNewApplicability(e.target.value)}
-                    className="heroui-input"
+                    placeholder="When to apply..."
+                    className="ui-input text-xs"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    {t('knowledgeDetail.fieldExclusions')}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-[var(--foreground)]">
+                    Exclusions / Negative Conditions
                   </label>
                   <input
                     type="text"
                     dir="auto"
                     value={newExclusions}
                     onChange={(e) => setNewExclusions(e.target.value)}
-                    className="heroui-input"
+                    placeholder="When NOT to apply..."
+                    className="ui-input text-xs"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  {t('knowledgeDetail.fieldRequirements')}
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  value={newRequirements}
-                  onChange={(e) => setNewRequirements(e.target.value)}
-                  placeholder="e.g. Python 3.11, Scikit-learn"
-                  className="heroui-input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  {t('knowledgeDetail.fieldSourceExcerpt')}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[var(--foreground)]">
+                  Prerequisites (One per line)
                 </label>
                 <textarea
                   dir="auto"
                   rows={2}
-                  value={newSourceExcerpt}
-                  onChange={(e) => setNewSourceExcerpt(e.target.value)}
-                  className="heroui-input"
+                  value={newRequirements}
+                  onChange={(e) => setNewRequirements(e.target.value)}
+                  placeholder="Node.js 20+&#10;HNSW index configuration"
+                  className="ui-input text-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="pt-3 border-t border-[var(--separator)] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="heroui-btn-secondary"
+                  className="ui-button ui-button-secondary text-xs"
                 >
-                  {t('common.cancel')}
+                  Cancel
                 </button>
                 <button
                   type="submit"
-                  className="heroui-btn-primary"
+                  className="ui-button ui-button-primary text-xs"
                 >
-                  {t('common.create')}
+                  Create Knowledge Item
                 </button>
               </div>
             </form>

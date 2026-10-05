@@ -237,15 +237,15 @@ export const GraphPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-3.5rem)] flex flex-col bg-[#09090b] overflow-hidden select-none">
+    <div className="relative w-full h-[calc(100vh-3.5rem)] flex flex-col bg-[var(--background)] overflow-hidden select-none">
       
       {/* Floating Top Control Toolbar (HeroUI Glass Bar) */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         
         {/* Left Toolbar Controls */}
-        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md shadow-lg pointer-events-auto">
+        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-[var(--surface)]/90 border border-[var(--border)] backdrop-blur-md shadow-lg pointer-events-auto">
           {/* Mode Switcher */}
-          <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-950 border border-zinc-800">
+          <div className="inline-flex items-center p-0.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)]">
             <button
               type="button"
               onClick={() => {
@@ -254,8 +254,8 @@ export const GraphPage: React.FC = () => {
               }}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                 viewMode === 'knowledge'
-                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs'
+                  : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
               Knowledge Topology
@@ -268,8 +268,8 @@ export const GraphPage: React.FC = () => {
               }}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                 viewMode === 'citation'
-                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs'
+                  : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
               Citation Provenance
@@ -278,13 +278,13 @@ export const GraphPage: React.FC = () => {
 
           {/* Search in Graph */}
           <div className="relative w-36 sm:w-48">
-            <Search className="w-3.5 h-3.5 text-zinc-500 absolute start-2.5 top-2 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-2.5 top-2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter graph nodes..."
-              className="heroui-input ps-8 py-1 text-xs"
+              className="ui-input ps-8 py-1 text-xs"
             />
           </div>
 
@@ -292,7 +292,7 @@ export const GraphPage: React.FC = () => {
           <select
             value={selectedCollection}
             onChange={(e) => setSelectedCollection(e.target.value)}
-            className="heroui-select text-xs py-1"
+            className="ui-select text-xs py-1"
           >
             <option value="all">All Collections</option>
             {collections.map((c) => (
@@ -307,7 +307,7 @@ export const GraphPage: React.FC = () => {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value as any)}
-              className="heroui-select text-xs py-1"
+              className="ui-select text-xs py-1"
             >
               <option value="all">All Types</option>
               <option value="procedure">Procedure</option>
@@ -321,7 +321,7 @@ export const GraphPage: React.FC = () => {
         </div>
 
         {/* Right Info Chip */}
-        <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs font-mono text-zinc-400 backdrop-blur-md shadow-lg pointer-events-auto">
+        <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--surface)]/90 border border-[var(--border)] text-xs font-mono text-[var(--muted)] backdrop-blur-md shadow-lg pointer-events-auto">
           <span>{nodes.length} nodes</span>
           <span>•</span>
           <span>{links.length} relationships</span>
@@ -329,11 +329,11 @@ export const GraphPage: React.FC = () => {
       </div>
 
       {/* Floating Bottom-Right Zoom & Fit Controls */}
-      <div className="absolute bottom-5 right-5 z-20 flex items-center p-1 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md shadow-xl">
+      <div className="absolute bottom-5 right-5 z-20 flex items-center p-1 rounded-xl bg-[var(--surface)]/90 border border-[var(--border)] backdrop-blur-md shadow-xl">
         <button
           type="button"
           onClick={() => setZoom((z) => Math.min(z + 0.2, 2.5))}
-          className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
+          className="p-1.5 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] rounded-lg cursor-pointer"
           title={t('graph.zoomIn')}
         >
           <ZoomIn className="w-4 h-4" />
@@ -341,7 +341,7 @@ export const GraphPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setZoom((z) => Math.max(z - 0.2, 0.4))}
-          className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
+          className="p-1.5 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] rounded-lg cursor-pointer"
           title={t('graph.zoomOut')}
         >
           <ZoomOut className="w-4 h-4" />
@@ -349,7 +349,7 @@ export const GraphPage: React.FC = () => {
         <button
           type="button"
           onClick={resetView}
-          className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg cursor-pointer"
+          className="p-1.5 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] rounded-lg cursor-pointer"
           title={t('graph.resetZoom')}
         >
           <Maximize2 className="w-4 h-4" />
@@ -357,7 +357,7 @@ export const GraphPage: React.FC = () => {
       </div>
 
       {/* Floating Bottom-Left Legend */}
-      <div className="absolute bottom-5 left-5 z-20 hidden md:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 backdrop-blur-md text-[11px] text-zinc-400 shadow-xl">
+      <div className="absolute bottom-5 left-5 z-20 hidden md:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[var(--surface)]/90 border border-[var(--border)] backdrop-blur-md text-[11px] text-[var(--muted)] shadow-xl">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-[#006FEE]" />
           <span>Procedure</span>
@@ -390,7 +390,7 @@ export const GraphPage: React.FC = () => {
         >
           <defs>
             <marker
-              id="heroui-arrow"
+              id="ui-arrow"
               viewBox="0 0 10 10"
               refX="22"
               refY="5"
@@ -427,7 +427,7 @@ export const GraphPage: React.FC = () => {
                     strokeDasharray={
                       link.relationshipType === 'conflicts_with' ? '4 3' : undefined
                     }
-                    markerEnd="url(#heroui-arrow)"
+                    markerEnd="url(#ui-arrow)"
                     opacity={connectedNodeIds.size === 0 || isHighlighted ? 0.9 : 0.25}
                   />
                   {isHighlighted && (
@@ -497,15 +497,15 @@ export const GraphPage: React.FC = () => {
 
       {/* Floating Side Inspector for Selected Node */}
       {selectedNode && (
-        <div className="absolute top-20 right-4 z-30 w-80 sm:w-96 rounded-xl border border-zinc-800 bg-[#18181b]/95 backdrop-blur-md p-4 space-y-3 shadow-2xl animate-fade-in">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        <div className="absolute top-20 right-4 z-30 w-80 sm:w-96 rounded-xl border border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md p-4 space-y-3 shadow-2xl animate-fade-in">
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
               Node Details
             </span>
             <button
               type="button"
               onClick={() => setSelectedNode(null)}
-              className="text-zinc-400 hover:text-zinc-100 p-0.5"
+              className="text-[var(--muted)] hover:text-[var(--foreground)] p-0.5"
             >
               <X className="w-4 h-4" />
             </button>
@@ -513,18 +513,18 @@ export const GraphPage: React.FC = () => {
 
           <div className="space-y-1.5">
             <Badge type="knowledgeType" value={selectedNode.type} size="sm" />
-            <h4 className="text-sm font-bold text-zinc-100 leading-snug">
+            <h4 className="text-sm font-bold text-[var(--foreground)] leading-snug">
               {selectedNode.title}
             </h4>
             {selectedNode.summary && (
-              <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed">
+              <p className="text-xs text-[var(--muted)] line-clamp-3 leading-relaxed">
                 {selectedNode.summary}
               </p>
             )}
           </div>
 
-          <div className="pt-2 border-t border-zinc-800 flex items-center justify-between">
-            <span className="text-[11px] text-zinc-500 font-mono">
+          <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between">
+            <span className="text-[11px] text-[var(--muted)] font-mono">
               {connectedNodeIds.size - 1} connected nodes
             </span>
             <button
@@ -536,7 +536,7 @@ export const GraphPage: React.FC = () => {
                   navigate(`/knowledge/${selectedNode.id}`);
                 }
               }}
-              className="heroui-btn-primary text-xs"
+              className="ui-button ui-button-primary text-xs"
             >
               <span>{t('common.openDetail')}</span>
               <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />

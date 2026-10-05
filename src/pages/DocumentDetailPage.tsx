@@ -187,7 +187,7 @@ export const DocumentDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-xs text-zinc-500">
+      <div className="py-20 text-center text-xs text-[var(--muted)]">
         <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
         <span>{t('common.loading')}</span>
       </div>
@@ -196,13 +196,13 @@ export const DocumentDetailPage: React.FC = () => {
 
   if (!document) {
     return (
-      <div className="py-20 text-center text-xs text-zinc-500 max-w-md mx-auto">
+      <div className="py-20 text-center text-xs text-[var(--muted)] max-w-md mx-auto">
         <AlertCircle className="w-7 h-7 mx-auto mb-2 text-rose-500" />
-        <h2 className="text-sm font-semibold text-zinc-100 mb-1">{t('sourceDetail.notFound')}</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t('sourceDetail.notFound')}</h2>
         <button
           type="button"
           onClick={() => navigate('/library?tab=sources')}
-          className="heroui-btn-secondary mt-3"
+          className="ui-button ui-button-secondary mt-3"
         >
           <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
           <span>{t('common.backToLibrary')}</span>
@@ -217,11 +217,11 @@ export const DocumentDetailPage: React.FC = () => {
       className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6"
     >
       {/* Back button & Breadcrumbs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
         <button
           type="button"
           onClick={() => navigate('/library?tab=sources')}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer w-fit"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer w-fit"
         >
           <ArrowLeft className="w-4 h-4 rtl:rotate-180 text-blue-400" />
           <span>{t('common.backToLibrary')}</span>
@@ -236,7 +236,7 @@ export const DocumentDetailPage: React.FC = () => {
                 setExtractSummary(selectedExcerpt.slice(0, 120));
                 setExtractModalOpen(true);
               }}
-              className="heroui-btn-primary text-xs"
+              className="ui-button ui-button-primary text-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{t('sourceDetail.extractKnowledge')}</span>
@@ -246,16 +246,16 @@ export const DocumentDetailPage: React.FC = () => {
           <button
             type="button"
             onClick={handleOpenEdit}
-            className="heroui-btn-secondary text-xs"
+            className="ui-button ui-button-secondary text-xs"
           >
-            <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+            <Edit3 className="w-3.5 h-3.5 text-[var(--muted)]" />
             <span>{t('sourceDetail.editSource')}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setDeleteModalOpen(true)}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
             title={t('sourceDetail.deleteSource')}
           >
             <Trash2 className="w-4 h-4" />
@@ -267,15 +267,15 @@ export const DocumentDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Document Content View (Left 8 cols) */}
         <div className="lg:col-span-8 space-y-4">
-          <div className="p-5 sm:p-6 rounded-xl border border-zinc-800 bg-[#18181b] space-y-4">
+          <div className="p-5 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-4">
             {/* Header info */}
-            <div className="space-y-2 pb-4 border-b border-zinc-800">
-              <div className="flex items-center justify-between text-xs text-zinc-400">
+            <div className="space-y-2 pb-4 border-b border-[var(--border)]">
+              <div className="flex items-center justify-between text-xs text-[var(--muted)]">
                 <span className="font-mono">{document.filename}</span>
                 <button
                   type="button"
                   onClick={handleCopyContent}
-                  className="inline-flex items-center gap-1 hover:text-zinc-100 cursor-pointer"
+                  className="inline-flex items-center gap-1 hover:text-[var(--foreground)] cursor-pointer"
                 >
                   {copied ? (
                     <>
@@ -293,14 +293,14 @@ export const DocumentDetailPage: React.FC = () => {
 
               <h1
                 dir="auto"
-                className="text-lg sm:text-2xl font-bold tracking-tight text-zinc-100 leading-snug"
+                className="text-lg sm:text-2xl font-bold tracking-tight text-[var(--foreground)] leading-snug"
               >
                 {document.title}
               </h1>
 
               {activeRevision && (
-                <div className="flex items-center gap-2 text-xs text-zinc-400 pt-1">
-                  <span className="bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-300 font-mono text-[11px]">
+                <div className="flex items-center gap-2 text-xs text-[var(--muted)] pt-1">
+                  <span className="bg-[var(--surface-secondary)] border border-[var(--border)] px-2 py-0.5 rounded text-[var(--foreground)] font-mono text-[11px]">
                     {activeRevision.revisionId}
                   </span>
                   <span>•</span>
@@ -310,7 +310,7 @@ export const DocumentDetailPage: React.FC = () => {
             </div>
 
             {/* Hint for excerpt extraction */}
-            <div className="p-2.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between">
+            <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/80 border border-[var(--border)] text-[11px] text-[var(--muted)] flex items-center justify-between">
               <span>
                 Tip: Highlight any sentence or paragraph with your mouse to extract a draft knowledge item.
               </span>
@@ -322,7 +322,7 @@ export const DocumentDetailPage: React.FC = () => {
             </div>
 
             {/* Markdown Reader */}
-            <div className="pt-2 text-zinc-300 text-xs sm:text-sm">
+            <div className="pt-2 text-[var(--foreground)] text-xs sm:text-sm">
               <MarkdownViewer content={activeContent} />
             </div>
           </div>
@@ -331,39 +331,39 @@ export const DocumentDetailPage: React.FC = () => {
         {/* Right Sidebar: Metadata, Revisions list, Extracted Knowledge (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
           {/* Metadata Card */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
-            <h3 className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
+            <h3 className="text-[11px] uppercase tracking-wider text-[var(--muted)] font-semibold">
               {t('sourceDetail.metadata')}
             </h3>
 
-            <div className="space-y-2 text-xs divide-y divide-zinc-800">
+            <div className="space-y-2 text-xs divide-y divide-[var(--separator)]">
               <div className="pt-1 flex items-center justify-between">
-                <span className="text-zinc-500">{t('knowledgeDetail.fieldCollection')}</span>
-                <span className="font-medium text-zinc-200">
+                <span className="text-[var(--muted)]">{t('knowledgeDetail.fieldCollection')}</span>
+                <span className="font-medium text-[var(--foreground)]">
                   {collection ? (locale === 'fa' ? collection.nameFa : collection.name) : '-'}
                 </span>
               </div>
               <div className="pt-2 flex items-center justify-between">
-                <span className="text-zinc-500">{t('sourceDetail.language')}</span>
-                <span className="font-medium text-zinc-200">
+                <span className="text-[var(--muted)]">{t('sourceDetail.language')}</span>
+                <span className="font-medium text-[var(--foreground)]">
                   {document.language === 'fa' ? 'فارسی' : 'English'}
                 </span>
               </div>
               <div className="pt-2 flex items-center justify-between">
-                <span className="text-zinc-500">{t('sourceDetail.size')}</span>
-                <span className="text-zinc-300 font-mono">
+                <span className="text-[var(--muted)]">{t('sourceDetail.size')}</span>
+                <span className="text-[var(--foreground)] font-mono">
                   {((document.rawSize || 0) / 1024).toFixed(1)} KiB
                 </span>
               </div>
               <div className="pt-2 flex items-center justify-between">
-                <span className="text-zinc-500">{t('sourceDetail.importedAt')}</span>
-                <span className="text-zinc-400">
+                <span className="text-[var(--muted)]">{t('sourceDetail.importedAt')}</span>
+                <span className="text-[var(--muted)]">
                   {new Date(document.importedAt || document.createdAt).toLocaleDateString()}
                 </span>
               </div>
               {(document.sourceUrl || document.url) && (
                 <div className="pt-2 flex items-center justify-between">
-                  <span className="text-zinc-500">{t('sourceDetail.originalUrl')}</span>
+                  <span className="text-[var(--muted)]">{t('sourceDetail.originalUrl')}</span>
                   <a
                     href={document.sourceUrl || document.url}
                     target="_blank"
@@ -379,13 +379,13 @@ export const DocumentDetailPage: React.FC = () => {
           </div>
 
           {/* Revisions History Card */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2.5">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5 text-zinc-400" />
+              <h3 className="text-[11px] uppercase tracking-wider text-[var(--muted)] font-semibold flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-[var(--muted)]" />
                 <span>{t('sourceDetail.revisions')}</span>
               </h3>
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-[11px] text-[var(--muted)] font-mono">
                 {document.revisions.length} total
               </span>
             </div>
@@ -400,19 +400,19 @@ export const DocumentDetailPage: React.FC = () => {
                     onClick={() => setSelectedRevisionId(rev.revisionId)}
                     className={`w-full text-start p-2.5 rounded-lg border text-xs transition-colors cursor-pointer ${
                       isSelected
-                        ? 'border-blue-500 bg-zinc-800 text-zinc-100 ring-1 ring-blue-500/20'
-                        : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 text-zinc-400'
+                        ? 'border-blue-500 bg-[var(--surface-tertiary)] text-[var(--foreground)] ring-1 ring-blue-500/20'
+                        : 'border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:border-[var(--border)] text-[var(--muted)]'
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px] mb-0.5">
                       <span className="font-semibold text-blue-400 font-mono">
                         {rev.revisionId}
                       </span>
-                      <span className="text-zinc-500 text-[10px]">
+                      <span className="text-[var(--muted)] text-[10px]">
                         {new Date(rev.timestamp).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="text-zinc-300 line-clamp-1 text-[11px]">
+                    <p className="text-[var(--foreground)] line-clamp-1 text-[11px]">
                       {rev.changeSummary || rev.summary || 'Snapshot'}
                     </p>
                   </button>
@@ -422,18 +422,18 @@ export const DocumentDetailPage: React.FC = () => {
           </div>
 
           {/* Related Knowledge Items Card */}
-          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2.5">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] uppercase tracking-wider text-zinc-400 font-semibold">
+              <h3 className="text-[11px] uppercase tracking-wider text-[var(--muted)] font-semibold">
                 {t('sourceDetail.relatedKnowledge')}
               </h3>
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-[11px] text-[var(--muted)] font-mono">
                 {relatedKnowledge.length}
               </span>
             </div>
 
             {relatedKnowledge.length === 0 ? (
-              <p className="text-xs text-zinc-500 italic">
+              <p className="text-xs text-[var(--muted)] italic">
                 {t('sourceDetail.noRelatedKnowledge')}
               </p>
             ) : (
@@ -442,7 +442,7 @@ export const DocumentDetailPage: React.FC = () => {
                   <div
                     key={k.id}
                     onClick={() => navigate(`/knowledge/${k.id}`)}
-                    className="p-2 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-850 hover:border-zinc-700 transition-colors cursor-pointer group"
+                    className="p-2 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:bg-[var(--surface-secondary)] hover:border-[var(--border)] transition-colors cursor-pointer group"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <Badge type="knowledgeType" value={k.type} size="sm" />
@@ -450,7 +450,7 @@ export const DocumentDetailPage: React.FC = () => {
                     </div>
                     <h4
                       dir="auto"
-                      className="text-xs font-medium text-zinc-200 group-hover:text-blue-400 truncate"
+                      className="text-xs font-medium text-[var(--foreground)] group-hover:text-blue-400 truncate"
                     >
                       {k.title}
                     </h4>
@@ -469,15 +469,15 @@ export const DocumentDetailPage: React.FC = () => {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in"
         >
-          <div className="w-full max-w-2xl bg-[#18181b] rounded-xl border border-zinc-800 overflow-hidden max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-100">
+          <div className="w-full max-w-2xl bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">
                 {t('sourceDetail.editSource')}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="p-1 rounded text-zinc-400 hover:text-zinc-100 cursor-pointer"
+                className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -485,7 +485,7 @@ export const DocumentDetailPage: React.FC = () => {
 
             <form onSubmit={handleSaveRevision} className="p-5 space-y-3.5 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Title
                 </label>
                 <input
@@ -494,12 +494,12 @@ export const DocumentDetailPage: React.FC = () => {
                   required
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Revision Summary (What changed?) *
                 </label>
                 <input
@@ -509,12 +509,12 @@ export const DocumentDetailPage: React.FC = () => {
                   placeholder="e.g. Corrected benchmark parameter tables and cited updated sources"
                   value={editRevisionSummary}
                   onChange={(e) => setEditRevisionSummary(e.target.value)}
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Markdown Content
                 </label>
                 <textarea
@@ -522,21 +522,21 @@ export const DocumentDetailPage: React.FC = () => {
                   rows={10}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="heroui-input font-mono text-xs"
+                  className="ui-input font-mono text-xs"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="heroui-btn-secondary"
+                  className="ui-button ui-button-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="heroui-btn-primary"
+                  className="ui-button ui-button-primary"
                 >
                   {t('common.save')}
                 </button>
@@ -553,15 +553,15 @@ export const DocumentDetailPage: React.FC = () => {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in"
         >
-          <div className="w-full max-w-lg bg-[#18181b] rounded-xl border border-zinc-800 p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <h3 className="text-sm font-semibold text-zinc-100">
+          <div className="w-full max-w-lg bg-[var(--surface)] rounded-xl border border-[var(--border)] p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">
                 {t('sourceDetail.extractKnowledge')}
               </h3>
               <button
                 type="button"
                 onClick={() => setExtractModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-100 p-1"
+                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -569,16 +569,16 @@ export const DocumentDetailPage: React.FC = () => {
 
             <form onSubmit={handleExtractKnowledge} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Selected Excerpt
                 </label>
-                <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 font-mono max-h-32 overflow-y-auto">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--foreground)] font-mono max-h-32 overflow-y-auto">
                   "{selectedExcerpt}"
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Title *
                 </label>
                 <input
@@ -588,12 +588,12 @@ export const DocumentDetailPage: React.FC = () => {
                   placeholder="e.g. Heuristic Row Projection Alignment"
                   value={extractTitle}
                   onChange={(e) => setExtractTitle(e.target.value)}
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   Summary
                 </label>
                 <textarea
@@ -602,21 +602,21 @@ export const DocumentDetailPage: React.FC = () => {
                   value={extractSummary}
                   onChange={(e) => setExtractSummary(e.target.value)}
                   placeholder="Brief summary..."
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setExtractModalOpen(false)}
-                  className="heroui-btn-secondary"
+                  className="ui-button ui-button-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="heroui-btn-primary"
+                  className="ui-button ui-button-primary"
                 >
                   {t('common.create')}
                 </button>

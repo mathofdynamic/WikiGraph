@@ -337,7 +337,7 @@ ${item.body || item.summary}
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-xs text-zinc-500">
+      <div className="py-20 text-center text-xs text-[var(--muted)]">
         <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
         <span>{t('common.loading')}</span>
       </div>
@@ -346,13 +346,13 @@ ${item.body || item.summary}
 
   if (!item) {
     return (
-      <div className="py-20 text-center text-xs text-zinc-500 max-w-md mx-auto">
+      <div className="py-20 text-center text-xs text-[var(--muted)] max-w-md mx-auto">
         <AlertCircle className="w-7 h-7 mx-auto mb-2 text-rose-500" />
-        <h2 className="text-sm font-semibold text-zinc-100 mb-1">{t('knowledgeDetail.notFound')}</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t('knowledgeDetail.notFound')}</h2>
         <button
           type="button"
           onClick={() => navigate('/library')}
-          className="heroui-btn-secondary mt-3"
+          className="ui-button ui-button-secondary mt-3"
         >
           <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
           <span>{t('common.backToLibrary')}</span>
@@ -365,11 +365,11 @@ ${item.body || item.summary}
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       
       {/* Top Header & Actions Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
         <button
           type="button"
           onClick={() => navigate('/library')}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer w-fit"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer w-fit"
         >
           <ArrowLeft className="w-4 h-4 rtl:rotate-180 text-blue-400" />
           <span>{t('common.backToLibrary')}</span>
@@ -380,7 +380,7 @@ ${item.body || item.summary}
           <button
             type="button"
             onClick={handleCopyAgentPrompt}
-            className="heroui-btn-secondary text-xs"
+            className="ui-button ui-button-secondary text-xs"
             title={t('marketplace.copyForAgent')}
           >
             {copiedPrompt ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Bot className="w-3.5 h-3.5 text-blue-400" />}
@@ -390,7 +390,7 @@ ${item.body || item.summary}
           <button
             type="button"
             onClick={handleCopyMarkdown}
-            className="heroui-btn-secondary text-xs"
+            className="ui-button ui-button-secondary text-xs"
             title="Copy Markdown"
           >
             {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -400,16 +400,16 @@ ${item.body || item.summary}
           <button
             type="button"
             onClick={() => setIsEditing(!isEditing)}
-            className="heroui-btn-secondary text-xs"
+            className="ui-button ui-button-secondary text-xs"
           >
-            <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+            <Edit3 className="w-3.5 h-3.5 text-[var(--muted)]" />
             <span>{isEditing ? t('common.close') : t('common.edit')}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setDeleteModalOpen(true)}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
             title={t('knowledgeDetail.deleteKnowledge')}
           >
             <Trash2 className="w-4 h-4" />
@@ -436,13 +436,13 @@ ${item.body || item.summary}
 
       {/* Composed Detail Content */}
       {isEditing ? (
-        <form onSubmit={handleSaveEdit} className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-4">
-          <h3 className="text-sm font-semibold text-zinc-100 pb-2 border-b border-zinc-800">
+        <form onSubmit={handleSaveEdit} className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-4">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] pb-2 border-b border-[var(--border)]">
             {t('common.edit')} {t('library.tabKnowledge')}
           </h3>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1">
               {t('knowledgeDetail.fieldTitle')} *
             </label>
             <input
@@ -451,19 +451,19 @@ ${item.body || item.summary}
               required
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
-              className="heroui-input"
+              className="ui-input"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('knowledgeDetail.fieldType')}
               </label>
               <select
                 value={editType}
                 onChange={(e) => setEditType(e.target.value as KnowledgeType)}
-                className="heroui-select w-full"
+                className="ui-select w-full"
               >
                 <option value="procedure">{t('types.procedure')}</option>
                 <option value="skill">{t('types.skill')}</option>
@@ -476,13 +476,13 @@ ${item.body || item.summary}
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('knowledgeDetail.fieldCollection')}
               </label>
               <select
                 value={editCollectionId}
                 onChange={(e) => setEditCollectionId(e.target.value)}
-                className="heroui-select w-full"
+                className="ui-select w-full"
               >
                 {allCollections.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -494,7 +494,7 @@ ${item.body || item.summary}
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1">
               {t('knowledgeDetail.fieldSummary')} *
             </label>
             <textarea
@@ -503,12 +503,12 @@ ${item.body || item.summary}
               rows={2}
               value={editSummary}
               onChange={(e) => setEditSummary(e.target.value)}
-              className="heroui-input"
+              className="ui-input"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1">
               {t('knowledgeDetail.fieldBody')}
             </label>
             <textarea
@@ -516,19 +516,19 @@ ${item.body || item.summary}
               rows={6}
               value={editBody}
               onChange={(e) => setEditBody(e.target.value)}
-              className="heroui-input"
+              className="ui-input"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('knowledgeDetail.fieldReviewStatus')}
               </label>
               <select
                 value={editReviewStatus}
                 onChange={(e) => setEditReviewStatus(e.target.value as ReviewStatus)}
-                className="heroui-select w-full"
+                className="ui-select w-full"
               >
                 <option value="draft">{t('reviewStatus.draft')}</option>
                 <option value="reviewed">{t('reviewStatus.reviewed')}</option>
@@ -537,13 +537,13 @@ ${item.body || item.summary}
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('knowledgeDetail.fieldEvidenceLevel')}
               </label>
               <select
                 value={editEvidenceLevel}
                 onChange={(e) => setEditEvidenceLevel(e.target.value as EvidenceLevel)}
-                className="heroui-select w-full"
+                className="ui-select w-full"
               >
                 <option value="unverified">{t('evidenceLevel.unverified')}</option>
                 <option value="observed">{t('evidenceLevel.observed')}</option>
@@ -554,7 +554,7 @@ ${item.body || item.summary}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('knowledgeDetail.fieldApplicability')}
               </label>
               <input
@@ -562,12 +562,12 @@ ${item.body || item.summary}
                 dir="auto"
                 value={editApplicability}
                 onChange={(e) => setEditApplicability(e.target.value)}
-                className="heroui-input"
+                className="ui-input"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                 {t('knowledgeDetail.fieldExclusions')}
               </label>
               <input
@@ -575,13 +575,13 @@ ${item.body || item.summary}
                 dir="auto"
                 value={editExclusions}
                 onChange={(e) => setEditExclusions(e.target.value)}
-                className="heroui-input"
+                className="ui-input"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1">
               {t('knowledgeDetail.fieldRequirements')}
             </label>
             <input
@@ -589,12 +589,12 @@ ${item.body || item.summary}
               dir="auto"
               value={editRequirementsStr}
               onChange={(e) => setEditRequirementsStr(e.target.value)}
-              className="heroui-input"
+              className="ui-input"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1">
               {t('knowledgeDetail.fieldSourceExcerpt')}
             </label>
             <textarea
@@ -602,21 +602,21 @@ ${item.body || item.summary}
               rows={2}
               value={editSourceExcerpt}
               onChange={(e) => setEditSourceExcerpt(e.target.value)}
-              className="heroui-input"
+              className="ui-input"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="heroui-btn-secondary"
+              className="ui-button ui-button-secondary"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
-              className="heroui-btn-primary"
+              className="ui-button ui-button-primary"
             >
               {t('common.save')}
             </button>
@@ -627,25 +627,25 @@ ${item.body || item.summary}
         <div className="space-y-6">
           
           {/* Header & Primary Metadata */}
-          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+          <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge type="knowledgeType" value={item.type} />
               <Badge type="evidence" value={item.evidenceLevel} />
               <Badge type="review" value={item.reviewStatus} />
               {collection && (
-                <span className="text-xs text-zinc-400 font-medium px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+                <span className="text-xs text-[var(--muted)] font-medium px-2 py-0.5 rounded bg-[var(--surface-tertiary)] border border-[var(--border)]">
                   {locale === 'fa' ? collection.nameFa : collection.name}
                 </span>
               )}
             </div>
 
-            <h1 dir="auto" className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+            <h1 dir="auto" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
               {item.title}
             </h1>
 
             {/* Core Takeaway Box */}
-            <div className="p-3.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs sm:text-sm text-zinc-300 leading-relaxed">
-              <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">
+            <div className="p-3.5 rounded-lg bg-[var(--surface)]/90 border border-[var(--border)] text-xs sm:text-sm text-[var(--foreground)] leading-relaxed">
+              <span className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider block mb-1">
                 {t('knowledgeDetail.fieldSummary')}
               </span>
               <p dir="auto">{item.summary}</p>
@@ -654,22 +654,22 @@ ${item.body || item.summary}
 
           {/* Operational Scope (Applicability & Exclusions) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-1.5 text-xs">
+            <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-1.5 text-xs">
               <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{t('knowledgeDetail.fieldApplicability')}</span>
               </div>
-              <p dir="auto" className="text-zinc-300 leading-relaxed">
+              <p dir="auto" className="text-[var(--foreground)] leading-relaxed">
                 {item.applicability || 'General application'}
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-1.5 text-xs">
+            <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-1.5 text-xs">
               <div className="flex items-center gap-1.5 text-rose-400 font-semibold">
                 <AlertCircle className="w-3.5 h-3.5" />
                 <span>{t('knowledgeDetail.fieldExclusions')}</span>
               </div>
-              <p dir="auto" className="text-zinc-300 leading-relaxed">
+              <p dir="auto" className="text-[var(--foreground)] leading-relaxed">
                 {item.exclusions || 'None specified'}
               </p>
             </div>
@@ -677,15 +677,15 @@ ${item.body || item.summary}
 
           {/* Requirements Chips */}
           {item.requirements && item.requirements.length > 0 && (
-            <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2">
-              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
+            <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2">
+              <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider block">
                 {t('knowledgeDetail.fieldRequirements')}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {item.requirements.map((req, i) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 rounded text-xs bg-zinc-850 text-zinc-300 border border-zinc-750 font-mono"
+                    className="px-2 py-0.5 rounded text-xs bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)] font-mono"
                   >
                     {req}
                   </span>
@@ -695,21 +695,21 @@ ${item.body || item.summary}
           )}
 
           {/* Main Content & Technical Guide */}
-          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
-            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+          <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
+            <h3 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
               {t('knowledgeDetail.fieldBody')}
             </h3>
-            <div className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            <div className="text-xs sm:text-sm text-[var(--foreground)] leading-relaxed">
               {item.body ? (
                 <MarkdownViewer content={item.body} />
               ) : (
-                <p className="italic text-zinc-500">{item.summary}</p>
+                <p className="italic text-[var(--muted)]">{item.summary}</p>
               )}
             </div>
           </div>
 
           {/* Source Grounding & Citation Anchor */}
-          <div className="p-4 rounded-xl border-s-2 border-s-blue-500 bg-[#18181b] border border-zinc-800 space-y-2">
+          <div className="p-4 rounded-xl border-s-2 border-s-blue-500 bg-[var(--surface)] border border-[var(--border)] space-y-2">
             <div className="flex items-center justify-between text-xs text-blue-400 font-medium">
               <span className="flex items-center gap-1.5">
                 <FileText className="w-4 h-4" />
@@ -729,16 +729,16 @@ ${item.body || item.summary}
 
             <blockquote
               dir="auto"
-              className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 italic font-mono leading-relaxed"
+              className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--foreground)] italic font-mono leading-relaxed"
             >
               "{item.sourceExcerpt || 'Direct citation excerpt anchored in source peer report.'}"
             </blockquote>
           </div>
 
           {/* Related Information (Graph Relationships) */}
-          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+          <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider flex items-center gap-2">
                 <GitFork className="w-3.5 h-3.5 text-blue-400" />
                 <span>{t('knowledgeDetail.relationshipsSection')}</span>
               </h3>
@@ -752,7 +752,7 @@ ${item.body || item.summary}
             </div>
 
             {relationships.length === 0 ? (
-              <p className="text-xs text-zinc-500">{t('knowledgeDetail.noRelationships')}</p>
+              <p className="text-xs text-[var(--muted)]">{t('knowledgeDetail.noRelationships')}</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {relationships.map((rel) => {
@@ -768,13 +768,13 @@ ${item.body || item.summary}
                     <div
                       key={rel.id}
                       onClick={() => navigate(`/knowledge/${target.id}`)}
-                      className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-850 hover:border-zinc-700 transition-colors cursor-pointer flex items-center justify-between group"
+                      className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:bg-[var(--surface-secondary)] hover:border-[var(--border)] transition-colors cursor-pointer flex items-center justify-between group"
                     >
                       <div className="min-w-0 pr-2">
                         <span className="text-[10px] font-medium text-blue-400 bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-800/30 me-1.5">
                           {relLabel}
                         </span>
-                        <span className="text-xs text-zinc-200 group-hover:text-blue-400 transition-colors font-medium truncate inline-block align-middle max-w-[200px]">
+                        <span className="text-xs text-[var(--foreground)] group-hover:text-blue-400 transition-colors font-medium truncate inline-block align-middle max-w-[200px]">
                           {target.title}
                         </span>
                       </div>
@@ -784,7 +784,7 @@ ${item.body || item.summary}
                           e.stopPropagation();
                           handleRemoveRelationship(rel.id);
                         }}
-                        className="p-1 text-zinc-500 hover:text-rose-400 shrink-0"
+                        className="p-1 text-[var(--muted)] hover:text-rose-400 shrink-0"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -796,9 +796,9 @@ ${item.body || item.summary}
           </div>
 
           {/* Practical Application Outcomes */}
-          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+          <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{t('knowledgeDetail.outcomesSection')}</span>
               </h3>
@@ -812,13 +812,13 @@ ${item.body || item.summary}
             </div>
 
             {outcomes.length === 0 ? (
-              <p className="text-xs text-zinc-500">{t('knowledgeDetail.noOutcomes')}</p>
+              <p className="text-xs text-[var(--muted)]">{t('knowledgeDetail.noOutcomes')}</p>
             ) : (
               <div className="space-y-2">
                 {outcomes.map((out) => (
                   <div
                     key={out.id}
-                    className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 text-xs space-y-1.5"
+                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 text-xs space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
                       <span
@@ -832,13 +832,13 @@ ${item.body || item.summary}
                       >
                         {t(`results.${out.result}`)}
                       </span>
-                      <span className="text-[10px] text-zinc-500 font-mono">
+                      <span className="text-[10px] text-[var(--muted)] font-mono">
                         {out.recordedAt ? new Date(out.recordedAt).toLocaleDateString() : ''}
                       </span>
                     </div>
-                    <p className="text-zinc-200 font-medium">{out.taskContext}</p>
+                    <p className="text-[var(--foreground)] font-medium">{out.taskContext}</p>
                     {out.metrics && (
-                      <p className="font-mono text-[11px] text-zinc-400 bg-zinc-800/60 p-1.5 rounded border border-zinc-700/50">
+                      <p className="font-mono text-[11px] text-[var(--muted)] bg-[var(--surface-tertiary)]/60 p-1.5 rounded border border-[var(--border)]/50">
                         {out.metrics}
                       </p>
                     )}
@@ -854,15 +854,15 @@ ${item.body || item.summary}
       {/* Add Relationship Modal */}
       {relModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
-          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-md w-full p-4 space-y-3.5 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <h3 className="text-xs font-semibold text-zinc-100">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl max-w-md w-full p-4 space-y-3.5 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <h3 className="text-xs font-semibold text-[var(--foreground)]">
                 {t('knowledgeDetail.addRelationship')}
               </h3>
               <button
                 type="button"
                 onClick={() => setRelModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-100 p-1 rounded"
+                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -870,13 +870,13 @@ ${item.body || item.summary}
 
             <form onSubmit={handleAddRelationship} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   {t('graph.relationType')}
                 </label>
                 <select
                   value={relType}
                   onChange={(e) => setRelType(e.target.value as RelationshipType)}
-                  className="heroui-select w-full"
+                  className="ui-select w-full"
                 >
                   <option value="supports">{t('relationTypes.supports')}</option>
                   <option value="requires">{t('relationTypes.requires')}</option>
@@ -888,13 +888,13 @@ ${item.body || item.summary}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   {t('graph.targetItem')}
                 </label>
                 <select
                   value={targetKnowledgeId}
                   onChange={(e) => setTargetKnowledgeId(e.target.value)}
-                  className="heroui-select w-full"
+                  className="ui-select w-full"
                 >
                   {allKnowledge
                     .filter((k) => k.id !== id)
@@ -907,7 +907,7 @@ ${item.body || item.summary}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   {t('graph.rationale')}
                 </label>
                 <textarea
@@ -915,21 +915,21 @@ ${item.body || item.summary}
                   value={relNotes}
                   onChange={(e) => setRelNotes(e.target.value)}
                   placeholder={t('graph.rationalePlaceholder')}
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setRelModalOpen(false)}
-                  className="heroui-btn-secondary"
+                  className="ui-button ui-button-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="heroui-btn-primary"
+                  className="ui-button ui-button-primary"
                 >
                   {t('common.save')}
                 </button>
@@ -942,15 +942,15 @@ ${item.body || item.summary}
       {/* Add Outcome Modal */}
       {outcomeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
-          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-md w-full p-4 space-y-3.5 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <h3 className="text-xs font-semibold text-zinc-100">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl max-w-md w-full p-4 space-y-3.5 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+              <h3 className="text-xs font-semibold text-[var(--foreground)]">
                 {t('knowledgeDetail.addOutcome')}
               </h3>
               <button
                 type="button"
                 onClick={() => setOutcomeModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-100 p-1 rounded"
+                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -958,7 +958,7 @@ ${item.body || item.summary}
 
             <form onSubmit={handleAddOutcome} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   {t('outcomes.taskContext')} *
                 </label>
                 <input
@@ -967,18 +967,18 @@ ${item.body || item.summary}
                   value={outcomeTask}
                   onChange={(e) => setOutcomeTask(e.target.value)}
                   placeholder="e.g. Extraction of SEC borderless tables"
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   {t('outcomes.result')}
                 </label>
                 <select
                   value={outcomeResult}
                   onChange={(e) => setOutcomeResult(e.target.value as any)}
-                  className="heroui-select w-full"
+                  className="ui-select w-full"
                 >
                   <option value="success">{t('results.success')}</option>
                   <option value="failure">{t('results.failure')}</option>
@@ -987,7 +987,7 @@ ${item.body || item.summary}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
                   {t('outcomes.metrics')}
                 </label>
                 <input
@@ -995,21 +995,21 @@ ${item.body || item.summary}
                   value={outcomeMetrics}
                   onChange={(e) => setOutcomeMetrics(e.target.value)}
                   placeholder="e.g. 99.2% alignment precision"
-                  className="heroui-input"
+                  className="ui-input"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
                 <button
                   type="button"
                   onClick={() => setOutcomeModalOpen(false)}
-                  className="heroui-btn-secondary"
+                  className="ui-button ui-button-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="heroui-btn-primary"
+                  className="ui-button ui-button-primary"
                 >
                   {t('common.save')}
                 </button>

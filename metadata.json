@@ -1,6 +1,6 @@
 {
   "name": "WikiGraph",
-  "description": "Agent Knowledge & Skills Marketplace for discovering, inspecting, and deploying peer-grounded research findings, executable procedures, and empirically tested tips.",
+  "description": "Private research knowledge workspace for preserving deep-research reports, extracting reusable insights, exploring relationship graphs, and assembling task-specific cited context.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
