@@ -1,27 +1,31 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  UploadCloud,
-  Plus,
-  Filter,
-  X,
   Search,
+  Filter,
+  Layers,
   FileText,
-  Lightbulb,
-  AlertCircle,
+  Clock,
   ExternalLink,
   ChevronRight,
+  Plus,
   RefreshCw,
-  Clock,
-  Layers,
-  CheckCircle2,
+  AlertCircle,
+  X,
+  Check,
+  Bot,
+  AlertTriangle,
+  UploadCloud,
+  FileCode,
+  ArrowRight,
+  Tag,
+  ShieldCheck,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import {
   Collection,
   EvidenceLevel,
-  KnowledgeFilter,
   KnowledgeItem,
   KnowledgeType,
   ReviewStatus,
@@ -36,27 +40,18 @@ export const LibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Tab: 'knowledge' | 'sources'
+  // Active tab: 'knowledge' | 'sources'
   const activeTab = (searchParams.get('tab') as 'knowledge' | 'sources') || 'knowledge';
+  const selectedKnowledgeId = searchParams.get('id');
 
-  // Filters state
+  // Filter state
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [selectedCollection, setSelectedCollection] = useState(searchParams.get('col') || 'all');
-  const [selectedType, setSelectedType] = useState<KnowledgeType | 'all'>(
-    (searchParams.get('type') as KnowledgeType) || 'all'
-  );
-  const [selectedLanguage, setSelectedLanguage] = useState<'all' | 'en' | 'fa'>(
-    (searchParams.get('lang') as 'all' | 'en' | 'fa') || 'all'
-  );
-  const [selectedReview, setSelectedReview] = useState<ReviewStatus | 'all'>(
-    (searchParams.get('review') as ReviewStatus) || 'all'
-  );
-  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceLevel | 'all'>(
-    (searchParams.get('evidence') as EvidenceLevel) || 'all'
-  );
-  const [selectedFreshness, setSelectedFreshness] = useState<
-    'all' | 'needs_review' | 'fresh' | 'stale'
-  >((searchParams.get('freshness') as 'all' | 'needs_review' | 'fresh' | 'stale') || 'all');
+  const [selectedCollection, setSelectedCollection] = useState<string>(searchParams.get('col') || 'all');
+  const [selectedType, setSelectedType] = useState<KnowledgeType | 'all'>('all');
+  const [selectedReview, setSelectedReview] = useState<ReviewStatus | 'all'>('all');
+  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceLevel | 'all'>('all');
+  const [selectedFreshness, setSelectedFreshness] = useState<'all' | 'needs_review' | 'fresh' | 'stale'>('all');
+  const [selectedLanguage, setSelectedLanguage] = useState<'all' | 'en' | 'fa'>('all');
 
   // Data state
   const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
@@ -65,38 +60,91 @@ export const LibraryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Inspector state for wide screen
-  const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(null);
-  const [newKnowledgeModalOpen, setNewKnowledgeModalOpen] = useState(false);
+  // Quick copied feedback
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Load data
+  // New Knowledge Modal state
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newSummary, setNewSummary] = useState('');
+  const [newBody, setNewBody] = useState('');
+  const [newType, setNewType] = useState<KnowledgeType>('procedure');
+  const [newCollectionId, setNewCollectionId] = useState('');
+  const [newEvidenceLevel, setNewEvidenceLevel] = useState<EvidenceLevel>('tested');
+  const [newApplicability, setNewApplicability] = useState('');
+  const [newExclusions, setNewExclusions] = useState('');
+  const [newRequirements, setNewRequirements] = useState('');
+  const [newSourceExcerpt, setNewSourceExcerpt] = useState('');
+
+  // Fetch data
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const filterArgs: KnowledgeFilter = {
-        search: searchQuery,
-        collectionId: selectedCollection !== 'all' ? selectedCollection : undefined,
-        type: selectedType,
-        language: selectedLanguage !== 'all' ? selectedLanguage : undefined,
-        reviewStatus: selectedReview,
-        evidenceLevel: selectedEvidence,
-        freshness: selectedFreshness,
-      };
-
-      const [kRes, sRes, cRes] = await Promise.all([
-        repository.listKnowledge(filterArgs),
-        repository.listSources(),
+      const [cols, allK, allS] = await Promise.all([
         repository.listCollections(),
+        repository.listKnowledge(),
+        repository.listSources(),
       ]);
 
-      setKnowledgeList(kRes);
-      setSourcesList(sRes);
-      setCollections(cRes);
+      setCollections(cols);
+      if (cols.length > 0 && !newCollectionId) {
+        setNewCollectionId(cols[0].id);
+      }
+      setSourcesList(allS);
 
-      if (kRes.length > 0 && !selectedKnowledgeId) {
-        setSelectedKnowledgeId(kRes[0].id);
+      // Filter knowledge items
+      let filtered = [...allK];
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(
+          (k) =>
+            k.title.toLowerCase().includes(q) ||
+            k.summary.toLowerCase().includes(q) ||
+            (k.body && k.body.toLowerCase().includes(q)) ||
+            (k.applicability && k.applicability.toLowerCase().includes(q)) ||
+            (k.sourceExcerpt && k.sourceExcerpt.toLowerCase().includes(q)) ||
+            k.requirements.some((r) => r.toLowerCase().includes(q))
+        );
+      }
+
+      if (selectedCollection !== 'all') {
+        filtered = filtered.filter((k) => k.collectionId === selectedCollection);
+      }
+      if (selectedType !== 'all') {
+        filtered = filtered.filter((k) => k.type === selectedType);
+      }
+      if (selectedReview !== 'all') {
+        filtered = filtered.filter((k) => k.reviewStatus === selectedReview);
+      }
+      if (selectedEvidence !== 'all') {
+        filtered = filtered.filter((k) => k.evidenceLevel === selectedEvidence);
+      }
+      if (selectedLanguage !== 'all') {
+        filtered = filtered.filter((k) => k.language === selectedLanguage);
+      }
+      if (selectedFreshness === 'needs_review') {
+        filtered = filtered.filter((k) => k.sourceHasChanged);
+      } else if (selectedFreshness === 'fresh') {
+        filtered = filtered.filter((k) => !k.sourceHasChanged && k.reviewStatus === 'reviewed');
+      } else if (selectedFreshness === 'stale') {
+        filtered = filtered.filter((k) => k.reviewStatus === 'deprecated');
+      }
+
+      setKnowledgeList(filtered);
+
+      // Auto-select first item if none selected or current selection missing
+      if (filtered.length > 0) {
+        const hasSelection = filtered.some((k) => k.id === selectedKnowledgeId);
+        if (!hasSelection) {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set('id', filtered[0].id);
+            return next;
+          }, { replace: true });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -114,10 +162,10 @@ export const LibraryPage: React.FC = () => {
     searchQuery,
     selectedCollection,
     selectedType,
-    selectedLanguage,
     selectedReview,
     selectedEvidence,
     selectedFreshness,
+    selectedLanguage,
   ]);
 
   const setTab = (tab: 'knowledge' | 'sources') => {
@@ -128,12 +176,20 @@ export const LibraryPage: React.FC = () => {
     });
   };
 
+  const setSelectedId = (id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('id', id);
+      return next;
+    }, { replace: true });
+  };
+
   // Selected knowledge for inspector
   const inspectorItem = useMemo(() => {
-    return knowledgeList.find((k) => k.id === selectedKnowledgeId) || null;
+    return knowledgeList.find((k) => k.id === selectedKnowledgeId) || knowledgeList[0] || null;
   }, [knowledgeList, selectedKnowledgeId]);
 
-  // Active filter chips count and list
+  // Active filter chips
   const activeChips = useMemo(() => {
     const chips: { label: string; onRemove: () => void }[] = [];
     if (selectedCollection !== 'all') {
@@ -147,12 +203,6 @@ export const LibraryPage: React.FC = () => {
       chips.push({
         label: `${t('library.filterType')}: ${t(`types.${selectedType}`)}`,
         onRemove: () => setSelectedType('all'),
-      });
-    }
-    if (selectedLanguage !== 'all') {
-      chips.push({
-        label: `${t('library.filterLanguage')}: ${selectedLanguage === 'fa' ? 'فارسی' : 'English'}`,
-        onRemove: () => setSelectedLanguage('all'),
       });
     }
     if (selectedReview !== 'all') {
@@ -179,81 +229,117 @@ export const LibraryPage: React.FC = () => {
         onRemove: () => setSelectedFreshness('all'),
       });
     }
-    if (searchQuery.trim() !== '') {
+    if (selectedLanguage !== 'all') {
       chips.push({
-        label: `"${searchQuery}"`,
-        onRemove: () => setSearchQuery(''),
+        label: `${t('library.filterLanguage')}: ${selectedLanguage === 'fa' ? 'فارسی' : 'English'}`,
+        onRemove: () => setSelectedLanguage('all'),
       });
     }
     return chips;
-  }, [
-    selectedCollection,
-    selectedType,
-    selectedLanguage,
-    selectedReview,
-    selectedEvidence,
-    selectedFreshness,
-    searchQuery,
-    collections,
-    locale,
-    t,
-  ]);
+  }, [selectedCollection, selectedType, selectedReview, selectedEvidence, selectedFreshness, selectedLanguage, collections, locale, t]);
 
   const clearAllFilters = () => {
+    setSearchQuery('');
     setSelectedCollection('all');
     setSelectedType('all');
-    setSelectedLanguage('all');
     setSelectedReview('all');
     setSelectedEvidence('all');
     setSelectedFreshness('all');
-    setSearchQuery('');
+    setSelectedLanguage('all');
   };
 
-  // Filter sources if search query exists
-  const filteredSources = useMemo(() => {
-    if (!searchQuery.trim()) return sourcesList;
-    const q = searchQuery.toLowerCase();
-    return sourcesList.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.filename.toLowerCase().includes(q) ||
-        s.originalContent.toLowerCase().includes(q)
-    );
-  }, [sourcesList, searchQuery]);
+  const handleCopyAgentPrompt = (e: React.MouseEvent, item: KnowledgeItem) => {
+    e.stopPropagation();
+    const promptXml = `<agent_skill id="${item.id}" type="${item.type}" evidence="${item.evidenceLevel}">
+<title>${item.title}</title>
+<summary>${item.summary}</summary>
+<applicability>${item.applicability || 'General'}</applicability>
+<exclusions>${item.exclusions || 'None'}</exclusions>
+<requirements>${item.requirements.join(', ')}</requirements>
+<procedure>
+${item.body || item.summary}
+</procedure>
+<citation_grounding>
+${item.sourceExcerpt || ''}
+</citation_grounding>
+</agent_skill>`;
+
+    navigator.clipboard.writeText(promptXml);
+    setCopiedId(item.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCreateKnowledge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newSummary.trim()) return;
+
+    try {
+      const sourceId = sourcesList[0]?.id || 'src-table-extract-01';
+      const requirements = newRequirements
+        .split(',')
+        .map((r) => r.trim())
+        .filter(Boolean);
+
+      const created = await repository.createKnowledge({
+        title: newTitle.trim(),
+        summary: newSummary.trim(),
+        body: newBody.trim() || '',
+        type: newType,
+        collectionId: newCollectionId || collections[0]?.id || 'col-data-extraction',
+        sourceId,
+        sourceRevisionId: sourcesList[0]?.revisions?.[0]?.revisionId || 'rev-01',
+        reviewStatus: 'reviewed',
+        evidenceLevel: newEvidenceLevel,
+        applicability: newApplicability.trim() || '',
+        exclusions: newExclusions.trim() || '',
+        requirements,
+        sourceExcerpt: newSourceExcerpt.trim() || '',
+        language: (locale as any) || 'en',
+      });
+
+      setCreateModalOpen(false);
+      setNewTitle('');
+      setNewSummary('');
+      setNewBody('');
+      setNewApplicability('');
+      setNewExclusions('');
+      setNewRequirements('');
+      setNewSourceExcerpt('');
+      notifyMutation();
+
+      navigate(`/knowledge/${created.id}`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
-      {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#23252a]">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5">
+      {/* Top Section: Page Title + Description with Aligned Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#8a8f98] uppercase tracking-wider mb-1">
-            <span>WikiGraph</span>
-            <span>/</span>
-            <span className="text-[#5e6ad2] font-medium">
-              {t('nav.library')}
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-title text-[#f7f8f8]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
             {t('library.title')}
-          </h2>
-          <p className="text-xs sm:text-sm text-[#8a8f98] mt-0.5">
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
             {t('library.subtitle')}
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Primary Workspace Actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => navigate('/import')}
-            className="linear-btn-secondary text-xs sm:text-sm gap-2"
+            className="heroui-btn-secondary"
           >
-            <UploadCloud className="w-4 h-4 text-[#5e6ad2]" />
+            <UploadCloud className="w-4 h-4 text-zinc-400" />
             <span>{t('library.importResearch')}</span>
           </button>
           <button
             type="button"
-            onClick={() => setNewKnowledgeModalOpen(true)}
-            className="linear-btn-primary text-xs sm:text-sm gap-2"
+            onClick={() => setCreateModalOpen(true)}
+            className="heroui-btn-primary"
           >
             <Plus className="w-4 h-4" />
             <span>{t('library.newKnowledge')}</span>
@@ -261,59 +347,60 @@ export const LibraryPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs & Search Bar */}
-      <div className="space-y-3">
+      {/* Controls Bar: Segmented Switch, Integrated Search, and Compact Filters */}
+      <div className="space-y-3 p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/60">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Tabs */}
-          <div className="flex items-center p-1 rounded-lg bg-[#0f1011] border border-[#23252a] w-fit">
+          
+          {/* Segmented Knowledge / Sources Switch */}
+          <div className="inline-flex items-center p-1 rounded-lg bg-zinc-900 border border-zinc-800 shrink-0">
             <button
               type="button"
               onClick={() => setTab('knowledge')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'knowledge'
-                  ? 'bg-[#141516] text-[#f7f8f8] border border-[#23252a]'
-                  : 'text-[#8a8f98] hover:text-[#f7f8f8] border border-transparent'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/60'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <Lightbulb className="w-4 h-4 text-[#5e6ad2]" />
+              <Layers className="w-3.5 h-3.5 text-blue-400" />
               <span>{t('library.tabKnowledge')}</span>
-              <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-[#1e2024] text-[#8a8f98]">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
                 {knowledgeList.length}
               </span>
             </button>
             <button
               type="button"
               onClick={() => setTab('sources')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'sources'
-                  ? 'bg-[#141516] text-[#f7f8f8] border border-[#23252a]'
-                  : 'text-[#8a8f98] hover:text-[#f7f8f8] border border-transparent'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/60'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <FileText className="w-4 h-4 text-[#7a7fad]" />
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
               <span>{t('library.tabSources')}</span>
-              <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-[#1e2024] text-[#8a8f98]">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
                 {sourcesList.length}
               </span>
             </button>
           </div>
 
-          {/* Quick in-library Search Input */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 text-[#8a8f98] absolute start-3 top-2.5 pointer-events-none" />
+          {/* Integrated Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute start-3 top-2.5 pointer-events-none" />
             <input
               type="text"
               dir="auto"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('common.searchPlaceholder')}
-              className="w-full ps-9 pe-8 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#0f1011] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+              className="heroui-input ps-9 pe-8"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute end-2.5 top-2 text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+                className="absolute end-2.5 top-2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -321,14 +408,14 @@ export const LibraryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Controls Bar (for Knowledge tab) */}
+        {/* Compact Filters (for Knowledge tab) */}
         {activeTab === 'knowledge' && (
-          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-zinc-800/80">
             {/* Collection Filter */}
             <select
               value={selectedCollection}
               onChange={(e) => setSelectedCollection(e.target.value)}
-              className="px-2.5 py-1.5 rounded-md border border-[#23252a] bg-[#0f1011] text-[#d0d6e0] cursor-pointer focus:outline-none focus:border-[#5e6ad2]"
+              className="heroui-select"
             >
               <option value="all">{t('library.allCollections')}</option>
               {collections.map((c) => (
@@ -341,8 +428,8 @@ export const LibraryPage: React.FC = () => {
             {/* Type Filter */}
             <select
               value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value as KnowledgeType | 'all')}
-              className="px-2.5 py-1.5 rounded-md border border-[#23252a] bg-[#0f1011] text-[#d0d6e0] cursor-pointer focus:outline-none focus:border-[#5e6ad2]"
+              onChange={(e) => setSelectedType(e.target.value as any)}
+              className="heroui-select"
             >
               <option value="all">{t('library.allTypes')}</option>
               <option value="research_finding">{t('types.research_finding')}</option>
@@ -357,8 +444,8 @@ export const LibraryPage: React.FC = () => {
             {/* Review Status Filter */}
             <select
               value={selectedReview}
-              onChange={(e) => setSelectedReview(e.target.value as ReviewStatus | 'all')}
-              className="px-2.5 py-1.5 rounded-md border border-[#23252a] bg-[#0f1011] text-[#d0d6e0] cursor-pointer focus:outline-none focus:border-[#5e6ad2]"
+              onChange={(e) => setSelectedReview(e.target.value as any)}
+              className="heroui-select"
             >
               <option value="all">{t('library.allReview')}</option>
               <option value="reviewed">{t('reviewStatus.reviewed')}</option>
@@ -369,8 +456,8 @@ export const LibraryPage: React.FC = () => {
             {/* Evidence Level Filter */}
             <select
               value={selectedEvidence}
-              onChange={(e) => setSelectedEvidence(e.target.value as EvidenceLevel | 'all')}
-              className="px-2.5 py-1.5 rounded-md border border-[#23252a] bg-[#0f1011] text-[#d0d6e0] cursor-pointer focus:outline-none focus:border-[#5e6ad2]"
+              onChange={(e) => setSelectedEvidence(e.target.value as any)}
+              className="heroui-select"
             >
               <option value="all">{t('library.allEvidence')}</option>
               <option value="tested">{t('evidenceLevel.tested')}</option>
@@ -381,12 +468,8 @@ export const LibraryPage: React.FC = () => {
             {/* Freshness Filter */}
             <select
               value={selectedFreshness}
-              onChange={(e) =>
-                setSelectedFreshness(
-                  e.target.value as 'all' | 'needs_review' | 'fresh' | 'stale'
-                )
-              }
-              className="px-2.5 py-1.5 rounded-md border border-[#23252a] bg-[#0f1011] text-[#d0d6e0] cursor-pointer focus:outline-none focus:border-[#5e6ad2]"
+              onChange={(e) => setSelectedFreshness(e.target.value as any)}
+              className="heroui-select"
             >
               <option value="all">{t('library.allFreshness')}</option>
               <option value="needs_review">{t('library.needsReview')}</option>
@@ -397,8 +480,8 @@ export const LibraryPage: React.FC = () => {
             {/* Language Filter */}
             <select
               value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value as 'all' | 'en' | 'fa')}
-              className="px-2.5 py-1.5 rounded-md border border-[#23252a] bg-[#0f1011] text-[#d0d6e0] cursor-pointer focus:outline-none focus:border-[#5e6ad2]"
+              onChange={(e) => setSelectedLanguage(e.target.value as any)}
+              className="heroui-select"
             >
               <option value="all">{t('library.filterLanguage')}: {t('common.all')}</option>
               <option value="en">English</option>
@@ -407,31 +490,31 @@ export const LibraryPage: React.FC = () => {
           </div>
         )}
 
-        {/* Active Filter Chips */}
+        {/* Quiet Filter Chips */}
         {activeChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-xs text-[#8a8f98] flex items-center gap-1">
+            <span className="text-[11px] text-zinc-500 flex items-center gap-1">
               <Filter className="w-3 h-3" />
             </span>
             {activeChips.map((chip, idx) => (
               <span
                 key={idx}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs bg-[#141516] text-[#d0d6e0] border border-[#23252a]"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-zinc-800 text-zinc-300 border border-zinc-700"
               >
                 <span>{chip.label}</span>
                 <button
                   type="button"
                   onClick={chip.onRemove}
-                  className="hover:text-[#f7f8f8] p-0.5 rounded cursor-pointer"
+                  className="hover:text-white p-0.5 rounded cursor-pointer"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-2.5 h-2.5" />
                 </button>
               </span>
             ))}
             <button
               type="button"
               onClick={clearAllFilters}
-              className="text-xs text-[#8a8f98] hover:text-[#f7f8f8] underline ps-1 cursor-pointer"
+              className="text-[11px] text-zinc-400 hover:text-zinc-200 underline ps-1 cursor-pointer"
             >
               {t('library.clearFilters')}
             </button>
@@ -441,29 +524,29 @@ export const LibraryPage: React.FC = () => {
 
       {/* Loading & Error States */}
       {loading && (
-        <div className="p-12 text-center text-[#8a8f98] text-sm">
-          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#5e6ad2]" />
+        <div className="py-16 text-center text-zinc-500 text-xs">
+          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
           <span>{t('common.loading')}</span>
         </div>
       )}
 
       {error && !loading && (
-        <div className="p-4 rounded-xl border border-[#34343a] bg-[#141516] flex items-center justify-between text-xs sm:text-sm text-[#f43f5e]">
+        <div className="p-4 rounded-xl border border-rose-900/50 bg-rose-950/20 flex items-center justify-between text-xs text-rose-300">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span>{error}</span>
           </div>
           <button
             type="button"
             onClick={fetchData}
-            className="px-2.5 py-1 rounded bg-[#f43f5e] text-white font-medium hover:bg-rose-600 cursor-pointer"
+            className="px-3 py-1 rounded bg-rose-600 text-white font-medium hover:bg-rose-500 cursor-pointer"
           >
             {t('common.retry')}
           </button>
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Workspace Area */}
       {!loading && !error && (
         <>
           {activeTab === 'knowledge' ? (
@@ -475,35 +558,40 @@ export const LibraryPage: React.FC = () => {
                 onAction={clearAllFilters}
               />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Knowledge List (Left 7 cols on wide screen) */}
-                <div className="lg:col-span-7 space-y-2.5">
+              /* Master/Detail Model (Left knowledge list, Right inspector) */
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                
+                {/* Left/Main Knowledge List (7 or 8 cols) */}
+                <div className="lg:col-span-7 xl:col-span-8 space-y-2">
                   {knowledgeList.map((item) => {
-                    const isSelected = item.id === selectedKnowledgeId;
+                    const isSelected = item.id === (inspectorItem?.id || selectedKnowledgeId);
                     const col = collections.find((c) => c.id === item.collectionId);
 
                     return (
                       <div
                         key={item.id}
-                        onClick={() => setSelectedKnowledgeId(item.id)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer relative ${
+                        onClick={() => setSelectedId(item.id)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer relative ${
                           isSelected
-                            ? 'bg-[#141516] border-[#5e6ad2]'
-                            : 'bg-[#0f1011] border-[#23252a] hover:border-[#34343a]'
+                            ? 'bg-zinc-800/80 border-blue-500 shadow-sm ring-1 ring-blue-500/30'
+                            : 'bg-[#18181b] border-zinc-800/90 hover:border-zinc-700 hover:bg-zinc-850'
                         }`}
                       >
-                        {/* Needs Review Alert Stripe */}
+                        {/* Source Changed Warning Alert */}
                         {item.sourceHasChanged && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-[#f59e0b] font-medium mb-1.5 bg-[#141516] px-2 py-0.5 rounded border border-[#34343a] w-fit">
+                          <div className="flex items-center gap-1.5 text-[11px] text-amber-400 font-medium mb-1.5 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-800/30 w-fit">
                             <Clock className="w-3 h-3" />
                             <span>{t('knowledgeDetail.sourceChangedWarning')}</span>
                           </div>
                         )}
 
-                        <div className="flex items-start justify-between gap-3 mb-1.5">
+                        {/* Title & Open Action */}
+                        <div className="flex items-start justify-between gap-3 mb-1">
                           <h3
                             dir="auto"
-                            className="text-sm sm:text-base font-semibold text-[#f7f8f8] hover:text-[#828fff] leading-snug tracking-card-title"
+                            className={`text-sm font-semibold leading-snug tracking-tight ${
+                              isSelected ? 'text-white' : 'text-zinc-200 hover:text-blue-400'
+                            }`}
                           >
                             {item.title}
                           </h3>
@@ -514,26 +602,30 @@ export const LibraryPage: React.FC = () => {
                               navigate(`/knowledge/${item.id}`);
                             }}
                             title={t('common.openDetail')}
-                            className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] hover:bg-[#18191a] shrink-0 cursor-pointer"
+                            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 shrink-0 cursor-pointer"
                           >
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </button>
                         </div>
 
+                        {/* Short Summary (2 lines) */}
                         <p
                           dir="auto"
-                          className="text-xs sm:text-sm text-[#8a8f98] line-clamp-2 mb-3 leading-relaxed"
+                          className="text-xs text-zinc-400 line-clamp-2 mb-2.5 leading-relaxed"
                         >
                           {item.summary}
                         </p>
 
-                        {/* Badges footer */}
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs pt-2 border-t border-[#23252a]">
-                          <Badge type="knowledgeType" value={item.type} size="sm" />
-                          <Badge type="evidence" value={item.evidenceLevel} size="sm" />
-                          <Badge type="review" value={item.reviewStatus} size="sm" />
+                        {/* Metadata / Badges & Source / Freshness Info */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-2 border-t border-zinc-800/60">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge type="knowledgeType" value={item.type} size="sm" />
+                            <Badge type="evidence" value={item.evidenceLevel} size="sm" />
+                            <Badge type="review" value={item.reviewStatus} size="sm" />
+                          </div>
+
                           {col && (
-                            <span className="text-[11px] text-[#8a8f98] font-medium ms-auto">
+                            <span className="text-[11px] text-zinc-500 font-medium truncate max-w-[150px]">
                               {locale === 'fa' ? col.nameFa : col.name}
                             </span>
                           )}
@@ -543,427 +635,379 @@ export const LibraryPage: React.FC = () => {
                   })}
                 </div>
 
-                {/* Wide-screen Detail Inspector (Right 5 cols) */}
-                <div className="hidden lg:block lg:col-span-5 sticky top-24">
-                  {inspectorItem ? (
-                    <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
-                      <div className="flex items-center justify-between pb-3 border-b border-[#23252a]">
-                        <span className="text-xs uppercase tracking-wider text-[#8a8f98]">
+                {/* Right Inspector (5 or 4 cols) - Holdings Style Side Panel */}
+                <div className="hidden lg:block lg:col-span-5 xl:col-span-4 sticky top-20">
+                  {inspectorItem && (
+                    <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-4 shadow-sm">
+                      
+                      {/* Inspector Header */}
+                      <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                           {t('library.selectedItem')}
                         </span>
                         <button
                           type="button"
                           onClick={() => navigate(`/knowledge/${inspectorItem.id}`)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-[#828fff] hover:text-[#5e6ad2] cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 cursor-pointer"
                         >
                           <span>{t('common.openDetail')}</span>
                           <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
                         </button>
                       </div>
 
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Badge type="knowledgeType" value={inspectorItem.type} />
-                          <Badge type="evidence" value={inspectorItem.evidenceLevel} />
-                          <Badge type="review" value={inspectorItem.reviewStatus} />
+                      {/* Item Badges & Title */}
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge type="knowledgeType" value={inspectorItem.type} size="sm" />
+                          <Badge type="evidence" value={inspectorItem.evidenceLevel} size="sm" />
+                          <Badge type="review" value={inspectorItem.reviewStatus} size="sm" />
                         </div>
                         <h4
                           dir="auto"
-                          className="text-base font-semibold tracking-card-title text-[#f7f8f8] leading-snug"
+                          className="text-sm font-bold text-zinc-100 leading-snug"
                         >
                           {inspectorItem.title}
                         </h4>
                       </div>
 
-                      <div className="text-xs sm:text-sm text-[#d0d6e0] leading-relaxed bg-[#141516] p-3 rounded-lg border border-[#23252a]">
-                        <div className="font-semibold text-[#8a8f98] text-[11px] uppercase tracking-wider mb-1">
+                      {/* Summary Panel */}
+                      <div className="text-xs text-zinc-300 leading-relaxed bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                        <div className="font-semibold text-zinc-500 text-[10px] uppercase tracking-wider mb-1">
                           {t('knowledgeDetail.fieldSummary')}
                         </div>
                         <p dir="auto">{inspectorItem.summary}</p>
                       </div>
 
+                      {/* Applicability */}
                       {inspectorItem.applicability && (
                         <div className="text-xs">
-                          <span className="font-semibold text-[#8a8f98] block mb-0.5">
+                          <span className="font-semibold text-zinc-400 block mb-0.5 text-[11px]">
                             {t('knowledgeDetail.fieldApplicability')}:
                           </span>
-                          <span dir="auto" className="text-[#d0d6e0]">
+                          <span dir="auto" className="text-zinc-300">
                             {inspectorItem.applicability}
                           </span>
                         </div>
                       )}
 
+                      {/* Exclusions */}
                       {inspectorItem.exclusions && (
                         <div className="text-xs">
-                          <span className="font-semibold text-[#8a8f98] block mb-0.5">
+                          <span className="font-semibold text-rose-400 block mb-0.5 text-[11px]">
                             {t('knowledgeDetail.fieldExclusions')}:
                           </span>
-                          <span dir="auto" className="text-[#d0d6e0]">
+                          <span dir="auto" className="text-zinc-300">
                             {inspectorItem.exclusions}
                           </span>
                         </div>
                       )}
 
-                      {/* Source excerpt citation pin */}
-                      <div className="text-xs p-3 rounded-lg border border-[#23252a] border-s-2 border-s-[#5e6ad2] bg-[#141516]">
-                        <span className="font-semibold text-[#828fff] block mb-1">
-                          {t('knowledgeDetail.fieldSourceExcerpt')}
-                        </span>
-                        <blockquote
-                          dir="auto"
-                          className="italic text-[#d0d6e0] ps-2"
-                        >
-                          "{inspectorItem.sourceExcerpt}"
-                        </blockquote>
-                        <div className="mt-2 pt-2 border-t border-[#23252a] flex items-center justify-between text-[11px] text-[#8a8f98]">
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/documents/${inspectorItem.sourceId}`)}
-                            className="hover:text-[#f7f8f8] underline cursor-pointer"
-                          >
-                            {t('sourceDetail.title')}
-                          </button>
-                          <span>{inspectorItem.sourceRevisionId}</span>
+                      {/* Requirements */}
+                      {inspectorItem.requirements && inspectorItem.requirements.length > 0 && (
+                        <div className="text-xs">
+                          <span className="font-semibold text-zinc-400 block mb-1 text-[11px]">
+                            {t('knowledgeDetail.fieldRequirements')}:
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {inspectorItem.requirements.map((req, i) => (
+                              <span
+                                key={i}
+                                className="px-2 py-0.5 rounded text-[10px] bg-zinc-900 text-zinc-300 border border-zinc-800 font-mono"
+                              >
+                                {req}
+                              </span>
+                            ))}
+                          </div>
                         </div>
+                      )}
+
+                      {/* Citation Excerpt */}
+                      {inspectorItem.sourceExcerpt && (
+                        <div className="p-3 rounded-lg border-s-2 border-s-blue-500 bg-zinc-900/60 border border-zinc-800 text-xs">
+                          <div className="font-semibold text-blue-400 text-[10px] uppercase tracking-wider mb-1">
+                            {t('knowledgeDetail.fieldSourceExcerpt')}
+                          </div>
+                          <blockquote dir="auto" className="italic text-zinc-400 font-mono text-[11px] leading-relaxed">
+                            "{inspectorItem.sourceExcerpt}"
+                          </blockquote>
+                        </div>
+                      )}
+
+                      {/* Bottom Inspector Actions */}
+                      <div className="pt-3 border-t border-zinc-800 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyAgentPrompt(e, inspectorItem)}
+                          className="heroui-btn-secondary text-xs flex-1 justify-center"
+                        >
+                          {copiedId === inspectorItem.id ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Bot className="w-3.5 h-3.5 text-blue-400" />
+                          )}
+                          <span>{copiedId === inspectorItem.id ? t('common.copied') : t('marketplace.copyForAgent')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/knowledge/${inspectorItem.id}`)}
+                          className="heroui-btn-primary text-xs flex-1 justify-center"
+                        >
+                          <span>{t('common.openDetail')}</span>
+                          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
+                        </button>
                       </div>
+
                     </div>
-                  ) : null}
+                  )}
                 </div>
+
               </div>
             )
           ) : (
-            /* Sources Tab View */
-            <div className="space-y-3">
-              {filteredSources.length === 0 ? (
-                <EmptyState
-                  title={t('library.noSourcesFound')}
-                  description={t('common.emptyDesc')}
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {filteredSources.map((doc) => {
-                    const col = collections.find((c) => c.id === doc.collectionId);
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => navigate(`/documents/${doc.id}`)}
-                        className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] hover:border-[#34343a] transition-all cursor-pointer group flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-xs text-[#8a8f98] mb-2">
-                            <span>{doc.filename}</span>
-                            <span>{((doc.rawSize || 0) / 1024).toFixed(1)} KiB</span>
-                          </div>
-
-                          <h3
-                            dir="auto"
-                            className="text-base font-semibold text-[#f7f8f8] group-hover:text-[#828fff] mb-2 leading-snug tracking-card-title"
-                          >
-                            {doc.title}
-                          </h3>
-
-                          <div className="flex items-center gap-2 text-xs text-[#8a8f98] mb-4">
-                            <Layers className="w-3.5 h-3.5 text-[#8a8f98]" />
-                            <span>
-                              {doc.revisions.length} {t('sourceDetail.revisions')}
+            /* SOURCE VIEW: Refined Table/List Interface (HeroUI Transaction Style) */
+            <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left rtl:text-right border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-900/90 text-zinc-400">
+                      <th className="p-3.5 font-medium">{t('sourceDetail.filename')}</th>
+                      <th className="p-3.5 font-medium">{t('common.collection')}</th>
+                      <th className="p-3.5 font-medium">{t('sourceDetail.revisions')}</th>
+                      <th className="p-3.5 font-medium">{t('sourceDetail.rawSize')}</th>
+                      <th className="p-3.5 font-medium">{t('library.colUpdated')}</th>
+                      <th className="p-3.5 font-medium text-end">{t('common.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {sourcesList.map((doc) => {
+                      const col = collections.find((c) => c.id === doc.collectionId);
+                      return (
+                        <tr
+                          key={doc.id}
+                          onClick={() => navigate(`/documents/${doc.id}`)}
+                          className="hover:bg-zinc-800/40 transition-colors cursor-pointer group"
+                        >
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                              <div>
+                                <span className="font-semibold text-zinc-100 group-hover:text-blue-400 transition-colors block">
+                                  {doc.title}
+                                </span>
+                                <span className="font-mono text-[11px] text-zinc-500">
+                                  {doc.filename}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap text-zinc-400">
+                            {col ? (locale === 'fa' ? col.nameFa : col.name) : '-'}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono">
+                              v{doc.revisions.length}
                             </span>
-                            <span>&bull;</span>
-                            <span>{doc.language === 'fa' ? 'فارسی' : 'English'}</span>
-                          </div>
-                        </div>
-
-                        <div className="pt-3 border-t border-[#23252a] flex items-center justify-between text-xs">
-                          <span className="font-medium text-[#8a8f98]">
-                            {col ? (locale === 'fa' ? col.nameFa : col.name) : ''}
-                          </span>
-                          <span className="text-[#828fff] font-medium group-hover:text-[#5e6ad2] transition-colors flex items-center gap-1">
-                            <span>{t('sourceDetail.viewOriginal')}</span>
-                            <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap font-mono text-zinc-400">
+                            {Math.round((doc.rawSize || 0) / 1024)} KiB
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap text-zinc-500">
+                            {new Date(doc.updatedAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-3.5 text-end whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 font-medium text-blue-400 group-hover:underline">
+                              <span>{t('common.openDetail')}</span>
+                              <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
       )}
 
       {/* New Knowledge Modal */}
-      {newKnowledgeModalOpen && (
-        <CreateKnowledgeModal
-          isOpen={newKnowledgeModalOpen}
-          collections={collections}
-          sources={sourcesList}
-          onClose={() => setNewKnowledgeModalOpen(false)}
-          onCreated={() => {
-            setNewKnowledgeModalOpen(false);
-            notifyMutation();
-          }}
-        />
-      )}
-    </div>
-  );
-};
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Plus className="w-4 h-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-zinc-100">
+                  {t('library.newKnowledge')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-100 p-1 rounded-md cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-// Modal for creating new knowledge directly
-interface CreateKnowledgeModalProps {
-  isOpen: boolean;
-  collections: Collection[];
-  sources: SourceDocument[];
-  onClose: () => void;
-  onCreated: () => void;
-}
+            <form onSubmit={handleCreateKnowledge} className="p-4 sm:p-5 overflow-y-auto space-y-3.5 flex-1">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('knowledgeDetail.fieldTitle')} *
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g. Dual-Pass Bounding Box Alignment for Tables"
+                  className="heroui-input"
+                />
+              </div>
 
-const CreateKnowledgeModal: React.FC<CreateKnowledgeModalProps> = ({
-  isOpen,
-  collections,
-  sources,
-  onClose,
-  onCreated,
-}) => {
-  const { repository } = useRepository();
-  const { t, locale } = useLocale();
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">
+                    {t('knowledgeDetail.fieldType')}
+                  </label>
+                  <select
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value as KnowledgeType)}
+                    className="heroui-select w-full"
+                  >
+                    <option value="procedure">{t('types.procedure')}</option>
+                    <option value="skill">{t('types.skill')}</option>
+                    <option value="research_finding">{t('types.research_finding')}</option>
+                    <option value="tip">{t('types.tip')}</option>
+                    <option value="example">{t('types.example')}</option>
+                    <option value="failure">{t('types.failure')}</option>
+                    <option value="lesson">{t('types.lesson')}</option>
+                  </select>
+                </div>
 
-  const [title, setTitle] = useState('');
-  const [summary, setSummary] = useState('');
-  const [body, setBody] = useState('');
-  const [type, setType] = useState<KnowledgeType>('procedure');
-  const [collectionId, setCollectionId] = useState(collections[0]?.id || 'col-research-synthesis');
-  const [sourceId, setSourceId] = useState(sources[0]?.id || '');
-  const [sourceExcerpt, setSourceExcerpt] = useState('');
-  const [applicability, setApplicability] = useState('');
-  const [exclusions, setExclusions] = useState('');
-  const [requirementsStr, setRequirementsStr] = useState('');
-  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>('draft');
-  const [evidenceLevel, setEvidenceLevel] = useState<EvidenceLevel>('observed');
-  const [saving, setSaving] = useState(false);
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">
+                    {t('knowledgeDetail.fieldCollection')}
+                  </label>
+                  <select
+                    value={newCollectionId}
+                    onChange={(e) => setNewCollectionId(e.target.value)}
+                    className="heroui-select w-full"
+                  >
+                    {collections.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {locale === 'fa' ? col.nameFa : col.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-  if (!isOpen) return null;
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('knowledgeDetail.fieldSummary')} *
+                </label>
+                <textarea
+                  dir="auto"
+                  required
+                  rows={2}
+                  value={newSummary}
+                  onChange={(e) => setNewSummary(e.target.value)}
+                  placeholder="Concise 1-2 sentence core takeaway..."
+                  className="heroui-input"
+                />
+              </div>
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !summary.trim()) return;
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('knowledgeDetail.fieldBody')}
+                </label>
+                <textarea
+                  dir="auto"
+                  rows={4}
+                  value={newBody}
+                  onChange={(e) => setNewBody(e.target.value)}
+                  placeholder="Technical procedure steps or markdown details..."
+                  className="heroui-input"
+                />
+              </div>
 
-    try {
-      setSaving(true);
-      const chosenSource = sources.find((s) => s.id === sourceId);
-      const revisionId = chosenSource?.revisions[0]?.revisionId || 'rev-src-01-a';
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">
+                    {t('knowledgeDetail.fieldApplicability')}
+                  </label>
+                  <input
+                    type="text"
+                    dir="auto"
+                    value={newApplicability}
+                    onChange={(e) => setNewApplicability(e.target.value)}
+                    className="heroui-input"
+                  />
+                </div>
 
-      const requirements = requirementsStr
-        .split(',')
-        .map((r) => r.trim())
-        .filter(Boolean);
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">
+                    {t('knowledgeDetail.fieldExclusions')}
+                  </label>
+                  <input
+                    type="text"
+                    dir="auto"
+                    value={newExclusions}
+                    onChange={(e) => setNewExclusions(e.target.value)}
+                    className="heroui-input"
+                  />
+                </div>
+              </div>
 
-      await repository.createKnowledge({
-        title,
-        summary,
-        body,
-        type,
-        collectionId,
-        sourceId: sourceId || sources[0]?.id || 'src-synth-eval-02',
-        sourceRevisionId: revisionId,
-        sourceExcerpt: sourceExcerpt || summary,
-        applicability,
-        exclusions,
-        requirements,
-        reviewStatus,
-        evidenceLevel,
-        language: locale,
-        sourceHasChanged: false,
-      });
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('knowledgeDetail.fieldRequirements')}
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={newRequirements}
+                  onChange={(e) => setNewRequirements(e.target.value)}
+                  placeholder="e.g. Python 3.11, Scikit-learn"
+                  className="heroui-input"
+                />
+              </div>
 
-      onCreated();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
-  };
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('knowledgeDetail.fieldSourceExcerpt')}
+                </label>
+                <textarea
+                  dir="auto"
+                  rows={2}
+                  value={newSourceExcerpt}
+                  onChange={(e) => setNewSourceExcerpt(e.target.value)}
+                  className="heroui-input"
+                />
+              </div>
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto"
-    >
-      <div className="w-full max-w-2xl bg-[#0f1011] rounded-xl border border-[#23252a] overflow-hidden my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#23252a]">
-          <h3 className="text-base font-semibold tracking-title text-[#f7f8f8]">
-            {t('library.newKnowledge')}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setCreateModalOpen(false)}
+                  className="heroui-btn-secondary"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="heroui-btn-primary"
+                >
+                  {t('common.create')}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          <div>
-            <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-              {t('knowledgeDetail.fieldTitle')} *
-            </label>
-            <input
-              type="text"
-              dir="auto"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                {t('knowledgeDetail.fieldType')}
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as KnowledgeType)}
-                className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-              >
-                <option value="procedure">{t('types.procedure')}</option>
-                <option value="research_finding">{t('types.research_finding')}</option>
-                <option value="tip">{t('types.tip')}</option>
-                <option value="skill">{t('types.skill')}</option>
-                <option value="example">{t('types.example')}</option>
-                <option value="failure">{t('types.failure')}</option>
-                <option value="lesson">{t('types.lesson')}</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                {t('knowledgeDetail.fieldCollection')}
-              </label>
-              <select
-                value={collectionId}
-                onChange={(e) => setCollectionId(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-              >
-                {collections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {locale === 'fa' ? c.nameFa : c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-              {t('knowledgeDetail.fieldSummary')} *
-            </label>
-            <textarea
-              dir="auto"
-              required
-              rows={2}
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-              {t('knowledgeDetail.fieldBody')}
-            </label>
-            <textarea
-              dir="auto"
-              rows={3}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2] text-xs leading-relaxed"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                {t('knowledgeDetail.fieldReviewStatus')}
-              </label>
-              <select
-                value={reviewStatus}
-                onChange={(e) => setReviewStatus(e.target.value as ReviewStatus)}
-                className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-              >
-                <option value="draft">{t('reviewStatus.draft')}</option>
-                <option value="reviewed">{t('reviewStatus.reviewed')}</option>
-                <option value="deprecated">{t('reviewStatus.deprecated')}</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                {t('knowledgeDetail.fieldEvidenceLevel')}
-              </label>
-              <select
-                value={evidenceLevel}
-                onChange={(e) => setEvidenceLevel(e.target.value as EvidenceLevel)}
-                className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-              >
-                <option value="unverified">{t('evidenceLevel.unverified')}</option>
-                <option value="observed">{t('evidenceLevel.observed')}</option>
-                <option value="tested">{t('evidenceLevel.tested')}</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-              {t('sourceDetail.title')}
-            </label>
-            <select
-              value={sourceId}
-              onChange={(e) => setSourceId(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-            >
-              {sources.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title} ({s.filename})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-              {t('knowledgeDetail.fieldSourceExcerpt')}
-            </label>
-            <input
-              type="text"
-              dir="auto"
-              value={sourceExcerpt}
-              onChange={(e) => setSourceExcerpt(e.target.value)}
-              placeholder="Exact sentence or paragraph from source report..."
-              className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#23252a]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="linear-btn-secondary text-xs sm:text-sm"
-            >
-              {t('common.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="linear-btn-primary text-xs sm:text-sm"
-            >
-              {saving ? t('common.saving') : t('common.create')}
-            </button>
-          </div>
-        </form>
-      </div>
+      )}
     </div>
   );
 };

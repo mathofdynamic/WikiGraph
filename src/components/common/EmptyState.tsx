@@ -23,22 +23,22 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
   return (
     <div
-      className={`flex flex-col items-center justify-center p-8 text-center rounded-xl border border-dashed border-[#23252a] bg-[#0f1011]/80 ${className}`}
+      className={`flex flex-col items-center justify-center p-8 text-center rounded-xl border border-dashed border-zinc-800 bg-zinc-900/40 ${className}`}
     >
-      <div className="w-12 h-12 rounded-xl bg-[#141516] border border-[#23252a] flex items-center justify-center text-[#8a8f98] mb-3.5">
-        <Icon className="w-5 h-5 text-[#5e6ad2]" />
+      <div className="w-12 h-12 rounded-xl bg-zinc-850 border border-zinc-800 flex items-center justify-center text-zinc-400 mb-3.5">
+        <Icon className="w-5 h-5 text-blue-500" />
       </div>
-      <h3 className="text-sm font-semibold tracking-card-title text-[#f7f8f8] mb-1">
+      <h3 className="text-sm font-semibold text-zinc-100 mb-1">
         {title || t('common.emptyTitle')}
       </h3>
-      <p className="text-xs text-[#8a8f98] max-w-sm mb-4 leading-relaxed">
+      <p className="text-xs text-zinc-400 max-w-sm mb-4 leading-relaxed">
         {description || t('common.emptyDesc')}
       </p>
       {actionLabel && onAction && (
         <button
           type="button"
           onClick={onAction}
-          className="linear-btn-primary text-xs"
+          className="heroui-btn-primary text-xs"
         >
           {actionLabel}
         </button>

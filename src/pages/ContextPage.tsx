@@ -7,14 +7,12 @@ import {
   Copy,
   Check,
   Download,
-  Bookmark,
   AlertTriangle,
   MoveUp,
   MoveDown,
   Layers,
   FileCode,
   FileText,
-  Sparkles,
   Info,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
@@ -52,10 +50,6 @@ export const ContextPage: React.FC = () => {
 
   // Copy & Download states
   const [copied, setCopied] = useState(false);
-  const [recipes, setRecipes] = useState<ContextRecipe[]>([]);
-  const [saveRecipeModalOpen, setSaveRecipeModalOpen] = useState(false);
-  const [recipeName, setRecipeName] = useState('');
-  const [recipeDesc, setRecipeDesc] = useState('');
 
   // Initial data load
   useEffect(() => {
@@ -71,7 +65,6 @@ export const ContextPage: React.FC = () => {
       setSources(sList);
       setCollections(cList);
 
-      // Pre-select first 4 items as a starting contextual packet
       if (kList.length > 0 && selectedIds.length === 0) {
         setSelectedIds(kList.slice(0, 4).map((k) => k.id));
       }
@@ -82,13 +75,11 @@ export const ContextPage: React.FC = () => {
     };
   }, [repository, version]);
 
-  // Selected knowledge items in order
   const selectedItems = useMemo(() => {
     const map = new Map(allKnowledge.map((k) => [k.id, k]));
     return selectedIds.map((id) => map.get(id)).filter(Boolean) as KnowledgeItem[];
   }, [selectedIds, allKnowledge]);
 
-  // Available knowledge items for left search
   const availableItems = useMemo(() => {
     let filtered = allKnowledge.filter((k) => !selectedIds.includes(k.id));
     if (selectedCollection !== 'all') {
@@ -106,15 +97,13 @@ export const ContextPage: React.FC = () => {
     return filtered;
   }, [allKnowledge, selectedIds, selectedCollection, selectedType, searchQuery]);
 
-  // Reorder actions
   const moveItem = (index: number, direction: 'up' | 'down') => {
-    const newIdx = direction === 'up' ? index - 1 : index + 1;
-    if (newIdx < 0 || newIdx >= selectedIds.length) return;
-    const copy = [...selectedIds];
-    const temp = copy[index];
-    copy[index] = copy[newIdx];
-    copy[newIdx] = temp;
-    setSelectedIds(copy);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= selectedIds.length) return;
+    const next = [...selectedIds];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    setSelectedIds(next);
   };
 
   const removeItem = (id: string) => {
@@ -122,274 +111,179 @@ export const ContextPage: React.FC = () => {
   };
 
   const addItem = (id: string) => {
-    setSelectedIds((prev) => [...prev, id]);
-  };
-
-  // Pre-built Prompt Recipes
-  const applyPresetRecipe = (presetType: 'security' | 'rag' | 'i18n') => {
-    if (presetType === 'security') {
-      setTaskGoal('Security & Zero Trust Guardrail Audit');
-      const ids = allKnowledge
-        .filter((k) => k.title.toLowerCase().includes('security') || k.type === 'procedure')
-        .slice(0, 4)
-        .map((k) => k.id);
-      setSelectedIds(ids.length > 0 ? ids : allKnowledge.slice(0, 3).map((k) => k.id));
-    } else if (presetType === 'rag') {
-      setTaskGoal('Dense Retrieval & Knowledge Packet Ingestion');
-      const ids = allKnowledge
-        .filter((k) => k.title.toLowerCase().includes('retrieval') || k.type === 'tip')
-        .slice(0, 4)
-        .map((k) => k.id);
-      setSelectedIds(ids.length > 0 ? ids : allKnowledge.slice(0, 3).map((k) => k.id));
-    } else {
-      setTaskGoal('Persian RTL Localization & Font Hierarchy Verification');
-      const ids = allKnowledge
-        .filter((k) => k.language === 'fa' || k.title.toLowerCase().includes('localization'))
-        .slice(0, 4)
-        .map((k) => k.id);
-      setSelectedIds(ids.length > 0 ? ids : allKnowledge.slice(0, 3).map((k) => k.id));
+    if (!selectedIds.includes(id)) {
+      setSelectedIds((prev) => [...prev, id]);
     }
   };
 
-  // Formatted Output Generator
-  const generatedOutput = useMemo(() => {
+  // Assembled payload preview
+  const assembledPayload = useMemo(() => {
     const sourceMap = new Map(sources.map((s) => [s.id, s]));
 
-    if (format === 'markdown') {
-      let md = `# Task Directive: ${taskGoal}\n\n`;
-      md += `*Assembled via WikiGraph Knowledge Engine on ${new Date().toISOString().split('T')[0]}*\n\n`;
-      md += `## Assembled Empirical Knowledge Context\n\n`;
-
-      selectedItems.forEach((item, idx) => {
-        const src = sourceMap.get(item.sourceId);
-        md += `### ${idx + 1}. [${item.type.toUpperCase()}] ${item.title} [^${idx + 1}]\n`;
-        md += `**Summary**: ${item.summary}\n\n`;
-        if (item.body) {
-          md += `**Details & Procedure**:\n\`\`\`\n${item.body}\n\`\`\`\n\n`;
-        }
-        if (item.applicability) {
-          md += `*Applicability*: ${item.applicability}\n`;
-        }
-        if (item.exclusions) {
-          md += `*Exclusions / Guardrails*: ${item.exclusions}\n`;
-        }
-        md += `\n`;
-      });
-
-      md += `## Citations & Verification Pins\n\n`;
-      selectedItems.forEach((item, idx) => {
-        const src = sourceMap.get(item.sourceId);
-        md += `[^${idx + 1}]: Source: **${src?.title || item.sourceId}** (${src?.filename || 'report.md'}, rev: ${item.sourceRevisionId}).\n`;
-        md += `> "${item.sourceExcerpt}"\n\n`;
-      });
-
-      return md;
-    }
-
     if (format === 'json') {
-      const packet = {
-        metadata: {
-          generator: 'WikiGraph v1.0',
-          generatedAt: new Date().toISOString(),
-          taskGoal,
-          totalItems: selectedItems.length,
-        },
-        items: selectedItems.map((item, idx) => {
-          const src = sourceMap.get(item.sourceId);
-          return {
-            index: idx + 1,
-            id: item.id,
-            type: item.type,
-            title: item.title,
-            summary: item.summary,
-            body: item.body,
-            evidenceLevel: item.evidenceLevel,
-            reviewStatus: item.reviewStatus,
-            applicability: item.applicability,
-            exclusions: item.exclusions,
-            requirements: item.requirements,
-            citation: {
-              sourceId: item.sourceId,
-              sourceFilename: src?.filename,
-              sourceTitle: src?.title,
-              sourceRevisionId: item.sourceRevisionId,
-              excerptPin: item.sourceExcerpt,
-            },
-          };
-        }),
+      const bundle = {
+        contextAssemblyVersion: '1.0',
+        timestamp: new Date().toISOString(),
+        taskObjective: taskGoal,
+        totalItems: selectedItems.length,
+        items: selectedItems.map((item, idx) => ({
+          priority: idx + 1,
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          evidenceLevel: item.evidenceLevel,
+          summary: item.summary,
+          applicability: item.applicability,
+          exclusions: item.exclusions,
+          requirements: item.requirements,
+          procedure: item.body || item.summary,
+          sourceCitation: {
+            document: sourceMap.get(item.sourceId)?.filename || item.sourceId,
+            excerpt: item.sourceExcerpt,
+          },
+        })),
       };
-      return JSON.stringify(packet, null, 2);
+      return JSON.stringify(bundle, null, 2);
     }
 
     if (format === 'briefing') {
-      let br = `EXECUTIVE KNOWLEDGE BRIEFING: ${taskGoal}\n`;
-      br += `======================================================\n\n`;
+      let b = `# Technical Context Briefing: ${taskGoal}\n\n`;
+      b += `*Generated: ${new Date().toLocaleDateString()} | Grounded Knowledge Units: ${selectedItems.length}*\n\n`;
+      b += `## Executive Summary & Applicable Heuristics\n\n`;
       selectedItems.forEach((item, idx) => {
-        br += `${idx + 1}. ${item.title} (${item.type.toUpperCase()})\n`;
-        br += `   • ${item.summary}\n`;
-        if (item.applicability) br += `   • When: ${item.applicability}\n`;
-        if (item.exclusions) br += `   • Caution: ${item.exclusions}\n`;
-        br += `   • Evidence: ${item.evidenceLevel} | Review: ${item.reviewStatus}\n\n`;
+        b += `### ${idx + 1}. ${item.title} [${item.type}]\n`;
+        b += `**Core Insight:** ${item.summary}\n`;
+        if (item.applicability) b += `**When to Apply:** ${item.applicability}\n`;
+        if (item.exclusions) b += `**Constraints:** ${item.exclusions}\n`;
+        b += `\n`;
       });
-      return br;
+      return b;
     }
 
-    // Plain text
-    let plain = `TASK: ${taskGoal}\n\n`;
+    // Default: Markdown
+    let md = `# Context Package: ${taskGoal}\n\n`;
+    md += `> Assembled for autonomous agent ingestion or human technical review.\n\n`;
     selectedItems.forEach((item, idx) => {
-      plain += `[ITEM ${idx + 1}] ${item.title}\n`;
-      plain += `${item.summary}\n`;
-      if (item.body) plain += `${item.body}\n`;
-      plain += `--------------------------------------------------\n`;
+      const srcDoc = sourceMap.get(item.sourceId);
+      md += `## Section ${idx + 1}: ${item.title}\n`;
+      md += `**Type:** ${item.type} | **Evidence Grade:** ${item.evidenceLevel}\n\n`;
+      md += `${item.summary}\n\n`;
+      if (item.body) {
+        md += `### Execution Steps\n${item.body}\n\n`;
+      }
+      if (item.sourceExcerpt) {
+        md += `> "${item.sourceExcerpt}"\n> — *Source: ${srcDoc?.filename || item.sourceId}*\n\n`;
+      }
     });
-    return plain;
-  }, [format, taskGoal, selectedItems, sources]);
-
-  // Token count estimate (~4 chars per token)
-  const tokenEstimate = Math.ceil(generatedOutput.length / 4);
+    return md;
+  }, [format, selectedItems, taskGoal, sources]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(generatedOutput);
+    navigator.clipboard.writeText(assembledPayload);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
     const ext = format === 'json' ? 'json' : 'md';
-    const blob = new Blob([generatedOutput], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([assembledPayload], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `wikigraph_context_${Date.now()}.${ext}`;
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `context_${taskGoal.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)}.${ext}`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleSaveRecipe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recipeName.trim()) return;
-
-    const newRecipe: ContextRecipe = {
-      id: `recipe-${Date.now()}`,
-      name: recipeName,
-      description: recipeDesc,
-      selectedKnowledgeIds: [...selectedIds],
-      outputFormat: format,
-      createdAt: new Date().toISOString(),
-    };
-
-    setRecipes((prev) => [...prev, newRecipe]);
-    setSaveRecipeModalOpen(false);
-    setRecipeName('');
-    setRecipeDesc('');
-  };
-
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#23252a]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#8a8f98] uppercase tracking-wider mb-1">
-            <span>WikiGraph</span>
-            <span>/</span>
-            <span className="text-[#828fff] font-medium">
-              {t('nav.context')}
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-title text-[#f7f8f8]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
             {t('context.title')}
-          </h2>
-          <p className="text-xs sm:text-sm text-[#8a8f98] mt-0.5">
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
             {t('context.subtitle')}
           </p>
         </div>
 
-        {/* Preset quick recipes */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-[#8a8f98] font-medium">{t('context.recipes')}:</span>
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => applyPresetRecipe('security')}
-            className="linear-btn-secondary text-xs"
+            onClick={handleCopy}
+            className="heroui-btn-secondary text-xs"
           >
-            Security Audit
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? t('common.copied') : t('common.copy')}</span>
           </button>
           <button
             type="button"
-            onClick={() => applyPresetRecipe('rag')}
-            className="linear-btn-secondary text-xs"
+            onClick={handleDownload}
+            className="heroui-btn-primary text-xs"
           >
-            RAG Synthesis
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPresetRecipe('i18n')}
-            className="linear-btn-secondary text-xs"
-          >
-            فارسی Localization
+            <Download className="w-3.5 h-3.5" />
+            <span>{t('common.download')}</span>
           </button>
         </div>
       </div>
 
-      {/* Two-Pane Assembly Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Pane (5 cols): Knowledge Selection & Reordering */}
-        <div className="lg:col-span-5 space-y-5">
-          {/* Target Task Input */}
-          <div className="p-4 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8a8f98]">
-              Task Directive / Objective
+      {/* Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left: Configuration & Knowledge Selection (7 cols) */}
+        <div className="lg:col-span-7 space-y-4">
+          
+          {/* Task Goal Input */}
+          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2">
+            <label className="block text-xs font-semibold text-zinc-300">
+              Task Objective / Downstream Purpose
             </label>
             <input
               type="text"
-              dir="auto"
               value={taskGoal}
               onChange={(e) => setTaskGoal(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
+              placeholder="e.g. Table Extraction Heuristics for Financial Filings"
+              className="heroui-input"
             />
           </div>
 
           {/* Selected Knowledge Items in Packet */}
-          <div className="p-4 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-[#23252a]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#d0d6e0] flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#828fff]" />
-                <span>{t('context.selectedItems')}</span>
+          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-400" />
+                <span>Assembled Knowledge Sequence</span>
               </span>
-              <span className="text-xs font-medium text-[#828fff]">
-                {selectedItems.length} items
+              <span className="text-xs font-medium text-blue-400 font-mono">
+                {selectedItems.length} units
               </span>
             </div>
 
             {selectedItems.length === 0 ? (
-              <p className="text-xs text-[#8a8f98] py-3 text-center italic">
-                {t('context.noItemsSelected')}
+              <p className="text-xs text-zinc-500 py-3 text-center italic">
+                No items selected yet. Choose items below to assemble your context packet.
               </p>
             ) : (
               <div className="space-y-2">
                 {selectedItems.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-lg border border-[#23252a] bg-[#141516] space-y-1.5 group"
+                    className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/70 space-y-1.5 group"
                   >
-                    {/* Source changed warning */}
                     {item.sourceHasChanged && (
-                      <div className="flex items-center gap-1 text-[11px] text-[#f59e0b] font-medium">
+                      <div className="flex items-center gap-1 text-[11px] text-amber-400 font-medium">
                         <AlertTriangle className="w-3 h-3" />
-                        <span>Source changed - verify citation</span>
+                        <span>Source changed - verification recommended</span>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs text-[#8a8f98] font-semibold">
-                          #{idx + 1}
-                        </span>
+                        <span className="text-xs text-zinc-500 font-mono">#{idx + 1}</span>
                         <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <h4
-                          dir="auto"
-                          className="text-xs font-medium text-[#f7f8f8] truncate"
-                        >
+                        <h4 dir="auto" className="text-xs font-medium text-zinc-200 truncate">
                           {item.title}
                         </h4>
                       </div>
@@ -399,7 +293,7 @@ export const ContextPage: React.FC = () => {
                           type="button"
                           disabled={idx === 0}
                           onClick={() => moveItem(idx, 'up')}
-                          className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] disabled:opacity-20 cursor-pointer"
+                          className="p-1 rounded text-zinc-400 hover:text-zinc-100 disabled:opacity-20 cursor-pointer"
                         >
                           <MoveUp className="w-3.5 h-3.5" />
                         </button>
@@ -407,24 +301,21 @@ export const ContextPage: React.FC = () => {
                           type="button"
                           disabled={idx === selectedItems.length - 1}
                           onClick={() => moveItem(idx, 'down')}
-                          className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] disabled:opacity-20 cursor-pointer"
+                          className="p-1 rounded text-zinc-400 hover:text-zinc-100 disabled:opacity-20 cursor-pointer"
                         >
                           <MoveDown className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
-                          className="p-1 rounded text-[#8a8f98] hover:text-[#fb7185] cursor-pointer"
+                          className="p-1 rounded text-zinc-400 hover:text-rose-400 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
-                    <p
-                      dir="auto"
-                      className="text-[11px] text-[#8a8f98] line-clamp-1"
-                    >
+                    <p dir="auto" className="text-[11px] text-zinc-400 line-clamp-1">
                       {item.summary}
                     </p>
                   </div>
@@ -433,32 +324,32 @@ export const ContextPage: React.FC = () => {
             )}
           </div>
 
-          {/* Add More Knowledge from Library Picker */}
-          <div className="p-4 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#d0d6e0] block">
-              {t('context.availableItems')}
+          {/* Available Knowledge Picker */}
+          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-300 block">
+              Available Knowledge Units
             </span>
 
-            {/* Filter inputs */}
+            {/* Filter Inputs */}
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-[#8a8f98] absolute start-2.5 top-2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 text-zinc-500 absolute start-2.5 top-2 pointer-events-none" />
                 <input
                   type="text"
                   dir="auto"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('common.searchPlaceholder')}
-                  className="w-full ps-8 pe-3 py-1 text-xs rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                  placeholder="Filter available knowledge..."
+                  className="heroui-input ps-8 py-1 text-xs"
                 />
               </div>
 
               <select
                 value={selectedCollection}
                 onChange={(e) => setSelectedCollection(e.target.value)}
-                className="px-2 py-1 text-xs rounded-md border border-[#23252a] bg-[#141516] text-[#d0d6e0] focus:outline-none focus:border-[#5e6ad2]"
+                className="heroui-select text-xs py-1"
               >
-                <option value="all">{t('library.allCollections')}</option>
+                <option value="all">All Collections</option>
                 {collections.map((c) => (
                   <option key={c.id} value={c.id}>
                     {locale === 'fa' ? c.nameFa : c.name}
@@ -467,32 +358,23 @@ export const ContextPage: React.FC = () => {
               </select>
             </div>
 
-            {/* List of items that can be added */}
-            <div className="max-h-60 overflow-y-auto space-y-1.5 divide-y divide-[#23252a]">
+            {/* List of Available Items */}
+            <div className="max-h-64 overflow-y-auto space-y-1.5 divide-y divide-zinc-800">
               {availableItems.length === 0 ? (
-                <p className="text-xs text-[#8a8f98] py-2 text-center italic">
-                  No additional items found.
+                <p className="text-xs text-zinc-500 py-3 text-center italic">
+                  No additional units match filter.
                 </p>
               ) : (
                 availableItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="pt-1.5 flex items-center justify-between gap-2"
-                  >
+                  <div key={item.id} className="pt-2 flex items-center justify-between gap-2">
                     <div className="min-w-0 pr-2">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <span
-                          dir="auto"
-                          className="text-xs font-medium text-[#f7f8f8] truncate"
-                        >
+                        <span dir="auto" className="text-xs font-medium text-zinc-200 truncate">
                           {item.title}
                         </span>
                       </div>
-                      <p
-                        dir="auto"
-                        className="text-[11px] text-[#8a8f98] line-clamp-1"
-                      >
+                      <p dir="auto" className="text-[11px] text-zinc-400 line-clamp-1">
                         {item.summary}
                       </p>
                     </div>
@@ -500,203 +382,68 @@ export const ContextPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => addItem(item.id)}
-                      className="p-1 rounded-md bg-[#141516] border border-[#23252a] hover:border-[#5e6ad2] text-[#8a8f98] hover:text-[#f7f8f8] shrink-0 cursor-pointer"
-                      title={t('common.add')}
+                      className="heroui-btn-secondary text-xs px-2.5 py-1 shrink-0"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3 h-3" />
+                      <span>Add</span>
                     </button>
                   </div>
                 ))
               )}
             </div>
           </div>
+
         </div>
 
-        {/* Right Pane (7 cols): Live Assembly Preview & Output Controls */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="p-5 sm:p-6 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
-            {/* Output Bar & Format Switcher */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#23252a]">
-              <div className="flex items-center gap-1.5 p-1 rounded-md bg-[#141516] border border-[#23252a] text-xs">
-                <button
-                  type="button"
-                  onClick={() => setFormat('markdown')}
-                  className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                    format === 'markdown'
-                      ? 'bg-[#1b1c1d] text-[#f7f8f8] border border-[#2e3036]'
-                      : 'text-[#8a8f98] hover:text-[#f7f8f8]'
-                  }`}
-                >
-                  Markdown
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormat('json')}
-                  className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                    format === 'json'
-                      ? 'bg-[#1b1c1d] text-[#f7f8f8] border border-[#2e3036]'
-                      : 'text-[#8a8f98] hover:text-[#f7f8f8]'
-                  }`}
-                >
-                  JSON Packet
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormat('briefing')}
-                  className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                    format === 'briefing'
-                      ? 'bg-[#1b1c1d] text-[#f7f8f8] border border-[#2e3036]'
-                      : 'text-[#8a8f98] hover:text-[#f7f8f8]'
-                  }`}
-                >
-                  Executive Brief
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormat('plain')}
-                  className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
-                    format === 'plain'
-                      ? 'bg-[#1b1c1d] text-[#f7f8f8] border border-[#2e3036]'
-                      : 'text-[#8a8f98] hover:text-[#f7f8f8]'
-                  }`}
-                >
-                  Plain Text
-                </button>
-              </div>
-
-              {/* Action Buttons: Copy, Download, Save Recipe */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="linear-btn-secondary text-xs gap-1.5"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-[#4ade80]" />
-                      <span className="text-[#4ade80]">{t('common.copied')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{t('common.copy')}</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="linear-btn-secondary text-xs p-1.5"
-                  title={t('common.download')}
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSaveRecipeModalOpen(true)}
-                  className="linear-btn-primary text-xs gap-1.5"
-                >
-                  <Bookmark className="w-3.5 h-3.5" />
-                  <span>Save Recipe</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Token & Character Count stats bar */}
-            <div className="flex items-center justify-between text-xs text-[#8a8f98]">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#828fff]" />
-                <span>~{tokenEstimate.toLocaleString()} estimated tokens</span>
+        {/* Right: Output Format & Assembled Live Preview (5 cols) */}
+        <div className="lg:col-span-5 space-y-4 sticky top-20">
+          <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3 shadow-xs">
+            
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                <span>Assembled Context Preview</span>
               </span>
-              <span>{generatedOutput.length.toLocaleString()} characters</span>
+
+              {/* Segmented Format Switch */}
+              <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                {(['markdown', 'json', 'briefing'] as OutputFormat[]).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => setFormat(fmt)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                      format === fmt
+                        ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    {fmt.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Live Assembly Text Box */}
-            <div className="relative">
-              <textarea
-                readOnly
-                dir="auto"
-                rows={20}
-                value={generatedOutput}
-                className="w-full p-4 text-xs rounded-lg border border-[#23252a] bg-[#010102] text-[#d0d6e0] leading-relaxed focus:outline-none select-text"
-              />
+            {/* Assembled Output Code Box */}
+            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-zinc-300 max-h-[550px] overflow-y-auto leading-relaxed">
+              <pre className="whitespace-pre-wrap">{assembledPayload}</pre>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Save Recipe Modal */}
-      {saveRecipeModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-md bg-[#0f1011] rounded-xl border border-[#23252a] shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#23252a] flex items-center justify-between">
-              <h3 className="text-base font-semibold tracking-title text-[#f7f8f8]">
-                Save Assembly Recipe
-              </h3>
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
+              <span>{assembledPayload.length} characters</span>
               <button
                 type="button"
-                onClick={() => setSaveRecipeModalOpen(false)}
-                className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+                onClick={handleCopy}
+                className="text-blue-400 hover:underline cursor-pointer"
               >
-                &times;
+                Copy to Clipboard
               </button>
             </div>
-
-            <form onSubmit={handleSaveRecipe} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Recipe Name *
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  required
-                  placeholder="e.g. Weekly Cloud Security Packet"
-                  value={recipeName}
-                  onChange={(e) => setRecipeName(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Description
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={2}
-                  placeholder="Instructions or scope of this reproducible recipe..."
-                  value={recipeDesc}
-                  onChange={(e) => setRecipeDesc(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#23252a]">
-                <button
-                  type="button"
-                  onClick={() => setSaveRecipeModalOpen(false)}
-                  className="linear-btn-secondary text-xs sm:text-sm"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="linear-btn-primary text-xs sm:text-sm"
-                >
-                  Save Recipe
-                </button>
-              </div>
-            </form>
           </div>
         </div>
-      )}
+
+      </div>
+
     </div>
   );
 };

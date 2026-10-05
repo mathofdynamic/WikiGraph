@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -12,11 +12,13 @@ import {
   GitFork,
   FileText,
   ShieldCheck,
-  Tag,
   X,
-  History,
   AlertCircle,
-  HelpCircle,
+  Copy,
+  Check,
+  Bot,
+  ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -29,9 +31,11 @@ import {
   RelationshipType,
   ReviewStatus,
   SourceDocument,
+  KnowledgeOutcome,
 } from '../types';
 import { Badge } from '../components/common/Badge';
 import { ConfirmModal } from '../components/common/ConfirmModal';
+import { MarkdownViewer } from '../components/common/MarkdownViewer';
 
 export const KnowledgeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,7 +49,12 @@ export const KnowledgeDetailPage: React.FC = () => {
   const [allKnowledge, setAllKnowledge] = useState<KnowledgeItem[]>([]);
   const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [relationships, setRelationships] = useState<KnowledgeRelationship[]>([]);
+  const [outcomes, setOutcomes] = useState<KnowledgeOutcome[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Copy feedback
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
   // Edit Mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -67,9 +76,15 @@ export const KnowledgeDetailPage: React.FC = () => {
   const [relType, setRelType] = useState<RelationshipType>('supports');
   const [relNotes, setRelNotes] = useState('');
 
+  // Add Outcome Modal state
+  const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
+  const [outcomeTask, setOutcomeTask] = useState('');
+  const [outcomeResult, setOutcomeResult] = useState<'success' | 'failure' | 'uncertain'>('success');
+  const [outcomeMetrics, setOutcomeMetrics] = useState('');
+  const [outcomeNotes, setOutcomeNotes] = useState('');
+
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleteRelTargetId, setDeleteRelTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -88,7 +103,7 @@ export const KnowledgeDetailPage: React.FC = () => {
         setItem(k);
         setEditTitle(k.title);
         setEditSummary(k.summary);
-        setEditBody(k.body);
+        setEditBody(k.body || '');
         setEditType(k.type);
         setEditCollectionId(k.collectionId);
         setEditReviewStatus(k.reviewStatus);
@@ -98,18 +113,21 @@ export const KnowledgeDetailPage: React.FC = () => {
         setEditRequirementsStr(k.requirements.join(', '));
         setEditSourceExcerpt(k.sourceExcerpt || '');
 
-        const [srcDoc, cols, allK, allRels] = await Promise.all([
+        const [srcDoc, cols, allK, allRels, allOutcomes] = await Promise.all([
           repository.getSource(k.sourceId),
           repository.listCollections(),
           repository.listKnowledge(),
           repository.listRelationships(),
+          repository.listOutcomes(id),
         ]);
 
         if (!active) return;
         setSource(srcDoc || null);
         setAllCollections(cols);
         setCollection(cols.find((c) => c.id === k.collectionId) || null);
-        setAllKnowledge(allK.filter((item) => item.id !== id));
+        setAllKnowledge(allK);
+        setOutcomes(allOutcomes);
+
         const itemRels = allRels.filter(
           (r) => r.sourceId === id || r.sourceKnowledgeId === id
         );
@@ -174,6 +192,55 @@ export const KnowledgeDetailPage: React.FC = () => {
     }
   };
 
+  const handleCopyAgentPrompt = () => {
+    if (!item) return;
+    const promptXml = `<agent_skill id="${item.id}" type="${item.type}" evidence="${item.evidenceLevel}">
+<title>${item.title}</title>
+<summary>${item.summary}</summary>
+<applicability>${item.applicability || 'General'}</applicability>
+<exclusions>${item.exclusions || 'None'}</exclusions>
+<requirements>${item.requirements.join(', ')}</requirements>
+<procedure>
+${item.body || item.summary}
+</procedure>
+<citation_grounding>
+${item.sourceExcerpt || ''}
+</citation_grounding>
+</agent_skill>`;
+
+    navigator.clipboard.writeText(promptXml);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 2000);
+  };
+
+  const handleCopyMarkdown = () => {
+    if (!item) return;
+    const md = `# ${item.title}
+
+> **Summary:** ${item.summary}
+> **Type:** ${item.type} | **Evidence:** ${item.evidenceLevel} | **Review:** ${item.reviewStatus}
+
+## Applicability
+${item.applicability || 'General'}
+
+## Exclusions
+${item.exclusions || 'None'}
+
+## Requirements
+${item.requirements.length > 0 ? item.requirements.map((r) => `- ${r}`).join('\n') : 'None'}
+
+## Methodology
+${item.body || item.summary}
+
+## Citation Grounding
+> "${item.sourceExcerpt || ''}"
+— Source: ${source?.filename || item.sourceId}
+`;
+    navigator.clipboard.writeText(md);
+    setCopiedMarkdown(true);
+    setTimeout(() => setCopiedMarkdown(false), 2000);
+  };
+
   const handleAddRelationship = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!item || !id || !targetKnowledgeId) return;
@@ -194,19 +261,33 @@ export const KnowledgeDetailPage: React.FC = () => {
     }
   };
 
-  const handleRemoveRelationship = async (targetId: string) => {
+  const handleRemoveRelationship = async (relId: string) => {
     if (!id) return;
     try {
-      const rel = relationships.find(
-        (r) =>
-          r.id === targetId ||
-          r.targetId === targetId ||
-          r.targetKnowledgeId === targetId
-      );
-      if (rel) {
-        await repository.deleteRelationship(rel.id);
-      }
-      setDeleteRelTargetId(null);
+      await repository.deleteRelationship(relId);
+      notifyMutation();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddOutcome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!item || !id || !outcomeTask) return;
+
+    try {
+      await repository.createOutcome({
+        knowledgeId: id,
+        taskContext: outcomeTask,
+        result: outcomeResult,
+        metrics: outcomeMetrics || undefined,
+        notes: outcomeNotes || undefined,
+      });
+
+      setOutcomeModalOpen(false);
+      setOutcomeTask('');
+      setOutcomeMetrics('');
+      setOutcomeNotes('');
       notifyMutation();
     } catch (err) {
       console.error(err);
@@ -224,7 +305,11 @@ export const KnowledgeDetailPage: React.FC = () => {
     }
   };
 
-  // Reciprocal relationship preview helper
+  const getRelationshipTarget = (rel: KnowledgeRelationship) => {
+    const targetId = rel.sourceKnowledgeId === id ? rel.targetKnowledgeId : rel.sourceKnowledgeId;
+    return allKnowledge.find((k) => k.id === targetId);
+  };
+
   const getReciprocalLabel = (type: RelationshipType): string => {
     switch (type) {
       case 'supports':
@@ -252,8 +337,8 @@ export const KnowledgeDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-12 text-center text-sm text-stone-500">
-        <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-600" />
+      <div className="py-20 text-center text-xs text-zinc-500">
+        <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
         <span>{t('common.loading')}</span>
       </div>
     );
@@ -261,62 +346,70 @@ export const KnowledgeDetailPage: React.FC = () => {
 
   if (!item) {
     return (
-      <div className="p-12 text-center text-sm text-stone-500">
-        <AlertCircle className="w-6 h-6 mx-auto mb-2 text-rose-500" />
-        <span>{t('knowledgeDetail.notFound')}</span>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => navigate('/library')}
-            className="text-emerald-700 underline text-xs"
-          >
-            {t('common.backToLibrary')}
-          </button>
-        </div>
+      <div className="py-20 text-center text-xs text-zinc-500 max-w-md mx-auto">
+        <AlertCircle className="w-7 h-7 mx-auto mb-2 text-rose-500" />
+        <h2 className="text-sm font-semibold text-zinc-100 mb-1">{t('knowledgeDetail.notFound')}</h2>
+        <button
+          type="button"
+          onClick={() => navigate('/library')}
+          className="heroui-btn-secondary mt-3"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
+          <span>{t('common.backToLibrary')}</span>
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#23252a]">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+      
+      {/* Top Header & Actions Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800">
         <button
           type="button"
           onClick={() => navigate('/library')}
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer w-fit"
         >
-          <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+          <ArrowLeft className="w-4 h-4 rtl:rotate-180 text-blue-400" />
           <span>{t('common.backToLibrary')}</span>
         </button>
 
+        {/* Action Buttons */}
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setRelModalOpen(true)}
-            className="linear-btn-secondary text-xs gap-1.5"
+            onClick={handleCopyAgentPrompt}
+            className="heroui-btn-secondary text-xs"
+            title={t('marketplace.copyForAgent')}
           >
-            <GitFork className="w-3.5 h-3.5 text-[#5e6ad2]" />
-            <span>{t('knowledgeDetail.addRelationship')}</span>
+            {copiedPrompt ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Bot className="w-3.5 h-3.5 text-blue-400" />}
+            <span>{copiedPrompt ? t('common.copied') : t('marketplace.copyForAgent')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyMarkdown}
+            className="heroui-btn-secondary text-xs"
+            title="Copy Markdown"
+          >
+            {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedMarkdown ? t('common.copied') : 'Markdown'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsEditing(!isEditing)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-              isEditing
-                ? 'bg-[#1f2347] border-[#5e6ad2] text-[#828fff]'
-                : 'linear-btn-secondary'
-            }`}
+            className="heroui-btn-secondary text-xs"
           >
-            <Edit3 className="w-3.5 h-3.5 text-[#5e6ad2]" />
+            <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
             <span>{isEditing ? t('common.close') : t('common.edit')}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setDeleteModalOpen(true)}
-            className="p-1.5 rounded-md text-[#8a8f98] hover:text-[#f43f5e] hover:bg-[#1a1012] cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
             title={t('knowledgeDetail.deleteKnowledge')}
           >
             <Trash2 className="w-4 h-4" />
@@ -324,440 +417,374 @@ export const KnowledgeDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Warning banner if Source Has Changed */}
+      {/* Source Changed Alert Banner */}
       {item.sourceHasChanged && (
-        <div className="p-4 rounded-xl border border-[#34343a] bg-[#141516] text-[#f59e0b] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start sm:items-center gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-[#f59e0b] shrink-0 mt-0.5 sm:mt-0" />
-            <div className="text-xs sm:text-sm">
-              <span className="font-semibold block sm:inline">
-                {t('knowledgeDetail.sourceChangedWarning')}
-              </span>
-              <span className="text-[#8a8f98] sm:ms-2 text-xs">
-                The underlying source report was updated with a new revision. Verify that this extracted knowledge remains accurate.
-              </span>
-            </div>
+        <div className="p-3.5 rounded-xl border border-amber-800/40 bg-amber-950/20 text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start sm:items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>{t('knowledgeDetail.sourceChangedWarning')}</span>
           </div>
           <button
             type="button"
             onClick={handleAcknowledgeSourceChange}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[#f59e0b] text-black hover:bg-[#fbbf24] shrink-0 self-end sm:self-auto cursor-pointer font-semibold"
+            className="px-2.5 py-1 rounded bg-amber-500 text-black font-semibold hover:bg-amber-400 shrink-0 self-end sm:self-auto cursor-pointer"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>{t('knowledgeDetail.acknowledgeSourceChange')}</span>
+            {t('knowledgeDetail.acknowledgeSourceChange')}
           </button>
         </div>
       )}
 
-      {/* Main Grid: Left Body & Source citation, Right Metadata & Relationships */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column (8 cols): Body / Editor */}
-        <div className="lg:col-span-8 space-y-6">
-          {isEditing ? (
-            /* Structured Editor Form */
-            <form
-              onSubmit={handleSaveEdit}
-              className="p-6 sm:p-8 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4"
-            >
-              <h3 className="text-base font-semibold tracking-title text-[#f7f8f8] pb-2 border-b border-[#23252a]">
-                {t('common.edit')} {t('library.tabKnowledge')}
-              </h3>
+      {/* Composed Detail Content */}
+      {isEditing ? (
+        <form onSubmit={handleSaveEdit} className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-4">
+          <h3 className="text-sm font-semibold text-zinc-100 pb-2 border-b border-zinc-800">
+            {t('common.edit')} {t('library.tabKnowledge')}
+          </h3>
 
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldTitle')} *
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              {t('knowledgeDetail.fieldTitle')} *
+            </label>
+            <input
+              type="text"
+              dir="auto"
+              required
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="heroui-input"
+            />
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                    {t('knowledgeDetail.fieldType')}
-                  </label>
-                  <select
-                    value={editType}
-                    onChange={(e) => setEditType(e.target.value as KnowledgeType)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                  >
-                    <option value="procedure">{t('types.procedure')}</option>
-                    <option value="research_finding">{t('types.research_finding')}</option>
-                    <option value="tip">{t('types.tip')}</option>
-                    <option value="skill">{t('types.skill')}</option>
-                    <option value="example">{t('types.example')}</option>
-                    <option value="failure">{t('types.failure')}</option>
-                    <option value="lesson">{t('types.lesson')}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                    {t('knowledgeDetail.fieldCollection')}
-                  </label>
-                  <select
-                    value={editCollectionId}
-                    onChange={(e) => setEditCollectionId(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                  >
-                    {allCollections.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {locale === 'fa' ? c.nameFa : c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldSummary')} *
-                </label>
-                <textarea
-                  dir="auto"
-                  required
-                  rows={2}
-                  value={editSummary}
-                  onChange={(e) => setEditSummary(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldBody')} (Markdown supported)
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={6}
-                  value={editBody}
-                  onChange={(e) => setEditBody(e.target.value)}
-                  className="w-full p-3 text-xs rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                    {t('knowledgeDetail.fieldReviewStatus')}
-                  </label>
-                  <select
-                    value={editReviewStatus}
-                    onChange={(e) => setEditReviewStatus(e.target.value as ReviewStatus)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                  >
-                    <option value="draft">{t('reviewStatus.draft')}</option>
-                    <option value="reviewed">{t('reviewStatus.reviewed')}</option>
-                    <option value="deprecated">{t('reviewStatus.deprecated')}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                    {t('knowledgeDetail.fieldEvidenceLevel')}
-                  </label>
-                  <select
-                    value={editEvidenceLevel}
-                    onChange={(e) => setEditEvidenceLevel(e.target.value as EvidenceLevel)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                  >
-                    <option value="unverified">{t('evidenceLevel.unverified')}</option>
-                    <option value="observed">{t('evidenceLevel.observed')}</option>
-                    <option value="tested">{t('evidenceLevel.tested')}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldApplicability')}
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  value={editApplicability}
-                  onChange={(e) => setEditApplicability(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldExclusions')}
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  value={editExclusions}
-                  onChange={(e) => setEditExclusions(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldRequirements')} (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  value={editRequirementsStr}
-                  onChange={(e) => setEditRequirementsStr(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  {t('knowledgeDetail.fieldSourceExcerpt')}
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={2}
-                  value={editSourceExcerpt}
-                  onChange={(e) => setEditSourceExcerpt(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#23252a]">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="linear-btn-secondary text-xs sm:text-sm"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="linear-btn-primary text-xs sm:text-sm"
-                >
-                  {t('common.save')}
-                </button>
-              </div>
-            </form>
-          ) : (
-            /* Read-only Structured Display */
-            <div className="p-6 sm:p-8 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-6">
-              <div className="space-y-3 pb-4 border-b border-[#23252a]">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge type="knowledgeType" value={item.type} />
-                  <Badge type="evidence" value={item.evidenceLevel} />
-                  <Badge type="review" value={item.reviewStatus} />
-                </div>
-
-                <h1
-                  dir="auto"
-                  className="text-xl sm:text-2xl font-bold tracking-title text-[#f7f8f8] leading-snug"
-                >
-                  {item.title}
-                </h1>
-
-                <p
-                  dir="auto"
-                  className="text-sm sm:text-base text-[#d0d6e0] leading-relaxed font-sans"
-                >
-                  {item.summary}
-                </p>
-              </div>
-
-              {/* Structured Body / Step instructions */}
-              {item.body && (
-                <div className="space-y-2">
-                  <h3 className="text-xs uppercase tracking-wider text-[#8a8f98] font-medium">
-                    {t('knowledgeDetail.fieldBody')}
-                  </h3>
-                  <div
-                    dir="auto"
-                    className="p-4 rounded-lg bg-[#141516] border border-[#23252a] text-xs sm:text-sm whitespace-pre-wrap leading-relaxed text-[#f7f8f8]"
-                  >
-                    {item.body}
-                  </div>
-                </div>
-              )}
-
-              {/* Applicability & Exclusions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {item.applicability && (
-                  <div className="p-4 rounded-lg border border-[#23252a] bg-[#141516] space-y-1">
-                    <span className="text-xs font-semibold text-[#828fff] block">
-                      {t('knowledgeDetail.fieldApplicability')}
-                    </span>
-                    <p dir="auto" className="text-xs text-[#d0d6e0] leading-normal">
-                      {item.applicability}
-                    </p>
-                  </div>
-                )}
-
-                {item.exclusions && (
-                  <div className="p-4 rounded-lg border border-[#23252a] bg-[#141516] space-y-1">
-                    <span className="text-xs font-semibold text-[#f43f5e] block">
-                      {t('knowledgeDetail.fieldExclusions')}
-                    </span>
-                    <p dir="auto" className="text-xs text-[#d0d6e0] leading-normal">
-                      {item.exclusions}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Requirements List */}
-              {item.requirements && item.requirements.length > 0 && (
-                <div className="space-y-1.5">
-                  <span className="text-xs font-semibold text-[#8a8f98] uppercase tracking-wider">
-                    {t('knowledgeDetail.fieldRequirements')}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {item.requirements.map((req, i) => (
-                      <span
-                        key={i}
-                        dir="auto"
-                        className="px-2.5 py-1 rounded-md text-xs bg-[#141516] text-[#d0d6e0] border border-[#23252a]"
-                      >
-                        {req}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Citation Pin to Source Document */}
-              <div className="p-4 rounded-lg border border-[#23252a] border-s-2 border-s-[#5e6ad2] bg-[#141516] space-y-2">
-                <div className="flex items-center justify-between text-xs font-medium text-[#828fff]">
-                  <span className="flex items-center gap-1.5">
-                    <FileText className="w-4 h-4" />
-                    <span>{t('knowledgeDetail.fieldSourceExcerpt')}</span>
-                  </span>
-                  {source && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/documents/${source.id}`)}
-                      className="inline-flex items-center gap-1 hover:text-[#f7f8f8] underline cursor-pointer"
-                    >
-                      <span>{source.filename}</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <blockquote
-                  dir="auto"
-                  className="italic text-xs sm:text-sm text-[#d0d6e0] ps-2 py-0.5"
-                >
-                  "{item.sourceExcerpt}"
-                </blockquote>
-
-                <div className="pt-2 text-[11px] text-[#8a8f98] flex items-center justify-between border-t border-[#23252a]">
-                  <span>Revision: {item.sourceRevisionId}</span>
-                  <span>Extracted citation pin</span>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                {t('knowledgeDetail.fieldType')}
+              </label>
+              <select
+                value={editType}
+                onChange={(e) => setEditType(e.target.value as KnowledgeType)}
+                className="heroui-select w-full"
+              >
+                <option value="procedure">{t('types.procedure')}</option>
+                <option value="skill">{t('types.skill')}</option>
+                <option value="research_finding">{t('types.research_finding')}</option>
+                <option value="tip">{t('types.tip')}</option>
+                <option value="example">{t('types.example')}</option>
+                <option value="failure">{t('types.failure')}</option>
+                <option value="lesson">{t('types.lesson')}</option>
+              </select>
             </div>
-          )}
-        </div>
 
-        {/* Right Column (4 cols): Metadata & Outbound Relationships */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Metadata Card */}
-          <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-3">
-            <h3 className="text-xs uppercase tracking-wider text-[#8a8f98] font-medium">
-              {t('sourceDetail.metadata')}
-            </h3>
-
-            <div className="space-y-2 text-xs divide-y divide-[#23252a]">
-              <div className="pt-1 flex items-center justify-between">
-                <span className="text-[#8a8f98]">{t('knowledgeDetail.fieldCollection')}</span>
-                <span className="font-medium text-[#f7f8f8]">
-                  {collection ? (locale === 'fa' ? collection.nameFa : collection.name) : '-'}
-                </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[#8a8f98]">{t('sourceDetail.language')}</span>
-                <span className="font-medium text-[#f7f8f8]">
-                  {item.language === 'fa' ? 'فارسی' : 'English'}
-                </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[#8a8f98]">{t('knowledgeDetail.fieldReviewStatus')}</span>
-                <Badge type="review" value={item.reviewStatus} size="sm" />
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[#8a8f98]">{t('knowledgeDetail.fieldEvidenceLevel')}</span>
-                <Badge type="evidence" value={item.evidenceLevel} size="sm" />
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[#8a8f98]">{t('common.updated')}</span>
-                <span className="text-[#8a8f98]">
-                  {new Date(item.updatedAt).toLocaleDateString()}
-                </span>
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                {t('knowledgeDetail.fieldCollection')}
+              </label>
+              <select
+                value={editCollectionId}
+                onChange={(e) => setEditCollectionId(e.target.value)}
+                className="heroui-select w-full"
+              >
+                {allCollections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {locale === 'fa' ? c.nameFa : c.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Connected Knowledge Relationships Card */}
-          <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              {t('knowledgeDetail.fieldSummary')} *
+            </label>
+            <textarea
+              dir="auto"
+              required
+              rows={2}
+              value={editSummary}
+              onChange={(e) => setEditSummary(e.target.value)}
+              className="heroui-input"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              {t('knowledgeDetail.fieldBody')}
+            </label>
+            <textarea
+              dir="auto"
+              rows={6}
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              className="heroui-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                {t('knowledgeDetail.fieldReviewStatus')}
+              </label>
+              <select
+                value={editReviewStatus}
+                onChange={(e) => setEditReviewStatus(e.target.value as ReviewStatus)}
+                className="heroui-select w-full"
+              >
+                <option value="draft">{t('reviewStatus.draft')}</option>
+                <option value="reviewed">{t('reviewStatus.reviewed')}</option>
+                <option value="deprecated">{t('reviewStatus.deprecated')}</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                {t('knowledgeDetail.fieldEvidenceLevel')}
+              </label>
+              <select
+                value={editEvidenceLevel}
+                onChange={(e) => setEditEvidenceLevel(e.target.value as EvidenceLevel)}
+                className="heroui-select w-full"
+              >
+                <option value="unverified">{t('evidenceLevel.unverified')}</option>
+                <option value="observed">{t('evidenceLevel.observed')}</option>
+                <option value="tested">{t('evidenceLevel.tested')}</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                {t('knowledgeDetail.fieldApplicability')}
+              </label>
+              <input
+                type="text"
+                dir="auto"
+                value={editApplicability}
+                onChange={(e) => setEditApplicability(e.target.value)}
+                className="heroui-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                {t('knowledgeDetail.fieldExclusions')}
+              </label>
+              <input
+                type="text"
+                dir="auto"
+                value={editExclusions}
+                onChange={(e) => setEditExclusions(e.target.value)}
+                className="heroui-input"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              {t('knowledgeDetail.fieldRequirements')}
+            </label>
+            <input
+              type="text"
+              dir="auto"
+              value={editRequirementsStr}
+              onChange={(e) => setEditRequirementsStr(e.target.value)}
+              className="heroui-input"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              {t('knowledgeDetail.fieldSourceExcerpt')}
+            </label>
+            <textarea
+              dir="auto"
+              rows={2}
+              value={editSourceExcerpt}
+              onChange={(e) => setEditSourceExcerpt(e.target.value)}
+              className="heroui-input"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="heroui-btn-secondary"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              className="heroui-btn-primary"
+            >
+              {t('common.save')}
+            </button>
+          </div>
+        </form>
+      ) : (
+        /* Composed Read View */
+        <div className="space-y-6">
+          
+          {/* Header & Primary Metadata */}
+          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge type="knowledgeType" value={item.type} />
+              <Badge type="evidence" value={item.evidenceLevel} />
+              <Badge type="review" value={item.reviewStatus} />
+              {collection && (
+                <span className="text-xs text-zinc-400 font-medium px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+                  {locale === 'fa' ? collection.nameFa : collection.name}
+                </span>
+              )}
+            </div>
+
+            <h1 dir="auto" className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
+              {item.title}
+            </h1>
+
+            {/* Core Takeaway Box */}
+            <div className="p-3.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs sm:text-sm text-zinc-300 leading-relaxed">
+              <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">
+                {t('knowledgeDetail.fieldSummary')}
+              </span>
+              <p dir="auto">{item.summary}</p>
+            </div>
+          </div>
+
+          {/* Operational Scope (Applicability & Exclusions) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-1.5 text-xs">
+              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{t('knowledgeDetail.fieldApplicability')}</span>
+              </div>
+              <p dir="auto" className="text-zinc-300 leading-relaxed">
+                {item.applicability || 'General application'}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-1.5 text-xs">
+              <div className="flex items-center gap-1.5 text-rose-400 font-semibold">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{t('knowledgeDetail.fieldExclusions')}</span>
+              </div>
+              <p dir="auto" className="text-zinc-300 leading-relaxed">
+                {item.exclusions || 'None specified'}
+              </p>
+            </div>
+          </div>
+
+          {/* Requirements Chips */}
+          {item.requirements && item.requirements.length > 0 && (
+            <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2">
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                {t('knowledgeDetail.fieldRequirements')}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {item.requirements.map((req, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 rounded text-xs bg-zinc-850 text-zinc-300 border border-zinc-750 font-mono"
+                  >
+                    {req}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main Content & Technical Guide */}
+          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              {t('knowledgeDetail.fieldBody')}
+            </h3>
+            <div className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+              {item.body ? (
+                <MarkdownViewer content={item.body} />
+              ) : (
+                <p className="italic text-zinc-500">{item.summary}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Source Grounding & Citation Anchor */}
+          <div className="p-4 rounded-xl border-s-2 border-s-blue-500 bg-[#18181b] border border-zinc-800 space-y-2">
+            <div className="flex items-center justify-between text-xs text-blue-400 font-medium">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-4 h-4" />
+                <span>{t('knowledgeDetail.fieldSourceExcerpt')}</span>
+              </span>
+              {source && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/documents/${source.id}`)}
+                  className="inline-flex items-center gap-1 hover:underline cursor-pointer font-mono"
+                >
+                  <span>{source.filename}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <blockquote
+              dir="auto"
+              className="p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 italic font-mono leading-relaxed"
+            >
+              "{item.sourceExcerpt || 'Direct citation excerpt anchored in source peer report.'}"
+            </blockquote>
+          </div>
+
+          {/* Related Information (Graph Relationships) */}
+          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase tracking-wider text-[#8a8f98] font-medium flex items-center gap-1.5">
-                <GitFork className="w-3.5 h-3.5 text-[#5e6ad2]" />
-                <span>{t('knowledgeDetail.relationships')}</span>
+              <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                <GitFork className="w-3.5 h-3.5 text-blue-400" />
+                <span>{t('knowledgeDetail.relationshipsSection')}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setRelModalOpen(true)}
-                className="text-xs text-[#828fff] hover:text-[#5e6ad2] font-medium cursor-pointer"
+                className="text-xs font-medium text-blue-400 hover:text-blue-300 cursor-pointer"
               >
-                + {t('common.add')}
+                + {t('knowledgeDetail.addRelationship')}
               </button>
             </div>
 
             {relationships.length === 0 ? (
-              <p className="text-xs text-[#8a8f98] italic">
-                {t('knowledgeDetail.noRelationships')}
-              </p>
+              <p className="text-xs text-zinc-500">{t('knowledgeDetail.noRelationships')}</p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {relationships.map((rel) => {
-                  const targetId = rel.targetKnowledgeId || rel.targetId || '';
-                  const targetItem = allKnowledge.find((k) => k.id === targetId);
-                  const relTypeStr = String(rel.relationshipType || rel.type || 'supports');
+                  const target = getRelationshipTarget(rel);
+                  if (!target) return null;
+                  const isOrigin = rel.sourceKnowledgeId === id;
+                  const relTypeVal = (rel.relationshipType || rel.type || 'supports') as RelationshipType;
+                  const relLabel = isOrigin
+                    ? t(`relationTypes.${relTypeVal}`)
+                    : getReciprocalLabel(relTypeVal);
+
                   return (
                     <div
-                      key={rel.id || targetId}
-                      className="p-3 rounded-lg border border-[#23252a] bg-[#141516] hover:border-[#34343a] transition-colors flex items-start justify-between gap-2 group"
+                      key={rel.id}
+                      onClick={() => navigate(`/knowledge/${target.id}`)}
+                      className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-850 hover:border-zinc-700 transition-colors cursor-pointer flex items-center justify-between group"
                     >
-                      <div
-                        onClick={() => navigate(`/knowledge/${targetId}`)}
-                        className="cursor-pointer min-w-0 flex-1"
-                      >
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#1f2347] text-[#828fff]">
-                            {t(`relationships.${relTypeStr}`)}
-                          </span>
-                        </div>
-                        <h5
-                          dir="auto"
-                          className="text-xs font-medium text-[#f7f8f8] group-hover:text-[#828fff] truncate"
-                        >
-                          {targetItem?.title || targetId}
-                        </h5>
-                        {(rel.notes || rel.rationale) && (
-                          <p dir="auto" className="text-[11px] text-[#8a8f98] line-clamp-1 mt-0.5">
-                            {rel.notes || rel.rationale}
-                          </p>
-                        )}
+                      <div className="min-w-0 pr-2">
+                        <span className="text-[10px] font-medium text-blue-400 bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-800/30 me-1.5">
+                          {relLabel}
+                        </span>
+                        <span className="text-xs text-zinc-200 group-hover:text-blue-400 transition-colors font-medium truncate inline-block align-middle max-w-[200px]">
+                          {target.title}
+                        </span>
                       </div>
-
                       <button
                         type="button"
-                        onClick={() => setDeleteRelTargetId(targetId)}
-                        className="p-1 rounded text-[#8a8f98] hover:text-[#f43f5e] cursor-pointer"
-                        title={t('knowledgeDetail.deleteRelationship')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveRelationship(rel.id);
+                        }}
+                        className="p-1 text-zinc-500 hover:text-rose-400 shrink-0"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -767,107 +794,144 @@ export const KnowledgeDetailPage: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Add Outbound Relationship Modal */}
+          {/* Practical Application Outcomes */}
+          <div className="p-5 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t('knowledgeDetail.outcomesSection')}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setOutcomeModalOpen(true)}
+                className="text-xs font-medium text-emerald-400 hover:text-emerald-300 cursor-pointer"
+              >
+                + {t('knowledgeDetail.addOutcome')}
+              </button>
+            </div>
+
+            {outcomes.length === 0 ? (
+              <p className="text-xs text-zinc-500">{t('knowledgeDetail.noOutcomes')}</p>
+            ) : (
+              <div className="space-y-2">
+                {outcomes.map((out) => (
+                  <div
+                    key={out.id}
+                    className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
+                          out.result === 'success'
+                            ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40'
+                            : out.result === 'failure'
+                            ? 'bg-rose-950/40 text-rose-300 border border-rose-800/40'
+                            : 'bg-amber-950/40 text-amber-300 border border-amber-800/40'
+                        }`}
+                      >
+                        {t(`results.${out.result}`)}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {out.recordedAt ? new Date(out.recordedAt).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+                    <p className="text-zinc-200 font-medium">{out.taskContext}</p>
+                    {out.metrics && (
+                      <p className="font-mono text-[11px] text-zinc-400 bg-zinc-800/60 p-1.5 rounded border border-zinc-700/50">
+                        {out.metrics}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* Add Relationship Modal */}
       {relModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-lg bg-[#0f1011] rounded-xl border border-[#23252a] overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#23252a] flex items-center justify-between">
-              <h3 className="text-base font-semibold tracking-title text-[#f7f8f8]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-md w-full p-4 space-y-3.5 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <h3 className="text-xs font-semibold text-zinc-100">
                 {t('knowledgeDetail.addRelationship')}
               </h3>
               <button
                 type="button"
                 onClick={() => setRelModalOpen(false)}
-                className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-100 p-1 rounded"
               >
-                &times;
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddRelationship} className="p-6 space-y-4">
+            <form onSubmit={handleAddRelationship} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Target Knowledge Item *
-                </label>
-                <select
-                  required
-                  value={targetKnowledgeId}
-                  onChange={(e) => setTargetKnowledgeId(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                >
-                  {allKnowledge.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      [{t(`types.${k.type}`)}] {k.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Relationship Type *
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('graph.relationType')}
                 </label>
                 <select
                   value={relType}
                   onChange={(e) => setRelType(e.target.value as RelationshipType)}
-                  className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
+                  className="heroui-select w-full"
                 >
-                  <option value="supports">{t('relationships.supports')}</option>
-                  <option value="conflicts_with">{t('relationships.conflicts_with')}</option>
-                  <option value="prerequisite_for">{t('relationships.prerequisite_for')}</option>
-                  <option value="derived_from">{t('relationships.derived_from')}</option>
-                  <option value="supersedes">{t('relationships.supersedes')}</option>
-                  <option value="relates_to">{t('relationships.relates_to')}</option>
+                  <option value="supports">{t('relationTypes.supports')}</option>
+                  <option value="requires">{t('relationTypes.requires')}</option>
+                  <option value="complements">{t('relationTypes.complements')}</option>
+                  <option value="conflicts_with">{t('relationTypes.conflicts_with')}</option>
+                  <option value="alternative_to">{t('relationTypes.alternative_to')}</option>
+                  <option value="supersedes">{t('relationTypes.supersedes')}</option>
                 </select>
               </div>
 
-              {/* Reciprocal Label Preview (Mandate from requirements) */}
-              <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a] text-xs">
-                <span className="font-semibold text-[#8a8f98] block mb-1">
-                  Reciprocal Relationship Preview:
-                </span>
-                <div className="text-[#d0d6e0] flex items-center gap-2">
-                  <span>Target item will perceive this as:</span>
-                  <span className="px-2 py-0.5 rounded bg-[#1f2347] text-[#828fff] font-semibold">
-                    {getReciprocalLabel(relType)}
-                  </span>
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('graph.targetItem')}
+                </label>
+                <select
+                  value={targetKnowledgeId}
+                  onChange={(e) => setTargetKnowledgeId(e.target.value)}
+                  className="heroui-select w-full"
+                >
+                  {allKnowledge
+                    .filter((k) => k.id !== id)
+                    .map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.title}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Notes / Context (optional)
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('graph.rationale')}
                 </label>
-                <input
-                  type="text"
-                  dir="auto"
+                <textarea
+                  rows={2}
                   value={relNotes}
                   onChange={(e) => setRelNotes(e.target.value)}
-                  placeholder="e.g. Validated through stress testing on cluster"
-                  className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                  placeholder={t('graph.rationalePlaceholder')}
+                  className="heroui-input"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#23252a]">
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setRelModalOpen(false)}
-                  className="linear-btn-secondary text-xs sm:text-sm"
+                  className="heroui-btn-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="linear-btn-primary text-xs sm:text-sm"
+                  className="heroui-btn-primary"
                 >
-                  {t('common.add')}
+                  {t('common.save')}
                 </button>
               </div>
             </form>
@@ -875,24 +939,96 @@ export const KnowledgeDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Item Confirmation */}
+      {/* Add Outcome Modal */}
+      {outcomeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-md w-full p-4 space-y-3.5 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <h3 className="text-xs font-semibold text-zinc-100">
+                {t('knowledgeDetail.addOutcome')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setOutcomeModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-100 p-1 rounded"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddOutcome} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('outcomes.taskContext')} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={outcomeTask}
+                  onChange={(e) => setOutcomeTask(e.target.value)}
+                  placeholder="e.g. Extraction of SEC borderless tables"
+                  className="heroui-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('outcomes.result')}
+                </label>
+                <select
+                  value={outcomeResult}
+                  onChange={(e) => setOutcomeResult(e.target.value as any)}
+                  className="heroui-select w-full"
+                >
+                  <option value="success">{t('results.success')}</option>
+                  <option value="failure">{t('results.failure')}</option>
+                  <option value="uncertain">{t('results.uncertain')}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  {t('outcomes.metrics')}
+                </label>
+                <input
+                  type="text"
+                  value={outcomeMetrics}
+                  onChange={(e) => setOutcomeMetrics(e.target.value)}
+                  placeholder="e.g. 99.2% alignment precision"
+                  className="heroui-input"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setOutcomeModalOpen(false)}
+                  className="heroui-btn-secondary"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="heroui-btn-primary"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={deleteModalOpen}
         title={t('knowledgeDetail.deleteKnowledge')}
         description={t('knowledgeDetail.deleteConfirm')}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
         isDestructive
         onConfirm={handleDeleteItem}
         onCancel={() => setDeleteModalOpen(false)}
-      />
-
-      {/* Delete Relationship Confirmation */}
-      <ConfirmModal
-        isOpen={deleteRelTargetId !== null}
-        title={t('knowledgeDetail.deleteRelationship')}
-        description="Are you sure you want to disconnect this knowledge relationship?"
-        isDestructive
-        onConfirm={() => deleteRelTargetId && handleRemoveRelationship(deleteRelTargetId)}
-        onCancel={() => setDeleteRelTargetId(null)}
       />
     </div>
   );

@@ -8,12 +8,13 @@ import {
   X,
   FileCode,
   ArrowRight,
-  ListPlus,
   Info,
   Clock,
   ExternalLink,
   ChevronRight,
   Sparkles,
+  Layers,
+  FolderOpen,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -31,6 +32,7 @@ interface QueueItem {
   duplicateHandling: 'skip' | 'copy' | 'revision';
   status: 'pending' | 'processing' | 'completed' | 'error';
   errorMessage?: string;
+  importedId?: string;
 }
 
 const MAX_FILE_SIZE_BYTES = 128 * 1024; // 128 KiB
@@ -56,7 +58,6 @@ export const ImportPage: React.FC = () => {
 
   // Section suggestions modal state
   const [inspectingItem, setInspectingItem] = useState<QueueItem | null>(null);
-  const [draftExcerpt, setDraftExcerpt] = useState<{ heading: string; excerpt: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,7 +70,6 @@ export const ImportPage: React.FC = () => {
     });
   }, [repository]);
 
-  // Parse markdown headings & excerpts
   const parseMarkdownHeadings = (
     md: string
   ): { level: number; text: string; excerpt: string }[] => {
@@ -81,7 +81,6 @@ export const ImportPage: React.FC = () => {
       if (match) {
         const level = match[1].length;
         const text = match[2].trim();
-        // Grab next 3 non-empty lines as excerpt
         const nextLines: string[] = [];
         for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
           const l = lines[j].trim();
@@ -100,65 +99,48 @@ export const ImportPage: React.FC = () => {
     return headings;
   };
 
-  const deriveTitle = (filename: string, content: string): string => {
-    const h1Match = content.match(/^#\s+(.+)$/m);
-    if (h1Match) return h1Match[1].trim();
-    // Otherwise clean filename
-    return filename.replace(/\.(md|markdown)$/i, '').replace(/[-_]/g, ' ');
-  };
-
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFiles = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
     setGeneralError(null);
-    setImportedCount(null);
+
+    if (queue.length + fileList.length > MAX_QUEUE_FILES) {
+      setGeneralError(t('import.queueFull'));
+      return;
+    }
 
     const newItems: QueueItem[] = [];
-    let currentTotal = queue.length;
 
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      if (currentTotal >= MAX_QUEUE_FILES) {
-        setGeneralError(t('import.queueFull'));
-        break;
-      }
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
 
-      if (!f.name.endsWith('.md') && !f.name.endsWith('.markdown')) {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setGeneralError(`${file.name}: ${t('import.fileTooLarge')}`);
         continue;
       }
 
-      if (f.size > MAX_FILE_SIZE_BYTES) {
-        setGeneralError(`${f.name}: ${t('import.fileTooLarge')}`);
-        continue;
-      }
-
-      const reader = new FileReader();
-      const id = `queue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-
-      reader.onload = (e) => {
-        const content = (e.target?.result as string) || '';
+      try {
+        const content = await file.text();
         const headings = parseMarkdownHeadings(content);
-        const title = deriveTitle(f.name, content);
+        const title = headings.find((h) => h.level === 1)?.text || file.name.replace(/\.[^/.]+$/, '');
 
-        setQueue((prev) => [
-          ...prev,
-          {
-            id,
-            file: f,
-            filename: f.name,
-            rawSize: f.size,
-            content,
-            title,
-            headings,
-            collectionId: collections[0]?.id || 'col-research-synthesis',
-            duplicateHandling: 'copy',
-            status: 'pending',
-          },
-        ]);
-      };
-
-      reader.readAsText(f, 'UTF-8');
-      currentTotal++;
+        newItems.push({
+          id: `queue-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          file,
+          filename: file.name,
+          rawSize: file.size,
+          content,
+          title,
+          headings,
+          collectionId: collections[0]?.id || 'col-data-extraction',
+          duplicateHandling: 'copy',
+          status: 'pending',
+        });
+      } catch (err) {
+        console.error(`Error reading ${file.name}`, err);
+      }
     }
+
+    setQueue((prev) => [...prev, ...newItems]);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -171,178 +153,102 @@ export const ImportPage: React.FC = () => {
     e.preventDefault();
     if (!pasteContent.trim()) return;
 
-    const rawSize = new Blob([pasteContent]).size;
-    if (rawSize > MAX_FILE_SIZE_BYTES) {
+    const filename = pasteFilename.trim() || `pasted_notes_${new Date().toISOString().slice(0, 10)}.md`;
+    const size = new Blob([pasteContent]).size;
+
+    if (size > MAX_FILE_SIZE_BYTES) {
       setGeneralError(t('import.fileTooLarge'));
       return;
     }
-    if (queue.length >= MAX_QUEUE_FILES) {
-      setGeneralError(t('import.queueFull'));
-      return;
-    }
-
-    const filename = pasteFilename.trim()
-      ? pasteFilename.endsWith('.md')
-        ? pasteFilename
-        : `${pasteFilename}.md`
-      : `pasted_report_${Date.now().toString(36)}.md`;
 
     const headings = parseMarkdownHeadings(pasteContent);
-    const title = deriveTitle(filename, pasteContent);
+    const title = headings.find((h) => h.level === 1)?.text || filename.replace(/\.[^/.]+$/, '');
 
-    setQueue((prev) => [
-      ...prev,
-      {
-        id: `queue-paste-${Date.now()}`,
-        filename,
-        rawSize,
-        content: pasteContent,
-        title,
-        headings,
-        collectionId: pasteCollectionId || collections[0]?.id || 'col-research-synthesis',
-        duplicateHandling: 'copy',
-        status: 'pending',
-      },
-    ]);
+    const newItem: QueueItem = {
+      id: `queue-paste-${Date.now()}`,
+      filename,
+      rawSize: size,
+      content: pasteContent,
+      title,
+      headings,
+      collectionId: pasteCollectionId || collections[0]?.id || 'col-data-extraction',
+      duplicateHandling: 'copy',
+      status: 'pending',
+    };
 
+    setQueue((prev) => [...prev, newItem]);
     setPasteContent('');
     setPasteFilename('');
     setActiveTab('files');
   };
 
-  const removeQueueItem = (id: string) => {
-    setQueue((prev) => prev.filter((item) => item.id !== id));
+  const handleUpdateItem = (id: string, updates: Partial<QueueItem>) => {
+    setQueue((prev) => prev.map((q) => (q.id === id ? { ...q, ...updates } : q)));
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setQueue((prev) => prev.filter((q) => q.id !== id));
   };
 
   const startProcessingQueue = async () => {
-    if (queue.length === 0) return;
+    if (queue.length === 0 || importing) return;
     setImporting(true);
     setGeneralError(null);
+    let successCount = 0;
 
-    try {
-      const existingSources = await repository.listSources();
-      let count = 0;
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      if (item.status === 'completed') continue;
 
-      for (const item of queue) {
-        if (item.status === 'completed') continue;
+      handleUpdateItem(item.id, { status: 'processing' });
 
-        // Check if matching filename already exists
-        const existing = existingSources.find((s) => s.filename.toLowerCase() === item.filename.toLowerCase());
+      try {
+        const created = await repository.createSource({
+          title: item.title,
+          filename: item.filename,
+          originalContent: item.content,
+          rawSize: item.rawSize,
+          language: locale,
+          collectionId: item.collectionId,
+          initialRevisionSummary: `Initial ingest of ${item.filename} with ${item.headings.length} headings`,
+        });
 
-        if (existing && item.duplicateHandling === 'skip') {
-          setQueue((prev) =>
-            prev.map((q) =>
-              q.id === item.id ? { ...q, status: 'completed', errorMessage: 'Skipped existing file' } : q
-            )
-          );
-          continue;
-        }
-
-        if (existing && item.duplicateHandling === 'revision') {
-          // Update as a new revision of existing
-          await repository.updateSource(
-            existing.id,
-            {},
-            item.content,
-            `Imported updated revision from ${item.filename}`
-          );
-          count++;
-        } else {
-          // Create new document
-          await repository.createSource({
-            title: item.title,
-            filename: item.filename,
-            originalContent: item.content,
-            rawSize: item.rawSize,
-            language: locale,
-            collectionId: item.collectionId,
-            initialRevisionSummary: `Initial import from ${item.filename}`,
-          });
-          count++;
-        }
-
-        setQueue((prev) =>
-          prev.map((q) => (q.id === item.id ? { ...q, status: 'completed' } : q))
-        );
+        handleUpdateItem(item.id, { status: 'completed', importedId: created.id });
+        successCount++;
+      } catch (err: any) {
+        console.error(err);
+        handleUpdateItem(item.id, {
+          status: 'error',
+          errorMessage: err.message || 'Import error',
+        });
       }
-
-      setImportedCount(count);
-      notifyMutation();
-    } catch (err) {
-      console.error(err);
-      setGeneralError(t('common.errorOccurred'));
-    } finally {
-      setImporting(false);
     }
-  };
 
-  // Create draft knowledge from section suggestion
-  const handleExtractDraftKnowledge = async (item: QueueItem, heading: string, excerpt: string) => {
-    try {
-      // First ensure the source document is created in repository
-      const createdSource = await repository.createSource({
-        title: item.title,
-        filename: item.filename,
-        originalContent: item.content,
-        rawSize: item.rawSize,
-        language: locale,
-        collectionId: item.collectionId,
-        initialRevisionSummary: `Imported for knowledge extraction: ${heading}`,
-      });
-
-      // Then create draft knowledge item
-      const draft = await repository.createKnowledge({
-        title: heading.replace(/^[#\d\.\s]+/, ''),
-        summary: excerpt || `Key insight extracted from ${item.filename} under ${heading}.`,
-        body: `Extracted procedure or finding from section "${heading}". Review and refine parameters.`,
-        type: 'procedure',
-        collectionId: item.collectionId,
-        sourceId: createdSource.id,
-        sourceRevisionId: createdSource.revisions[0].revisionId,
-        sourceExcerpt: excerpt || heading,
-        applicability: `Applicable when working with data described in ${item.filename}.`,
-        exclusions: 'Not verified for production environments without empirical testing.',
-        requirements: ['Standard environment'],
-        reviewStatus: 'draft',
-        evidenceLevel: 'observed',
-        language: locale,
-        sourceHasChanged: false,
-      });
-
-      notifyMutation();
-      setInspectingItem(null);
-      navigate(`/knowledge/${draft.id}`);
-    } catch (err) {
-      console.error(err);
-    }
+    setImporting(false);
+    setImportedCount(successCount);
+    notifyMutation();
   };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#23252a]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#8a8f98] uppercase tracking-wider mb-1">
-            <span>WikiGraph</span>
-            <span>/</span>
-            <span className="text-[#828fff] font-medium">
-              {t('nav.import')}
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-title text-[#f7f8f8]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
             {t('import.title')}
-          </h2>
-          <p className="text-xs sm:text-sm text-[#8a8f98] mt-0.5">
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
             {t('import.subtitle')}
           </p>
         </div>
 
         {queue.length > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setQueue([])}
-              className="px-3 py-1.5 text-xs text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+              className="heroui-btn-secondary text-xs"
             >
               {t('common.reset')}
             </button>
@@ -350,55 +256,97 @@ export const ImportPage: React.FC = () => {
               type="button"
               disabled={importing || queue.every((q) => q.status === 'completed')}
               onClick={startProcessingQueue}
-              className="linear-btn-primary text-xs sm:text-sm gap-2"
+              className="heroui-btn-primary text-xs"
             >
               <UploadCloud className="w-4 h-4" />
-              <span>{importing ? t('common.saving') : t('import.btnStartImport')}</span>
+              <span>{importing ? t('common.saving') : `${t('import.btnStartImport')} (${queue.length})`}</span>
             </button>
           </div>
         )}
       </div>
 
-      {/* Prototype Ingestion Notice */}
-      <div className="p-4 rounded-xl border border-[#23252a] bg-[#0f1011] text-xs text-[#8a8f98] flex items-start gap-3">
-        <Info className="w-4 h-4 text-[#828fff] shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <span className="font-semibold text-[#f7f8f8]">
-            {t('import.limitsTitle')}:
-          </span>
-          <p>{t('import.limitsDesc')}</p>
+      {/* Stage Progression Indicator */}
+      <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs">
+        <div className={`p-2 rounded-lg text-center font-medium ${queue.length === 0 ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
+          <span className="font-mono text-[11px] block text-zinc-500">Stage 01</span>
+          <span>1. Select Files</span>
+        </div>
+        <div className={`p-2 rounded-lg text-center font-medium ${queue.length > 0 && !importedCount ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
+          <span className="font-mono text-[11px] block text-zinc-500">Stage 02</span>
+          <span>2. Review Queue ({queue.length})</span>
+        </div>
+        <div className={`p-2 rounded-lg text-center font-medium ${importedCount ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40' : 'text-zinc-400'}`}>
+          <span className="font-mono text-[11px] block text-zinc-500">Stage 03</span>
+          <span>3. Complete</span>
         </div>
       </div>
 
-      {/* Tabs: Upload vs Paste */}
-      <div className="flex items-center p-1 rounded-md bg-[#141516] border border-[#23252a] w-fit">
+      {/* Ingestion limits notification */}
+      <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181b] text-xs text-zinc-400 flex items-start gap-3">
+        <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold text-zinc-200 me-1">
+            {t('import.limitsTitle')}:
+          </span>
+          <span>{t('import.limitsDesc')}</span>
+        </div>
+      </div>
+
+      {/* Success Notification */}
+      {importedCount !== null && (
+        <div className="p-4 rounded-xl border border-emerald-800/40 bg-emerald-950/20 text-emerald-300 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Successfully imported {importedCount} document(s) into workspace.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/library?tab=sources')}
+            className="heroui-btn-primary text-xs"
+          >
+            <span>View Source Documents</span>
+            <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
+          </button>
+        </div>
+      )}
+
+      {/* General Error Banner */}
+      {generalError && (
+        <div className="p-3.5 rounded-xl border border-rose-900/40 bg-rose-950/20 text-xs text-rose-300 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{generalError}</span>
+        </div>
+      )}
+
+      {/* Segmented Switch: Upload Files vs Paste Markdown */}
+      <div className="inline-flex items-center p-1 rounded-lg bg-zinc-900 border border-zinc-800">
         <button
           type="button"
           onClick={() => setActiveTab('files')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             activeTab === 'files'
-              ? 'bg-[#1b1c1d] text-[#f7f8f8] border border-[#2e3036]'
-              : 'text-[#8a8f98] hover:text-[#f7f8f8]'
+              ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60 shadow-xs'
+              : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >
-          <FileText className="w-4 h-4 text-[#828fff]" />
+          <FileText className="w-3.5 h-3.5 text-blue-400" />
           <span>{t('import.tabFiles')}</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('paste')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
             activeTab === 'paste'
-              ? 'bg-[#1b1c1d] text-[#f7f8f8] border border-[#2e3036]'
-              : 'text-[#8a8f98] hover:text-[#f7f8f8]'
+              ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60 shadow-xs'
+              : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >
-          <FileCode className="w-4 h-4 text-[#5e6ad2]" />
+          <FileCode className="w-3.5 h-3.5 text-blue-400" />
           <span>{t('import.tabPaste')}</span>
         </button>
       </div>
 
-      {/* File Upload Zone */}
+      {/* File Upload Zone (Neutral & Structured) */}
       {activeTab === 'files' ? (
         <div
           onDragOver={(e) => {
@@ -408,10 +356,10 @@ export const ImportPage: React.FC = () => {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`p-8 sm:p-12 rounded-xl border-2 border-dashed text-center transition-all cursor-pointer ${
+          className={`p-6 sm:p-8 rounded-xl border border-dashed text-center transition-all cursor-pointer ${
             dragOver
-              ? 'border-[#5e6ad2] bg-[#1f2347]'
-              : 'border-[#23252a] hover:border-[#5e6ad2] bg-[#0f1011]'
+              ? 'border-blue-500 bg-blue-950/15'
+              : 'border-zinc-700/80 hover:border-zinc-600 bg-[#18181b]'
           }`}
         >
           <input
@@ -422,22 +370,22 @@ export const ImportPage: React.FC = () => {
             onChange={(e) => handleFiles(e.target.files)}
             className="hidden"
           />
-          <div className="w-12 h-12 rounded-lg bg-[#141516] border border-[#23252a] text-[#828fff] flex items-center justify-center mx-auto mb-3.5">
-            <UploadCloud className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 text-blue-400 flex items-center justify-center mx-auto mb-2.5">
+            <UploadCloud className="w-5 h-5" />
           </div>
-          <h3 className="text-base font-semibold tracking-title text-[#f7f8f8] mb-1">
+          <h3 className="text-sm font-semibold text-zinc-100 mb-0.5">
             {t('import.dropzoneTitle')}
           </h3>
-          <p className="text-xs sm:text-sm text-[#8a8f98] max-w-md mx-auto">
+          <p className="text-xs text-zinc-400 max-w-sm mx-auto">
             {t('import.dropzoneSubtitle')}
           </p>
         </div>
       ) : (
         /* Paste Markdown Form */
-        <form onSubmit={handleAddPasted} className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
+        <form onSubmit={handleAddPasted} className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-3.5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[#8a8f98] mb-1">
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
                 {t('import.pasteFilename')}
               </label>
               <input
@@ -445,22 +393,22 @@ export const ImportPage: React.FC = () => {
                 dir="auto"
                 value={pasteFilename}
                 onChange={(e) => setPasteFilename(e.target.value)}
-                placeholder="my_research_notes.md"
-                className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                placeholder="research_report.md"
+                className="heroui-input"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#8a8f98] mb-1">
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
                 {t('import.pasteCollection')}
               </label>
               <select
                 value={pasteCollectionId}
                 onChange={(e) => setPasteCollectionId(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
+                className="heroui-select w-full"
               >
-                {collections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {locale === 'fa' ? c.nameFa : c.name}
+                {collections.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {locale === 'fa' ? col.nameFa : col.name}
                   </option>
                 ))}
               </select>
@@ -468,242 +416,151 @@ export const ImportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-              {t('import.pasteTitle')}
+            <label className="block text-xs font-medium text-zinc-400 mb-1">
+              Markdown Text
             </label>
             <textarea
               dir="auto"
               required
-              rows={8}
+              rows={6}
               value={pasteContent}
               onChange={(e) => setPasteContent(e.target.value)}
-              placeholder={t('import.pastePlaceholder')}
-              className="w-full p-3 text-xs sm:text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+              placeholder="# Research Report Title..."
+              className="heroui-input font-mono text-xs"
             />
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-1">
             <button
               type="submit"
-              className="linear-btn-primary text-xs sm:text-sm"
+              className="heroui-btn-primary"
             >
-              Add to Queue
+              <span>Add to Queue</span>
             </button>
           </div>
         </form>
       )}
 
-      {/* General Error or Success Message */}
-      {generalError && (
-        <div className="p-3 rounded-lg border border-[#4c1d24] bg-[#241215] text-xs text-[#fb7185] flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{generalError}</span>
-        </div>
-      )}
-
-      {importedCount !== null && (
-        <div className="p-3 rounded-lg border border-[#184a37] bg-[#10221c] text-xs text-[#4ade80] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-[#4ade80]" />
-            <span>
-              {t('import.importSuccess')} ({importedCount} documents processed).
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/library?tab=sources')}
-            className="font-medium underline cursor-pointer hover:text-white"
-          >
-            {t('library.tabSources')}
-          </button>
-        </div>
-      )}
-
-      {/* Import Queue Table */}
+      {/* Queue Table */}
       {queue.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-[#8a8f98] font-medium px-1">
-            <span>
-              {queue.length} file{queue.length > 1 ? 's' : ''} in queue
-            </span>
-            <span>Max {MAX_QUEUE_FILES} files</span>
+        <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs space-y-0">
+          <div className="p-3.5 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-xs font-semibold text-zinc-300">
+            <span>Import Queue ({queue.length} files)</span>
+            <span className="text-[11px] text-zinc-500 font-mono">Max 128 KiB per file</span>
           </div>
 
-          <div className="rounded-xl border border-[#23252a] bg-[#0f1011] overflow-hidden divide-y divide-[#23252a]">
-            {queue.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="w-4 h-4 text-[#828fff] shrink-0" />
-                    <span className="font-semibold text-xs sm:text-sm text-[#f7f8f8] truncate">
-                      {item.title}
-                    </span>
-                    <span className="text-[11px] text-[#8a8f98] shrink-0">
-                      ({item.filename})
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-[#8a8f98]">
-                    <span>{(item.rawSize / 1024).toFixed(1)} KiB</span>
-                    <span>&bull;</span>
-                    <span>{item.headings.length} headings</span>
-                    <span>&bull;</span>
-                    {/* Collection picker for this item */}
-                    <select
-                      value={item.collectionId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setQueue((prev) =>
-                          prev.map((q) => (q.id === item.id ? { ...q, collectionId: val } : q))
-                        );
-                      }}
-                      className="px-2 py-0.5 rounded border border-[#23252a] bg-[#141516] text-[#d0d6e0] text-xs focus:outline-none focus:border-[#5e6ad2]"
-                    >
-                      {collections.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {locale === 'fa' ? c.nameFa : c.name}
-                        </option>
-                      ))}
-                    </select>
-                    <span>&bull;</span>
-                    {/* Duplicate handling */}
-                    <select
-                      value={item.duplicateHandling}
-                      onChange={(e) => {
-                        const val = e.target.value as 'skip' | 'copy' | 'revision';
-                        setQueue((prev) =>
-                          prev.map((q) => (q.id === item.id ? { ...q, duplicateHandling: val } : q))
-                        );
-                      }}
-                      className="px-2 py-0.5 rounded border border-[#23252a] bg-[#141516] text-[#d0d6e0] text-xs focus:outline-none focus:border-[#5e6ad2]"
-                    >
-                      <option value="copy">{t('import.dupCopy')}</option>
-                      <option value="skip">{t('import.dupSkip')}</option>
-                      <option value="revision">{t('import.dupRevision')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
-                  {/* Section Suggestions button */}
-                  {item.headings.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setInspectingItem(item)}
-                      className="linear-btn-secondary text-xs gap-1.5"
-                    >
-                      <ListPlus className="w-3.5 h-3.5 text-[#828fff]" />
-                      <span>{t('import.btnInspectSections')}</span>
-                    </button>
-                  )}
-
-                  {/* Status Indicator */}
-                  {item.status === 'completed' ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-[#4ade80] font-medium">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Imported</span>
-                    </span>
-                  ) : item.status === 'error' ? (
-                    <span className="text-xs text-[#fb7185] font-medium">Error</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => removeQueueItem(item.id)}
-                      className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Section Suggestions Inspector Modal */}
-      {inspectingItem && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-2xl bg-[#0f1011] rounded-xl border border-[#23252a] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#23252a]">
-              <div className="min-w-0 pr-4">
-                <span className="text-[11px] uppercase tracking-wider text-[#8a8f98]">
-                  {t('import.btnInspectSections')}
-                </span>
-                <h3 className="text-base font-semibold tracking-title text-[#f7f8f8] truncate">
-                  {inspectingItem.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setInspectingItem(null)}
-                className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4">
-              <p className="text-xs text-[#8a8f98]">
-                Extracted headings and section previews from Markdown structure. Click to create a draft knowledge item from any section suggestion.
-              </p>
-
-              <div className="space-y-3">
-                {inspectingItem.headings.map((h, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-lg border border-[#23252a] bg-[#141516] hover:border-[#34343a] transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span
-                        dir="auto"
-                        className="font-medium text-xs sm:text-sm text-[#f7f8f8]"
+          <div className="overflow-x-auto">
+            <table className="w-full text-left rtl:text-right border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-zinc-800 bg-zinc-900/40 text-zinc-400">
+                  <th className="p-3 font-medium">{t('import.colFile')}</th>
+                  <th className="p-3 font-medium">{t('import.colSize')}</th>
+                  <th className="p-3 font-medium">{t('import.colCollection')}</th>
+                  <th className="p-3 font-medium">{t('import.colDuplicates')}</th>
+                  <th className="p-3 font-medium">{t('import.colStatus')}</th>
+                  <th className="p-3 font-medium text-end">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {queue.map((item) => (
+                  <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <div>
+                          <div className="font-semibold text-zinc-200">{item.filename}</div>
+                          <div className="text-[11px] text-zinc-500 font-mono">
+                            {item.headings.length} headings detected
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3 font-mono text-zinc-400">
+                      {Math.round(item.rawSize / 1024)} KiB
+                    </td>
+                    <td className="p-3">
+                      <select
+                        value={item.collectionId}
+                        onChange={(e) => handleUpdateItem(item.id, { collectionId: e.target.value })}
+                        disabled={item.status !== 'pending'}
+                        className="heroui-select text-xs py-1"
                       >
-                        {h.text}
-                      </span>
+                        {collections.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {locale === 'fa' ? c.nameFa : c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      <select
+                        value={item.duplicateHandling}
+                        onChange={(e) =>
+                          handleUpdateItem(item.id, {
+                            duplicateHandling: e.target.value as any,
+                          })
+                        }
+                        disabled={item.status !== 'pending'}
+                        className="heroui-select text-xs py-1"
+                      >
+                        <option value="copy">{t('import.dupCopy')}</option>
+                        <option value="skip">{t('import.dupSkip')}</option>
+                        <option value="revision">{t('import.dupRevision')}</option>
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      {item.status === 'pending' && (
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-zinc-800 text-zinc-400 border border-zinc-700">
+                          Pending
+                        </span>
+                      )}
+                      {item.status === 'processing' && (
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-blue-950/40 text-blue-400 border border-blue-800/40 inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3 animate-spin" />
+                          Processing
+                        </span>
+                      )}
+                      {item.status === 'completed' && (
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-950/40 text-emerald-300 border border-emerald-800/40 inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Imported
+                        </span>
+                      )}
+                      {item.status === 'error' && (
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-rose-950/40 text-rose-300 border border-rose-800/40 inline-flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Failed
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-end whitespace-nowrap">
+                      {item.status === 'completed' && item.importedId ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/documents/${item.importedId}`)}
+                          className="text-xs text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer me-2"
+                        >
+                          <span>View</span>
+                          <ChevronRight className="w-3 h-3 rtl:rotate-180" />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        onClick={() =>
-                          handleExtractDraftKnowledge(inspectingItem, h.text, h.excerpt)
-                        }
-                        className="linear-btn-primary text-xs gap-1 shrink-0"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                        title="Remove"
                       >
-                        <span>{t('import.extractDraft')}</span>
-                        <ChevronRight className="w-3 h-3 rtl:rotate-180" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                    </div>
-                    {h.excerpt && (
-                      <p
-                        dir="auto"
-                        className="text-xs text-[#8a8f98] line-clamp-2 italic"
-                      >
-                        "{h.excerpt}"
-                      </p>
-                    )}
-                  </div>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-
-            <div className="px-6 py-3 bg-[#0f1011] border-t border-[#23252a] text-end">
-              <button
-                type="button"
-                onClick={() => setInspectingItem(null)}
-                className="linear-btn-secondary text-xs sm:text-sm"
-              >
-                {t('common.close')}
-              </button>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
+
     </div>
   );
 };

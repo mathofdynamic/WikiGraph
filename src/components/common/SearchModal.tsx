@@ -90,16 +90,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
       role="dialog"
       aria-modal="true"
       aria-label={t('common.search')}
-      className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 p-4 bg-[#000000]/70 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 p-4 bg-black/75 backdrop-blur-xs"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-xl bg-[#0f1011] border border-[#23252a] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+        className="w-full max-w-2xl rounded-xl bg-zinc-900 border border-zinc-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#23252a]">
-          <Search className="w-5 h-5 text-[#8a8f98] shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
+          <Search className="w-5 h-5 text-zinc-400 shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -107,32 +107,32 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('common.searchPlaceholder')}
-            className="w-full bg-transparent text-sm sm:text-base text-[#f7f8f8] placeholder-[#62666d] focus:outline-none"
+            className="w-full bg-transparent text-sm sm:text-base text-zinc-100 placeholder-zinc-500 focus:outline-none"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
-              className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+              className="p-1 rounded text-zinc-400 hover:text-zinc-100 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           )}
-          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-[#141516] text-[#8a8f98] border border-[#23252a]">
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
             ESC
           </kbd>
         </div>
 
         {/* Results List */}
-        <div className="max-h-[60vh] overflow-y-auto p-3 space-y-4 divide-y divide-[#23252a]">
+        <div className="max-h-[60vh] overflow-y-auto p-3 space-y-4 divide-y divide-zinc-800">
           {/* Knowledge Items */}
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8f98] px-2 mb-1.5 flex items-center gap-1.5">
-              <Lightbulb className="w-3.5 h-3.5 text-[#5e6ad2]" />
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 px-2 mb-1.5 flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5 text-blue-400" />
               <span>{t('library.tabKnowledge')}</span>
             </div>
             {knowledgeResults.length === 0 ? (
-              <p className="text-xs text-[#62666d] px-2 py-1.5 italic">
+              <p className="text-xs text-zinc-500 px-2 py-1.5 italic">
                 {t('library.noKnowledgeFound')}
               </p>
             ) : (
@@ -142,26 +142,26 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
                     key={item.id}
                     type="button"
                     onClick={() => handleSelectKnowledge(item.id)}
-                    className="w-full flex items-center justify-between text-left rtl:text-right p-2.5 rounded-lg hover:bg-[#141516] transition-colors group cursor-pointer border border-transparent hover:border-[#23252a]"
+                    className="w-full flex items-center justify-between text-left rtl:text-right p-2.5 rounded-lg hover:bg-zinc-800/60 transition-colors group cursor-pointer border border-transparent hover:border-zinc-700"
                   >
                     <div className="min-w-0 pr-3 rtl:pr-0 rtl:pl-3">
                       <div className="flex items-center gap-2 mb-0.5">
                         <Badge type="knowledgeType" value={item.type} size="sm" />
                         <span
                           dir="auto"
-                          className="text-xs sm:text-sm font-medium text-[#f7f8f8] group-hover:text-[#828fff] truncate"
+                          className="text-xs sm:text-sm font-medium text-zinc-100 group-hover:text-blue-400 truncate"
                         >
                           {item.title}
                         </span>
                       </div>
                       <p
                         dir="auto"
-                        className="text-xs text-[#8a8f98] line-clamp-1"
+                        className="text-xs text-zinc-400 line-clamp-1"
                       >
                         {item.summary}
                       </p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-[#62666d] group-hover:text-[#d0d6e0] rtl:rotate-180 shrink-0 transition-transform" />
+                    <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 rtl:rotate-180 shrink-0 transition-transform" />
                   </button>
                 ))}
               </div>
@@ -170,12 +170,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
 
           {/* Sources */}
           <div className="pt-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8f98] px-2 mb-1.5 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#7a7fad]" />
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 px-2 mb-1.5 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-zinc-400" />
               <span>{t('library.tabSources')}</span>
             </div>
             {sourceResults.length === 0 ? (
-              <p className="text-xs text-[#62666d] px-2 py-1.5 italic">
+              <p className="text-xs text-zinc-500 px-2 py-1.5 italic">
                 {t('library.noSourcesFound')}
               </p>
             ) : (
@@ -185,20 +185,20 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
                     key={src.id}
                     type="button"
                     onClick={() => handleSelectSource(src.id)}
-                    className="w-full flex items-center justify-between text-left rtl:text-right p-2.5 rounded-lg hover:bg-[#141516] transition-colors group cursor-pointer border border-transparent hover:border-[#23252a]"
+                    className="w-full flex items-center justify-between text-left rtl:text-right p-2.5 rounded-lg hover:bg-zinc-800/60 transition-colors group cursor-pointer border border-transparent hover:border-zinc-700"
                   >
                     <div className="min-w-0 pr-3 rtl:pr-0 rtl:pl-3">
                       <span
                         dir="auto"
-                        className="text-xs sm:text-sm font-medium text-[#f7f8f8] group-hover:text-[#828fff] block truncate"
+                        className="text-xs sm:text-sm font-medium text-zinc-100 group-hover:text-blue-400 block truncate"
                       >
                         {src.title}
                       </span>
-                      <span className="text-[11px] text-[#8a8f98]">
+                      <span className="text-[11px] text-zinc-400">
                         {src.filename} &bull; {((src.rawSize || 0) / 1024).toFixed(1)} KiB
                       </span>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-[#62666d] group-hover:text-[#d0d6e0] rtl:rotate-180 shrink-0 transition-transform" />
+                    <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 rtl:rotate-180 shrink-0 transition-transform" />
                   </button>
                 ))}
               </div>
@@ -207,9 +207,9 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
         </div>
 
         {/* Footer info */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-[#141516] border-t border-[#23252a] text-[11px] text-[#8a8f98]">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-950/70 border-t border-zinc-800 text-[11px] text-zinc-400">
           <span>{t('common.demoNotice')}</span>
-          <span className="text-[#62666d]">WikiGraph v1.0</span>
+          <span className="text-zinc-500">WikiGraph v1.0</span>
         </div>
       </div>
     </div>

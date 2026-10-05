@@ -4,24 +4,19 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
-  ArrowRight,
-  Sparkles,
-  Calendar,
-  Layers,
   Trash2,
   ExternalLink,
-  BookOpen,
   X,
   History,
+  ShieldCheck,
+  TrendingUp,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import {
   KnowledgeItem,
   KnowledgeOutcome,
-  KnowledgeType,
   OutcomeResult,
-  ReviewStatus,
 } from '../types';
 import { Badge } from '../components/common/Badge';
 import { ConfirmModal } from '../components/common/ConfirmModal';
@@ -43,12 +38,6 @@ export const OutcomesPage: React.FC = () => {
   const [appliedKnowledgeIds, setAppliedKnowledgeIds] = useState<string[]>([]);
   const [result, setResult] = useState<OutcomeResult>('success');
   const [reviewNotes, setReviewNotes] = useState('');
-
-  // Promote Outcome to Lesson/Failure modal
-  const [promoteOutcome, setPromoteOutcome] = useState<KnowledgeOutcome | null>(null);
-  const [promoteType, setPromoteType] = useState<KnowledgeType>('lesson');
-  const [promoteTitle, setPromoteTitle] = useState('');
-  const [promoteSummary, setPromoteSummary] = useState('');
 
   // Delete modal
   const [deleteOutcomeId, setDeleteOutcomeId] = useState<string | null>(null);
@@ -89,9 +78,11 @@ export const OutcomesPage: React.FC = () => {
     try {
       await repository.createOutcome({
         task: taskName,
+        taskContext: taskName,
         prompt: promptNotes || undefined,
         appliedKnowledgeIds,
         result,
+        notes: reviewNotes || undefined,
         reviewNotes: reviewNotes || 'Executed task in workspace.',
       });
 
@@ -99,6 +90,7 @@ export const OutcomesPage: React.FC = () => {
       setTaskName('');
       setPromptNotes('');
       setAppliedKnowledgeIds([]);
+      setResult('success');
       setReviewNotes('');
       notifyMutation();
     } catch (err) {
@@ -106,52 +98,7 @@ export const OutcomesPage: React.FC = () => {
     }
   };
 
-  const handlePromoteOutcome = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!promoteOutcome || !promoteTitle.trim()) return;
-
-    try {
-      // Find source of first applied knowledge item for linkage
-      const appliedIds = promoteOutcome.appliedKnowledgeIds || [];
-      const firstApplied = knowledgeList.find((k) => appliedIds.includes(k.id));
-
-      const created = await repository.createKnowledge({
-        title: promoteTitle,
-        summary: promoteSummary || promoteOutcome.reviewNotes || promoteOutcome.notes || '',
-        body: `Empirical outcome observation logged during task "${promoteOutcome.task || promoteOutcome.taskContext}".\nResult: ${promoteOutcome.result}.\nNotes: ${promoteOutcome.reviewNotes || promoteOutcome.notes || ''}`,
-        type: promoteType,
-        collectionId: firstApplied?.collectionId || 'col-research-synthesis',
-        sourceId: firstApplied?.sourceId || 'src-synth-eval-02',
-        sourceRevisionId: firstApplied?.sourceRevisionId || 'rev-src-01-a',
-        sourceExcerpt: `Outcome log: ${promoteOutcome.task || promoteOutcome.taskContext} (${promoteOutcome.result})`,
-        applicability: `Observed in practice during "${promoteOutcome.task || promoteOutcome.taskContext}".`,
-        exclusions: 'Field observation, subject to ongoing testing.',
-        requirements: [],
-        reviewStatus: 'reviewed',
-        evidenceLevel: 'tested',
-        language: locale,
-        sourceHasChanged: false,
-      });
-
-      // Reciprocal relationship link
-      if (firstApplied) {
-        await repository.addRelationship({
-          sourceKnowledgeId: created.id,
-          targetKnowledgeId: firstApplied.id,
-          relationshipType: promoteType === 'failure' ? 'conflicts_with' : 'derived_from',
-          notes: `Observed outcome from executing task: ${promoteOutcome.task}`,
-        });
-      }
-
-      setPromoteOutcome(null);
-      notifyMutation();
-      navigate(`/knowledge/${created.id}`);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDelete = async () => {
+  const handleDeleteOutcome = async () => {
     if (!deleteOutcomeId) return;
     try {
       await repository.deleteOutcome(deleteOutcomeId);
@@ -162,181 +109,189 @@ export const OutcomesPage: React.FC = () => {
     }
   };
 
+  const stats = {
+    total: outcomes.length,
+    success: outcomes.filter((o) => o.result === 'success').length,
+    failure: outcomes.filter((o) => o.result === 'failure').length,
+    uncertain: outcomes.filter((o) => o.result === 'uncertain').length,
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#23252a]">
+      
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#8a8f98] uppercase tracking-wider mb-1">
-            <span>WikiGraph</span>
-            <span>/</span>
-            <span className="text-[#828fff] font-medium">
-              {t('nav.outcomes')}
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-title text-[#f7f8f8]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
             {t('outcomes.title')}
-          </h2>
-          <p className="text-xs sm:text-sm text-[#8a8f98] mt-0.5">
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
             {t('outcomes.subtitle')}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Result Filter */}
-          <select
-            value={resultFilter}
-            onChange={(e) => setResultFilter(e.target.value as OutcomeResult | 'all')}
-            className="px-2.5 py-1.5 text-xs rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-          >
-            <option value="all">{t('common.all')}</option>
-            <option value="success">{t('results.success')}</option>
-            <option value="failure">{t('results.failure')}</option>
-            <option value="uncertain">{t('results.uncertain')}</option>
-          </select>
+        <button
+          type="button"
+          onClick={() => setLogModalOpen(true)}
+          className="heroui-btn-primary"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{t('outcomes.recordBtn')}</span>
+        </button>
+      </div>
 
-          <button
-            type="button"
-            onClick={() => setLogModalOpen(true)}
-            className="linear-btn-primary text-xs sm:text-sm gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('outcomes.logOutcome')}</span>
-          </button>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181b]">
+          <div className="text-xl font-bold text-zinc-100 font-mono">{stats.total}</div>
+          <div className="text-[11px] text-zinc-400 mt-0.5">Total Audit Runs</div>
+        </div>
+        <div className="p-3.5 rounded-xl border border-emerald-800/30 bg-emerald-950/15">
+          <div className="text-xl font-bold text-emerald-400 font-mono">{stats.success}</div>
+          <div className="text-[11px] text-emerald-400/80 mt-0.5">Successful Runs</div>
+        </div>
+        <div className="p-3.5 rounded-xl border border-rose-800/30 bg-rose-950/15">
+          <div className="text-xl font-bold text-rose-400 font-mono">{stats.failure}</div>
+          <div className="text-[11px] text-rose-400/80 mt-0.5">Failure / Breakages</div>
+        </div>
+        <div className="p-3.5 rounded-xl border border-amber-800/30 bg-amber-950/15">
+          <div className="text-xl font-bold text-amber-400 font-mono">{stats.uncertain}</div>
+          <div className="text-[11px] text-amber-400/80 mt-0.5">Inconclusive</div>
         </div>
       </div>
 
-      {/* Outcomes Timeline List */}
-      <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex items-center gap-1.5 p-1 rounded-lg bg-zinc-900 border border-zinc-800 w-fit">
+        {(['all', 'success', 'failure', 'uncertain'] as (OutcomeResult | 'all')[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setResultFilter(f)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              resultFilter === f
+                ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700/60'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {f === 'all' ? t('common.all') : t(`results.${f}`)}
+          </button>
+        ))}
+      </div>
+
+      {/* Outcomes List */}
+      <div className="space-y-3">
         {filteredOutcomes.length === 0 ? (
-          <div className="p-12 text-center text-xs sm:text-sm text-[#8a8f98] border border-dashed border-[#23252a] rounded-xl bg-[#0f1011]">
-            {t('outcomes.noOutcomes')}
+          <div className="p-12 text-center text-xs text-zinc-500 rounded-xl border border-zinc-800 bg-[#18181b]">
+            <p>{t('outcomes.noOutcomes')}</p>
           </div>
         ) : (
-          filteredOutcomes.map((outcome) => (
-            <div
-              key={outcome.id}
-              className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-3"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#23252a]">
-                <div className="flex items-center gap-2.5">
-                  <Badge type="outcome" value={outcome.result} />
-                  <h3
-                    dir="auto"
-                    className="text-base font-semibold tracking-title text-[#f7f8f8]"
-                  >
-                    {outcome.task}
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-[#8a8f98]">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>{new Date(outcome.executedAt || outcome.recordedAt || Date.now()).toLocaleString()}</span>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteOutcomeId(outcome.id)}
-                    className="p-1 rounded text-[#8a8f98] hover:text-[#fb7185] cursor-pointer ml-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Review Notes */}
+          filteredOutcomes.map((out) => {
+            const dateStr = out.recordedAt || out.executedAt;
+            return (
               <div
-                dir="auto"
-                className="text-xs sm:text-sm text-[#d0d6e0] leading-relaxed bg-[#141516] p-3.5 rounded-lg border border-[#23252a]"
+                key={out.id}
+                className="p-4 rounded-xl border border-zinc-800 bg-[#18181b] space-y-2.5 hover:border-zinc-700 transition-colors"
               >
-                {outcome.reviewNotes || outcome.notes}
-              </div>
-
-              {/* Applied Knowledge Chips */}
-              {(outcome.appliedKnowledgeIds || []).length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-xs text-[#8a8f98] font-medium">Applied Knowledge:</span>
-                  {(outcome.appliedKnowledgeIds || []).map((kId) => {
-                    const item = knowledgeList.find((k) => k.id === kId);
-                    return (
-                      <button
-                        key={kId}
-                        type="button"
-                        onClick={() => navigate(`/knowledge/${kId}`)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-[#141516] hover:bg-[#1b1c1d] text-[#d0d6e0] border border-[#23252a] cursor-pointer transition-colors"
-                      >
-                        <span dir="auto">{item?.title || kId}</span>
-                        <ExternalLink className="w-3 h-3 text-[#8a8f98]" />
-                      </button>
-                    );
-                  })}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge type="outcome" value={out.result} size="sm" />
+                    <span className="text-xs font-semibold text-zinc-100">
+                      {out.task || out.taskContext}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-[11px] text-zinc-500 font-mono">
+                      {dateStr ? new Date(dateStr).toLocaleDateString() : 'Recent'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteOutcomeId(out.id)}
+                      className="text-zinc-500 hover:text-rose-400 cursor-pointer p-0.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-              )}
 
-              {/* Promote action */}
-              <div className="pt-2 border-t border-[#23252a] flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPromoteOutcome(outcome);
-                    setPromoteTitle(`Lesson from: ${outcome.task || outcome.taskContext || ''}`);
-                    setPromoteSummary(outcome.reviewNotes || outcome.notes || '');
-                    setPromoteType(outcome.result === 'failure' ? 'failure' : 'lesson');
-                  }}
-                  className="linear-btn-secondary text-xs gap-1.5"
-                >
-                  <BookOpen className="w-3.5 h-3.5 text-[#828fff]" />
-                  <span>{t('outcomes.promoteToLesson')}</span>
-                </button>
+                {out.metrics && (
+                  <div className="p-2 rounded bg-zinc-900 border border-zinc-800 font-mono text-[11px] text-zinc-300">
+                    <span className="text-zinc-500 me-2">Measured:</span>
+                    <span>{out.metrics}</span>
+                  </div>
+                )}
+
+                {(out.notes || out.reviewNotes || out.prompt) && (
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    {out.notes || out.reviewNotes || out.prompt}
+                  </p>
+                )}
+
+                {/* Linked Knowledge Items */}
+                {out.appliedKnowledgeIds && out.appliedKnowledgeIds.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-zinc-800/80">
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Applied:</span>
+                    {out.appliedKnowledgeIds.map((kId) => {
+                      const k = knowledgeList.find((item) => item.id === kId);
+                      return (
+                        <button
+                          key={kId}
+                          type="button"
+                          onClick={() => navigate(`/knowledge/${kId}`)}
+                          className="px-2 py-0.5 rounded text-[11px] bg-zinc-900 text-blue-400 hover:text-blue-300 border border-zinc-800 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>{k?.title || kId}</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
       {/* Log Outcome Modal */}
       {logModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-xl bg-[#0f1011] rounded-xl border border-[#23252a] shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#23252a] flex items-center justify-between">
-              <h3 className="text-base font-semibold tracking-title text-[#f7f8f8]">
-                {t('outcomes.logOutcome')}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <h3 className="text-sm font-semibold text-zinc-100">
+                {t('outcomes.modalTitle')}
               </h3>
               <button
                 type="button"
                 onClick={() => setLogModalOpen(false)}
-                className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-100 p-1"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateOutcome} className="p-6 space-y-4">
+            <form onSubmit={handleCreateOutcome} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Task / Prompt Objective *
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Task / Execution Context *
                 </label>
                 <input
                   type="text"
-                  dir="auto"
                   required
-                  placeholder="e.g. Migration of RAG pipeline to edge worker"
                   value={taskName}
                   onChange={(e) => setTaskName(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                  placeholder="e.g. Scanned SEC 10-K tables extraction batch"
+                  className="heroui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Result *
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Result
                 </label>
                 <select
                   value={result}
                   onChange={(e) => setResult(e.target.value as OutcomeResult)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
+                  className="heroui-select w-full"
                 >
                   <option value="success">{t('results.success')}</option>
                   <option value="failure">{t('results.failure')}</option>
@@ -345,31 +300,16 @@ export const OutcomesPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Review Notes & Observations *
-                </label>
-                <textarea
-                  dir="auto"
-                  required
-                  rows={3}
-                  placeholder="What happened when the assembled knowledge was applied? Any unexpected failure or edge case?"
-                  value={reviewNotes}
-                  onChange={(e) => setReviewNotes(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
                   Applied Knowledge Items
                 </label>
-                <div className="max-h-36 overflow-y-auto space-y-1 p-2 border border-[#23252a] rounded-lg bg-[#141516]">
+                <div className="max-h-36 overflow-y-auto space-y-1 p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
                   {knowledgeList.map((k) => {
                     const isChecked = appliedKnowledgeIds.includes(k.id);
                     return (
                       <label
                         key={k.id}
-                        className="flex items-center gap-2 p-1.5 text-xs hover:bg-[#1b1c1d] rounded cursor-pointer transition-colors"
+                        className="flex items-center gap-2 p-1 rounded hover:bg-zinc-800/50 cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -381,28 +321,52 @@ export const OutcomesPage: React.FC = () => {
                               setAppliedKnowledgeIds((prev) => prev.filter((id) => id !== k.id));
                             }
                           }}
-                          className="rounded text-[#5e6ad2] focus:ring-0"
+                          className="rounded text-blue-600 focus:ring-blue-500"
                         />
-                        <span dir="auto" className="truncate text-[#d0d6e0]">
-                          {k.title}
-                        </span>
+                        <span className="text-zinc-300 truncate">{k.title}</span>
                       </label>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#23252a]">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Measured Benchmarks / Metrics
+                </label>
+                <input
+                  type="text"
+                  value={promptNotes}
+                  onChange={(e) => setPromptNotes(e.target.value)}
+                  placeholder="e.g. 99.1% column alignment, 0 unparsed cells"
+                  className="heroui-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Observations / Review Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  placeholder="Key empirical lessons or failure symptoms..."
+                  className="heroui-input"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setLogModalOpen(false)}
-                  className="linear-btn-secondary text-xs sm:text-sm"
+                  className="heroui-btn-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="linear-btn-primary text-xs sm:text-sm"
+                  className="heroui-btn-primary"
                 >
                   {t('common.save')}
                 </button>
@@ -412,98 +376,15 @@ export const OutcomesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Promote to Lesson/Failure Modal */}
-      {promoteOutcome && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-lg bg-[#0f1011] rounded-xl border border-[#23252a] shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#23252a] flex items-center justify-between">
-              <h3 className="text-base font-semibold tracking-title text-[#f7f8f8]">
-                {t('outcomes.promoteToLesson')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setPromoteOutcome(null)}
-                className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handlePromoteOutcome} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Knowledge Type
-                </label>
-                <select
-                  value={promoteType}
-                  onChange={(e) => setPromoteType(e.target.value as KnowledgeType)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] focus:outline-none focus:border-[#5e6ad2]"
-                >
-                  <option value="lesson">{t('types.lesson')}</option>
-                  <option value="failure">{t('types.failure')}</option>
-                  <option value="tip">{t('types.tip')}</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  required
-                  value={promoteTitle}
-                  onChange={(e) => setPromoteTitle(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Extracted Summary *
-                </label>
-                <textarea
-                  dir="auto"
-                  required
-                  rows={3}
-                  value={promoteSummary}
-                  onChange={(e) => setPromoteSummary(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#23252a]">
-                <button
-                  type="button"
-                  onClick={() => setPromoteOutcome(null)}
-                  className="linear-btn-secondary text-xs sm:text-sm"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="linear-btn-primary text-xs sm:text-sm"
-                >
-                  Promote & Open
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation modal */}
+      {/* Delete Confirmation Modal */}
       <ConfirmModal
-        isOpen={deleteOutcomeId !== null}
+        isOpen={Boolean(deleteOutcomeId)}
         title="Delete Outcome Record"
-        description="Are you sure you want to delete this task execution outcome?"
+        description="Are you sure you want to delete this recorded empirical outcome?"
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
         isDestructive
-        onConfirm={handleDelete}
+        onConfirm={handleDeleteOutcome}
         onCancel={() => setDeleteOutcomeId(null)}
       />
     </div>

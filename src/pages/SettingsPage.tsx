@@ -1,20 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Settings,
-  FolderKanban,
   Languages,
-  Sun,
-  Moon,
   Download,
   Upload,
   RotateCcw,
   Plus,
   Trash2,
-  Check,
-  CheckCircle2,
-  AlertTriangle,
+  FolderOpen,
+  X,
   Server,
-  Info,
+  Database,
+  CheckCircle2,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -23,10 +20,8 @@ import { Collection } from '../types';
 import { ConfirmModal } from '../components/common/ConfirmModal';
 
 export const SettingsPage: React.FC = () => {
-  const { repository, isDemoMode, setIsDemoMode, resetToFixtures, notifyMutation } =
-    useRepository();
+  const { repository, resetToFixtures, notifyMutation } = useRepository();
   const { t, locale, setLocale } = useLocale();
-  const { theme, setTheme, isDark } = useTheme();
 
   const [collections, setCollections] = useState<Collection[]>([]);
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -38,7 +33,7 @@ export const SettingsPage: React.FC = () => {
   const [newColNameFa, setNewColNameFa] = useState('');
   const [newColDesc, setNewColDesc] = useState('');
 
-  // Backup import input
+  // Backup import
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
@@ -105,7 +100,7 @@ export const SettingsPage: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `wikigraph_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `wikigraph_backup_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -118,399 +113,296 @@ export const SettingsPage: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (evt) => {
+    reader.onload = async (event) => {
       try {
-        const text = evt.target?.result as string;
-        const data = JSON.parse(text);
-
-        if (!data.knowledge || !data.sources) {
-          setImportStatus('Invalid backup file structure.');
-          return;
+        const json = JSON.parse(event.target?.result as string);
+        if (json.collections && Array.isArray(json.collections)) {
+          localStorage.setItem('wikigraph_collections', JSON.stringify(json.collections));
         }
-
-        // Store into localStorage
-        const store = {
-          sources: data.sources || [],
-          knowledge: data.knowledge || [],
-          collections: data.collections || [],
-          outcomes: data.outcomes || [],
-        };
-        localStorage.setItem('wikigraph_demo_store_v1', JSON.stringify(store));
-        setImportStatus('Backup successfully imported! Reloading workspace...');
+        if (json.sources && Array.isArray(json.sources)) {
+          localStorage.setItem('wikigraph_sources', JSON.stringify(json.sources));
+        }
+        if (json.knowledge && Array.isArray(json.knowledge)) {
+          localStorage.setItem('wikigraph_knowledge', JSON.stringify(json.knowledge));
+        }
+        setImportStatus('Backup successfully restored.');
         notifyMutation();
-        setTimeout(() => window.location.reload(), 1200);
+        const updatedCols = await repository.listCollections();
+        setCollections(updatedCols);
       } catch (err) {
         console.error(err);
-        setImportStatus('Failed to parse JSON backup file.');
+        setImportStatus('Failed to restore backup: Invalid JSON file.');
       }
     };
     reader.readAsText(file);
   };
 
-  const handleConfirmReset = () => {
-    resetToFixtures();
+  const handleReset = async () => {
+    await resetToFixtures();
     setResetModalOpen(false);
-    repository.listCollections().then(setCollections);
+    const updatedCols = await repository.listCollections();
+    setCollections(updatedCols);
+    notifyMutation();
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
+      
       {/* Header */}
-      <div className="pb-4 border-b border-[#23252a]">
-        <div className="flex items-center gap-2 text-xs text-[#8a8f98] uppercase tracking-wider mb-1">
-          <span>WikiGraph</span>
-          <span>/</span>
-          <span className="text-[#828fff] font-medium">
-            {t('nav.settings')}
-          </span>
-        </div>
-        <h2 className="text-xl sm:text-2xl font-semibold tracking-title text-[#f7f8f8]">
+      <div className="pb-3 border-b border-zinc-800">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
           {t('settings.title')}
-        </h2>
-        <p className="text-xs sm:text-sm text-[#8a8f98] mt-0.5">
+        </h1>
+        <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
           {t('settings.subtitle')}
         </p>
       </div>
 
-      {/* 1. Language & Direction */}
-      <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
-        <div className="flex items-center gap-2.5 pb-2 border-b border-[#23252a]">
-          <Languages className="w-4 h-4 text-[#828fff]" />
-          <h3 className="text-sm font-semibold tracking-title text-[#f7f8f8]">
-            {t('settings.language')}
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {importStatus && (
+        <div className="p-3.5 rounded-xl border border-blue-900/40 bg-blue-950/20 text-xs text-blue-300 flex items-center justify-between">
+          <span>{importStatus}</span>
           <button
             type="button"
-            onClick={() => setLocale('en')}
-            className={`p-3.5 rounded-lg border text-left transition-colors cursor-pointer flex items-center justify-between ${
-              locale === 'en'
-                ? 'border-[#5e6ad2] bg-[#141516]'
-                : 'border-[#23252a] bg-[#141516] hover:bg-[#1b1c1d]'
-            }`}
+            onClick={() => setImportStatus(null)}
+            className="text-zinc-400 hover:text-zinc-100"
           >
-            <div>
-              <span className="font-semibold text-sm text-[#f7f8f8] block">
-                English
-              </span>
-              <span className="text-xs text-[#8a8f98]">Left-to-right (LTR) layout</span>
-            </div>
-            {locale === 'en' && <Check className="w-4 h-4 text-[#828fff]" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setLocale('fa')}
-            className={`p-3.5 rounded-lg border text-right transition-colors cursor-pointer flex items-center justify-between ${
-              locale === 'fa'
-                ? 'border-[#5e6ad2] bg-[#141516]'
-                : 'border-[#23252a] bg-[#141516] hover:bg-[#1b1c1d]'
-            }`}
-          >
-            <div>
-              <span className="font-semibold text-sm text-[#f7f8f8] block">
-                فارسی (Persian)
-              </span>
-              <span className="text-xs text-[#8a8f98]">چینش راست به چپ (RTL) با قلم وزیرمتن</span>
-            </div>
-            {locale === 'fa' && <Check className="w-4 h-4 text-[#828fff]" />}
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
+      )}
 
-      {/* 2. Visual Theme */}
-      <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
-        <div className="flex items-center gap-2.5 pb-2 border-b border-[#23252a]">
-          <Sun className="w-4 h-4 text-[#eab308]" />
-          <h3 className="text-sm font-semibold tracking-title text-[#f7f8f8]">
-            {t('settings.theme')}
-          </h3>
+      {/* Grouped Section 1: Localization & Language */}
+      <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+          <Languages className="w-4 h-4 text-blue-400" />
+          <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+            {t('settings.languageSection')}
+          </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => setTheme('light')}
-            className={`p-3.5 rounded-lg border text-start transition-colors cursor-pointer flex items-center justify-between ${
-              theme === 'light'
-                ? 'border-[#5e6ad2] bg-[#141516]'
-                : 'border-[#23252a] bg-[#141516] hover:bg-[#1b1c1d]'
-            }`}
-          >
-            <div>
-              <span className="font-semibold text-xs sm:text-sm text-[#f7f8f8] block">
-                {t('settings.light')}
-              </span>
-              <span className="text-[11px] text-[#8a8f98]">Crisp high-contrast light</span>
-            </div>
-            {theme === 'light' && <Check className="w-4 h-4 text-[#828fff]" />}
-          </button>
+        <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-xs font-medium text-zinc-200 block">Workspace Language</span>
+            <span className="text-[11px] text-zinc-500">Select interface language and text direction (LTR / RTL)</span>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setTheme('dark')}
-            className={`p-3.5 rounded-lg border text-start transition-colors cursor-pointer flex items-center justify-between ${
-              theme === 'dark'
-                ? 'border-[#5e6ad2] bg-[#141516]'
-                : 'border-[#23252a] bg-[#141516] hover:bg-[#1b1c1d]'
-            }`}
-          >
-            <div>
-              <span className="font-semibold text-xs sm:text-sm text-[#f7f8f8] block">
-                {t('settings.dark')}
-              </span>
-              <span className="text-[11px] text-[#8a8f98]">Linear dark canvas (#010102)</span>
-            </div>
-            {theme === 'dark' && <Check className="w-4 h-4 text-[#828fff]" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setTheme('system')}
-            className={`p-3.5 rounded-lg border text-start transition-colors cursor-pointer flex items-center justify-between ${
-              theme === 'system'
-                ? 'border-[#5e6ad2] bg-[#141516]'
-                : 'border-[#23252a] bg-[#141516] hover:bg-[#1b1c1d]'
-            }`}
-          >
-            <div>
-              <span className="font-semibold text-xs sm:text-sm text-[#f7f8f8] block">
-                {t('settings.system')}
-              </span>
-              <span className="text-[11px] text-[#8a8f98]">Follow OS setting</span>
-            </div>
-            {theme === 'system' && <Check className="w-4 h-4 text-[#828fff]" />}
-          </button>
+          <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-900 border border-zinc-800 shrink-0">
+            <button
+              type="button"
+              onClick={() => setLocale('en')}
+              className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                locale === 'en'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              English
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocale('fa')}
+              className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                locale === 'fa'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              فارسی (Persian)
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 3. Manage Collections */}
-      <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-[#23252a]">
-          <div className="flex items-center gap-2.5">
-            <FolderKanban className="w-4 h-4 text-[#828fff]" />
-            <h3 className="text-sm font-semibold tracking-title text-[#f7f8f8]">
-              {t('settings.collections')}
-            </h3>
+      {/* Grouped Section 2: Research Collections Management */}
+      <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="w-4 h-4 text-blue-400" />
+            <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+              Research Domains & Collections
+            </h2>
           </div>
           <button
             type="button"
             onClick={() => setNewColOpen(true)}
-            className="linear-btn-primary text-xs gap-1.5"
+            className="heroui-btn-primary text-xs py-1"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{t('settings.newCollection')}</span>
+            <span>Add Collection</span>
           </button>
         </div>
 
-        <div className="rounded-lg border border-[#23252a] divide-y divide-[#23252a] overflow-hidden bg-[#141516]">
-          {collections.map((c) => (
+        <div className="divide-y divide-zinc-800">
+          {collections.map((col) => (
             <div
-              key={c.id}
-              className="p-3.5 flex items-center justify-between gap-3 text-xs"
+              key={col.id}
+              className="p-3.5 flex items-center justify-between gap-3 hover:bg-zinc-850/40 transition-colors"
             >
-              <div>
-                <span className="font-semibold text-[#f7f8f8] block">
-                  {c.name} / {c.nameFa}
-                </span>
-                {c.description && (
-                  <span className="text-[#8a8f98] text-[11px]">{c.description}</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-zinc-100">{col.name}</span>
+                  {col.nameFa && col.nameFa !== col.name && (
+                    <span className="text-xs text-zinc-400 font-normal">({col.nameFa})</span>
+                  )}
+                </div>
+                {col.description && (
+                  <p className="text-[11px] text-zinc-400 truncate max-w-md mt-0.5">
+                    {col.description}
+                  </p>
                 )}
               </div>
 
-              {collections.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setDeleteColId(c.id)}
-                  className="p-1 rounded text-[#8a8f98] hover:text-[#fb7185] cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setDeleteColId(col.id)}
+                className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                title="Delete Collection"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 4. Data Management: Export Backup & Reset */}
-      <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-4">
-        <h3 className="text-sm font-semibold tracking-title text-[#f7f8f8] pb-2 border-b border-[#23252a]">
-          Data Management & Portability
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={handleExportBackup}
-            className="p-4 rounded-xl border border-[#23252a] hover:border-[#5e6ad2] bg-[#141516] hover:bg-[#1b1c1d] text-start space-y-1 cursor-pointer transition-colors"
-          >
-            <Download className="w-5 h-5 text-[#828fff] mb-1" />
-            <span className="font-medium text-xs sm:text-sm text-[#f7f8f8] block">
-              {t('settings.exportBackup')}
-            </span>
-            <span className="text-[11px] text-[#8a8f98] block leading-tight">
-              Export complete JSON backup of all research and relationships
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-4 rounded-xl border border-[#23252a] hover:border-[#5e6ad2] bg-[#141516] hover:bg-[#1b1c1d] text-start space-y-1 cursor-pointer transition-colors"
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImportBackup}
-              className="hidden"
-            />
-            <Upload className="w-5 h-5 text-[#828fff] mb-1" />
-            <span className="font-medium text-xs sm:text-sm text-[#f7f8f8] block">
-              {t('settings.importBackup')}
-            </span>
-            <span className="text-[11px] text-[#8a8f98] block leading-tight">
-              Restore workspace from a previously exported JSON backup
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setResetModalOpen(true)}
-            className="p-4 rounded-xl border border-[#3f1922] hover:border-[#fb7185] bg-[#1a0c10] text-start space-y-1 cursor-pointer transition-colors"
-          >
-            <RotateCcw className="w-5 h-5 text-[#fb7185] mb-1" />
-            <span className="font-medium text-xs sm:text-sm text-[#fecdd3] block">
-              {t('settings.resetDemo')}
-            </span>
-            <span className="text-[11px] text-[#fda4af]/80 block leading-tight">
-              Re-seed with fresh realistic demo reports and knowledge
-            </span>
-          </button>
+      {/* Grouped Section 3: Storage & Workspace Hygiene */}
+      <div className="rounded-xl border border-zinc-800 bg-[#18181b] overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+          <Database className="w-4 h-4 text-blue-400" />
+          <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+            {t('settings.storageSection')}
+          </h2>
         </div>
 
-        {importStatus && (
-          <div className="p-3 rounded-lg bg-[#141516] border border-[#23252a] text-xs text-[#d0d6e0]">
-            {importStatus}
+        <div className="p-4 space-y-4 divide-y divide-zinc-800">
+          {/* Storage Description */}
+          <div className="text-xs text-zinc-400 leading-relaxed">
+            {t('settings.storageDesc')}
           </div>
-        )}
-      </div>
 
-      {/* 5. Production Cloudflare Architecture Readiness */}
-      <div className="p-5 rounded-xl border border-[#23252a] bg-[#0f1011] space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-[#23252a]">
-          <div className="flex items-center gap-2">
-            <Server className="w-4 h-4 text-[#828fff]" />
-            <h3 className="text-sm font-semibold tracking-title text-[#f7f8f8]">
-              Cloudflare Pages + D1 Seam Status
-            </h3>
+          {/* Backup & Restore Controls */}
+          <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-medium text-zinc-200 block">Workspace Backup</span>
+              <span className="text-[11px] text-zinc-500">Download snapshot or restore from a JSON backup file</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="heroui-btn-secondary text-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export (.json)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="heroui-btn-secondary text-xs"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Restore</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImportBackup}
+                className="hidden"
+              />
+            </div>
           </div>
-          <span className="text-xs font-medium px-2 py-0.5 rounded bg-[#1b1c1d] border border-[#2e3036] text-[#828fff]">
-            Repository Pattern Active
-          </span>
-        </div>
 
-        <p className="text-xs text-[#8a8f98] leading-relaxed">
-          The frontend strictly decouples all UI views from persistence using the{' '}
-          <code className="px-1.5 py-0.5 bg-[#141516] border border-[#23252a] rounded text-[11px] text-[#d0d6e0]">
-            KnowledgeRepository
-          </code>{' '}
-          contract. All routes are currently serviced by{' '}
-          <code className="px-1.5 py-0.5 bg-[#141516] border border-[#23252a] rounded text-[11px] text-[#d0d6e0]">
-            MockKnowledgeRepository
-          </code>
-          . When Codex wires Cloudflare Pages Functions + D1, simply toggle to{' '}
-          <code className="px-1.5 py-0.5 bg-[#141516] border border-[#23252a] rounded text-[11px] text-[#d0d6e0]">
-            ApiKnowledgeRepository
-          </code>
-          .
-        </p>
+          {/* Reset Workspace */}
+          <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-medium text-rose-400 block">{t('settings.btnReset')}</span>
+              <span className="text-[11px] text-zinc-500">Reset all documents and knowledge back to clean fixtures</span>
+            </div>
 
-        <div className="flex items-center gap-3 pt-1 text-xs">
-          <span className="text-[#8a8f98]">Active Adapter:</span>
-          <span className="font-semibold text-[#f7f8f8]">
-            {isDemoMode ? 'MockKnowledgeRepository (Local Demo)' : 'ApiKnowledgeRepository (/api/v1)'}
-          </span>
+            <button
+              type="button"
+              onClick={() => setResetModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-950/30 text-rose-300 hover:bg-rose-900/40 border border-rose-900/50 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 inline me-1.5" />
+              <span>Reset Store</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Create Collection Modal */}
+      {/* New Collection Modal */}
       {newColOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-md bg-[#0f1011] rounded-xl border border-[#23252a] shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#23252a] flex items-center justify-between">
-              <h3 className="text-base font-semibold tracking-title text-[#f7f8f8]">
-                {t('settings.newCollection')}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#18181b] border border-zinc-800 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <h3 className="text-sm font-semibold text-zinc-100">Add Collection</h3>
               <button
                 type="button"
                 onClick={() => setNewColOpen(false)}
-                className="p-1 rounded text-[#8a8f98] hover:text-[#f7f8f8] cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-100 p-1"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCollection} className="p-6 space-y-4">
+            <form onSubmit={handleCreateCollection} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Collection Name (English) *
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Name (English) *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Distributed Consensus"
                   value={newColName}
                   onChange={(e) => setNewColName(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                  placeholder="e.g. LLM Reasoning Heuristics"
+                  className="heroui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  نام مجموعه (فارسی)
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Name (Persian / Alternate)
                 </label>
                 <input
                   type="text"
-                  dir="rtl"
-                  placeholder="مثلا: هماهنگی توزیع‌شده"
                   value={newColNameFa}
                   onChange={(e) => setNewColNameFa(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                  placeholder="e.g. روش‌های استدلال مدل‌های زبانی"
+                  className="heroui-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#8a8f98] mb-1">
-                  Description (optional)
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Description
                 </label>
                 <textarea
                   rows={2}
                   value={newColDesc}
                   onChange={(e) => setNewColDesc(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm rounded-md border border-[#23252a] bg-[#141516] text-[#f7f8f8] placeholder-[#62666d] focus:outline-none focus:border-[#5e6ad2]"
+                  placeholder="Scope and purpose..."
+                  className="heroui-input"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#23252a]">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setNewColOpen(false)}
-                  className="linear-btn-secondary text-xs sm:text-sm"
+                  className="heroui-btn-secondary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="linear-btn-primary text-xs sm:text-sm"
+                  className="heroui-btn-primary"
                 >
-                  {t('common.create')}
+                  {t('common.save')}
                 </button>
               </div>
             </form>
@@ -518,24 +410,28 @@ export const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Reset Confirmation Modal */}
-      <ConfirmModal
-        isOpen={resetModalOpen}
-        title={t('settings.resetDemo')}
-        description={t('settings.resetConfirm')}
-        isDestructive
-        onConfirm={handleConfirmReset}
-        onCancel={() => setResetModalOpen(false)}
-      />
-
       {/* Delete Collection Modal */}
       <ConfirmModal
-        isOpen={deleteColId !== null}
+        isOpen={Boolean(deleteColId)}
         title="Delete Collection"
-        description="Are you sure you want to delete this collection?"
+        description="Are you sure you want to delete this collection? Existing knowledge units will not be deleted."
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
         isDestructive
         onConfirm={handleDeleteCollection}
         onCancel={() => setDeleteColId(null)}
+      />
+
+      {/* Reset Confirmation Modal */}
+      <ConfirmModal
+        isOpen={resetModalOpen}
+        title={t('settings.resetConfirmTitle')}
+        description={t('settings.resetConfirmDesc')}
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
+        isDestructive
+        onConfirm={handleReset}
+        onCancel={() => setResetModalOpen(false)}
       />
     </div>
   );

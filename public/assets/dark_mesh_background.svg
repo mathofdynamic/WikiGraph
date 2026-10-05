@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none">
+  <defs>
+    <!-- Deep obsidian dark gradient background -->
+    <linearGradient id="canvasGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020306" />
+      <stop offset="50%" stop-color="#05060b" />
+      <stop offset="100%" stop-color="#010204" />
+    </linearGradient>
+
+    <!-- Subtle mesh pattern -->
+    <pattern id="gridPattern" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-opacity="0.025" />
+      <circle cx="48" cy="0" r="1" fill="#ffffff" fill-opacity="0.04" />
+    </pattern>
+
+    <!-- Atmospheric soft monochrome focal points -->
+    <radialGradient id="softAtmosphere1" cx="35%" cy="20%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.035" />
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.008" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="softAtmosphere2" cx="75%" cy="65%" r="45%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.025" />
+      <stop offset="70%" stop-color="#ffffff" stop-opacity="0.005" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background Base Canvas -->
+  <rect width="100%" height="100%" fill="url(#canvasGrad)" />
+
+  <!-- Atmospheric Lighting -->
+  <rect width="100%" height="100%" fill="url(#softAtmosphere1)" />
+  <rect width="100%" height="100%" fill="url(#softAtmosphere2)" />
+
+  <!-- Geometric Grid Texture -->
+  <rect width="100%" height="100%" fill="url(#gridPattern)" />
+
+  <!-- Constellation Nodes & Knowledge Graph Mesh Filaments (Monochrome Graphite) -->
+  <g opacity="0.35" stroke="#ffffff" stroke-width="0.8">
+    <line x1="280" y1="180" x2="440" y2="290" stroke-opacity="0.06" />
+    <line x1="440" y1="290" x2="620" y2="210" stroke-opacity="0.05" />
+    <line x1="620" y1="210" x2="780" y2="340" stroke-opacity="0.07" />
+    <line x1="780" y1="340" x2="940" y2="230" stroke-opacity="0.04" />
+    <line x1="940" y1="230" x2="1120" y2="360" stroke-opacity="0.06" />
+    <line x1="1120" y1="360" x2="1340" y2="260" stroke-opacity="0.05" />
+    <line x1="1340" y1="260" x2="1520" y2="400" stroke-opacity="0.07" />
+    <line x1="1520" y1="400" x2="1740" y2="310" stroke-opacity="0.04" />
+
+    <line x1="380" y1="520" x2="560" y2="440" stroke-opacity="0.05" />
+    <line x1="560" y1="440" x2="720" y2="580" stroke-opacity="0.06" />
+    <line x1="720" y1="580" x2="920" y2="510" stroke-opacity="0.05" />
+    <line x1="920" y1="510" x2="1080" y2="640" stroke-opacity="0.07" />
+    <line x1="1080" y1="640" x2="1310" y2="530" stroke-opacity="0.04" />
+    <line x1="1310" y1="530" x2="1490" y2="670" stroke-opacity="0.06" />
+
+    <line x1="440" y1="290" x2="560" y2="440" stroke-opacity="0.04" />
+    <line x1="780" y1="340" x2="720" y2="580" stroke-opacity="0.05" />
+    <line x1="1120" y1="360" x2="1080" y2="640" stroke-opacity="0.05" />
+    <line x1="1340" y1="260" x2="1310" y2="530" stroke-opacity="0.04" />
+  </g>
+
+  <!-- Constellation Nodes -->
+  <g fill="#ffffff">
+    <circle cx="280" cy="180" r="2.5" fill-opacity="0.08" />
+    <circle cx="440" cy="290" r="3.5" fill-opacity="0.12" />
+    <circle cx="620" cy="210" r="2.5" fill-opacity="0.08" />
+    <circle cx="780" cy="340" r="4" fill-opacity="0.14" />
+    <circle cx="940" cy="230" r="2.5" fill-opacity="0.08" />
+    <circle cx="1120" cy="360" r="3.5" fill-opacity="0.12" />
+    <circle cx="1340" cy="260" r="3" fill-opacity="0.09" />
+    <circle cx="1520" cy="400" r="4" fill-opacity="0.13" />
+    <circle cx="1740" cy="310" r="2" fill-opacity="0.07" />
+
+    <circle cx="380" cy="520" r="2" fill-opacity="0.07" />
+    <circle cx="560" cy="440" r="3" fill-opacity="0.11" />
+    <circle cx="720" cy="580" r="3.5" fill-opacity="0.12" />
+    <circle cx="920" cy="510" r="2.5" fill-opacity="0.08" />
+    <circle cx="1080" cy="640" r="4" fill-opacity="0.15" />
+    <circle cx="1310" cy="530" r="3" fill-opacity="0.09" />
+    <circle cx="1490" cy="670" r="3.5" fill-opacity="0.11" />
+  </g>
+</svg>

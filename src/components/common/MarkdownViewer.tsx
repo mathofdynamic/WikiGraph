@@ -11,53 +11,53 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
   return (
     <div
       dir="auto"
-      className={`prose max-w-none text-[#d0d6e0] leading-relaxed font-sans ${className}`}
+      className={`prose max-w-none text-zinc-300 leading-relaxed font-sans ${className}`}
     >
       <ReactMarkdown
         components={{
           // Sanitize images to prevent automatic remote network requests
           img: ({ alt, src }) => (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-dashed border-[#23252a] bg-[#0f1011] text-xs text-[#8a8f98] my-2 select-none">
-              <Image className="w-3.5 h-3.5 shrink-0 text-[#8a8f98]" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-dashed border-zinc-800 bg-zinc-900 text-xs text-zinc-400 my-2 select-none">
+              <Image className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
               <span>[Sanitized Image: {alt || src || 'Resource Blocked'}]</span>
             </span>
           ),
-          // Clean typography for headers with Linear scale and negative tracking
+          // Clean typography for headers
           h1: ({ children }) => (
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-title text-[#f7f8f8] mt-6 mb-3 pb-2 border-b border-[#23252a]">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 mt-6 mb-3 pb-2 border-b border-zinc-800">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg sm:text-xl font-medium tracking-card-title text-[#f7f8f8] mt-5 mb-2.5">
+            <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100 mt-5 mb-2.5">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-sm sm:text-base font-medium tracking-card-title text-[#f7f8f8] mt-4 mb-2">
+            <h3 className="text-sm sm:text-base font-medium text-zinc-200 mt-4 mb-2">
               {children}
             </h3>
           ),
-          p: ({ children }) => <p className="mb-3 text-xs sm:text-sm leading-relaxed text-[#d0d6e0]">{children}</p>,
+          p: ({ children }) => <p className="mb-3 text-xs sm:text-sm leading-relaxed text-zinc-300">{children}</p>,
           ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1 mb-3 text-xs sm:text-sm pl-2 text-[#d0d6e0]">{children}</ul>
+            <ul className="list-disc list-inside space-y-1 mb-3 text-xs sm:text-sm pl-2 text-zinc-300">{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1 mb-3 text-xs sm:text-sm pl-2 text-[#d0d6e0]">{children}</ol>
+            <ol className="list-decimal list-inside space-y-1 mb-3 text-xs sm:text-sm pl-2 text-zinc-300">{children}</ol>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-[#5e6ad2] rtl:border-l-0 rtl:border-r-2 rtl:border-[#5e6ad2] pl-3.5 rtl:pl-0 rtl:pr-3.5 my-3 text-[#8a8f98] bg-[#0f1011] py-2 rounded-r rtl:rounded-r-none rtl:rounded-l text-xs border-y border-r border-[#23252a]">
+            <blockquote className="border-l-2 border-blue-500 rtl:border-l-0 rtl:border-r-2 rtl:border-blue-500 pl-3.5 rtl:pl-0 rtl:pr-3.5 my-3 text-zinc-400 bg-zinc-900/60 py-2 rounded-r rtl:rounded-r-none rtl:rounded-l text-xs border-y border-r border-zinc-800">
               {children}
             </blockquote>
           ),
           code: ({ children, className }) => {
             const isInline = !className;
             return isInline ? (
-              <code className="px-1.5 py-0.5 rounded bg-[#141516] text-[#f7f8f8] text-xs font-medium border border-[#23252a]">
+              <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200 text-xs font-medium border border-zinc-700/60 font-mono">
                 {children}
               </code>
             ) : (
-              <pre className="p-3.5 rounded-lg bg-[#0a0a0b] text-[#f7f8f8] text-xs font-normal overflow-x-auto my-3 border border-[#23252a]">
+              <pre className="p-3.5 rounded-lg bg-zinc-950 text-zinc-200 text-xs font-mono overflow-x-auto my-3 border border-zinc-800">
                 <code>{children}</code>
               </pre>
             );

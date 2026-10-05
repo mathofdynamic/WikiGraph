@@ -14,7 +14,6 @@ import { ConnectionsPage } from './pages/ConnectionsPage';
 import { DocumentDetailPage } from './pages/DocumentDetailPage';
 import { KnowledgeDetailPage } from './pages/KnowledgeDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { LoginPage } from './pages/LoginPage';
 
 export default function App() {
   return (
@@ -23,13 +22,11 @@ export default function App() {
         <RepositoryProvider>
           <BrowserRouter>
             <Routes>
-              {/* Standalone Login Screen */}
-              <Route path="/login" element={<LoginPage />} />
-
-              {/* Main Application with AppLayout Shell */}
+              {/* Main Agent Marketplace Application Shell */}
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Navigate to="/library" replace />} />
                 <Route path="library" element={<LibraryPage />} />
+                <Route path="marketplace" element={<Navigate to="/library" replace />} />
                 <Route path="graph" element={<GraphPage />} />
                 <Route path="context" element={<ContextPage />} />
                 <Route path="import" element={<ImportPage />} />
@@ -40,7 +37,8 @@ export default function App() {
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
 
-              {/* Catch-all redirect */}
+              {/* Redirect login or unknown to marketplace */}
+              <Route path="/login" element={<Navigate to="/library" replace />} />
               <Route path="*" element={<Navigate to="/library" replace />} />
             </Routes>
           </BrowserRouter>
@@ -49,3 +47,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+

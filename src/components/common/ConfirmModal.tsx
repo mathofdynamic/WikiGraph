@@ -44,35 +44,35 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000]/70 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
     >
       <div
-        className="w-full max-w-md rounded-xl bg-[#0f1011] border border-[#23252a] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-md rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#23252a]">
-          <div className="flex items-center gap-2 text-[#f7f8f8] font-medium tracking-card-title text-sm">
-            {isDestructive && <AlertTriangle className="w-4 h-4 text-[#f43f5e] shrink-0" />}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2 text-zinc-100 font-medium text-sm">
+            {isDestructive && <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />}
             <span id="confirm-modal-title">{title}</span>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="p-1 rounded-md text-[#8a8f98] hover:text-[#f7f8f8] hover:bg-[#141516] cursor-pointer transition-colors"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 cursor-pointer transition-colors"
             aria-label={t('common.close')}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 text-xs sm:text-sm text-[#8a8f98] leading-relaxed">
+        <div className="p-5 text-xs sm:text-sm text-zinc-400 leading-relaxed">
           {description}
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-[#141516] border-t border-[#23252a]">
+        <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-zinc-950/70 border-t border-zinc-800">
           <button
             type="button"
             onClick={onCancel}
-            className="linear-btn-secondary text-xs"
+            className="heroui-btn-secondary text-xs"
           >
             {cancelLabel || t('common.cancel')}
           </button>
@@ -80,7 +80,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             ref={confirmBtnRef}
             type="button"
             onClick={onConfirm}
-            className={isDestructive ? 'px-3.5 py-2 rounded-md bg-[#f43f5e] hover:bg-rose-600 text-white text-xs font-medium cursor-pointer transition-colors' : 'linear-btn-primary text-xs'}
+            className={isDestructive ? 'px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer transition-colors' : 'heroui-btn-primary text-xs'}
           >
             {confirmLabel || t('common.confirm')}
           </button>
