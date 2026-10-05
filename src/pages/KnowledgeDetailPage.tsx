@@ -381,10 +381,10 @@ ${item.body || item.summary}
             type="button"
             onClick={handleCopyAgentPrompt}
             className="ui-button ui-button-secondary text-xs"
-            title={t('marketplace.copyForAgent')}
+            title="Copy Context Prompt"
           >
-            {copiedPrompt ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Bot className="w-3.5 h-3.5 text-blue-400" />}
-            <span>{copiedPrompt ? t('common.copied') : t('marketplace.copyForAgent')}</span>
+            {copiedPrompt ? <Check className="w-3.5 h-3.5 text-[var(--success)]" /> : <Copy className="w-3.5 h-3.5 text-[var(--accent)]" />}
+            <span>{copiedPrompt ? t('common.copied') : 'Copy Prompt'}</span>
           </button>
 
           <button

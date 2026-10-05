@@ -312,7 +312,7 @@ export const LibraryPage: React.FC = () => {
               dir="auto"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('common.searchPlaceholder')}
+              placeholder={t('library.filterLibrary') || 'Filter library…'}
               className="ui-input ps-9 pe-8"
             />
             {searchQuery && (
@@ -454,15 +454,15 @@ export const LibraryPage: React.FC = () => {
                     <div
                       key={item.id}
                       onClick={() => handleSelectKnowledge(item)}
-                      className={`p-4 rounded-xl border transition-all cursor-pointer relative group ${
+                      className={`p-4 rounded-xl border border-[var(--border)] transition-colors cursor-pointer relative group ${
                         isSelected
-                          ? 'bg-[var(--surface-secondary)] border-[var(--border)] ring-1 ring-[var(--accent)]/40'
-                          : 'bg-[var(--surface)] border-[var(--border)] hover:bg-[var(--surface-secondary)]/50'
+                          ? 'bg-[var(--surface-secondary)]'
+                          : 'bg-[var(--surface)] hover:bg-[var(--surface-secondary)]/50'
                       }`}
                     >
-                      {/* Left subtle accent indicator line for selected item */}
+                      {/* Left subtle 2px accent indicator line for selected item */}
                       {isSelected && (
-                        <div className="absolute start-0 top-3 bottom-3 w-1 bg-[var(--accent)] rounded-e" />
+                        <div className="absolute start-0 top-3 bottom-3 w-[2px] bg-[var(--accent)] rounded-e" />
                       )}
 
                       <div className="flex items-start justify-between gap-3">
@@ -549,13 +549,13 @@ export const LibraryPage: React.FC = () => {
                   {/* Inspector Header: Title + open button */}
                   <div className="space-y-2 pb-3 border-b border-[var(--separator)]">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--muted)]">
+                      <span className="text-[12px] font-medium text-[var(--muted)]">
                         {t('library.selectedItem')}
                       </span>
                       <button
                         type="button"
                         onClick={() => navigate(`/knowledge/${activeItem.id}`)}
-                        className="ui-button ui-button-ghost text-xs p-1 text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+                        className="ui-button ui-button-ghost text-xs p-1 text-[var(--muted)] hover:text-[var(--foreground)] inline-flex items-center gap-1"
                       >
                         <span>{t('common.openDetail')}</span>
                         <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
@@ -579,12 +579,12 @@ export const LibraryPage: React.FC = () => {
 
                   {/* Summary */}
                   <div className="space-y-1">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    <div className="text-[12px] font-medium text-[var(--muted)]">
                       Summary
                     </div>
                     <p
                       dir="auto"
-                      className="text-[13px] text-[var(--foreground)] leading-relaxed"
+                      className="text-[13px] sm:text-[14px] text-[var(--foreground)] leading-relaxed"
                     >
                       {activeItem.summary}
                     </p>
@@ -593,12 +593,12 @@ export const LibraryPage: React.FC = () => {
                   {/* Applicability */}
                   {activeItem.applicability && (
                     <div className="space-y-1">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                      <div className="text-[12px] font-medium text-[var(--muted)]">
                         Applicability
                       </div>
                       <p
                         dir="auto"
-                        className="text-[12px] text-[var(--foreground)] leading-relaxed"
+                        className="text-[13px] text-[var(--foreground)] leading-relaxed"
                       >
                         {activeItem.applicability}
                       </p>
@@ -608,12 +608,12 @@ export const LibraryPage: React.FC = () => {
                   {/* Exclusions */}
                   {activeItem.exclusions && (
                     <div className="space-y-1">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                      <div className="text-[12px] font-medium text-[var(--muted)]">
                         Exclusions
                       </div>
                       <p
                         dir="auto"
-                        className="text-[12px] text-[var(--muted)] leading-relaxed"
+                        className="text-[13px] text-[var(--muted)] leading-relaxed"
                       >
                         {activeItem.exclusions}
                       </p>
@@ -623,10 +623,10 @@ export const LibraryPage: React.FC = () => {
                   {/* Requirements */}
                   {activeItem.requirements && activeItem.requirements.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                      <div className="text-[12px] font-medium text-[var(--muted)]">
                         Prerequisites & Requirements ({activeItem.requirements.length})
                       </div>
-                      <ul className="space-y-1 text-[12px] text-[var(--foreground)] list-disc list-inside ps-1">
+                      <ul className="space-y-1 text-[13px] text-[var(--foreground)] list-disc list-inside ps-1">
                         {activeItem.requirements.map((r, i) => (
                           <li key={i} dir="auto" className="leading-snug">
                             {r}
@@ -639,12 +639,12 @@ export const LibraryPage: React.FC = () => {
                   {/* Source Citation */}
                   {activeItem.sourceExcerpt && (
                     <div className="space-y-1 pt-1 border-t border-[var(--separator)]">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                      <div className="text-[12px] font-medium text-[var(--muted)]">
                         Grounding Citation
                       </div>
                       <blockquote
                         dir="auto"
-                        className="text-[12px] text-[var(--muted)] italic ps-2.5 border-s-2 border-[var(--border)] leading-relaxed"
+                        className="text-[13px] text-[var(--muted)] italic ps-2.5 border-s-2 border-[var(--border)] leading-relaxed"
                       >
                         "{activeItem.sourceExcerpt}"
                       </blockquote>
@@ -656,10 +656,10 @@ export const LibraryPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => navigate(`/knowledge/${activeItem.id}`)}
-                      className="flex-1 ui-button ui-button-primary text-xs"
+                      className="flex-1 ui-button ui-button-secondary text-xs"
                     >
                       <span>Open Full Knowledge Node</span>
-                      <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
+                      <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180 text-[var(--muted)]" />
                     </button>
                   </div>
                 </div>

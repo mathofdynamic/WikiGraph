@@ -16,7 +16,7 @@ const THEME_STORAGE_KEY = 'wikigraph_pref_theme';
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
-    return saved || 'dark'; // Default to Linear dark canvas
+    return saved || 'dark'; // Default to dark theme
   });
 
   const [isDark, setIsDark] = useState<boolean>(true);

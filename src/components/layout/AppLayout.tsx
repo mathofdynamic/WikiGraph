@@ -64,8 +64,15 @@ export const AppLayout: React.FC = () => {
     <div className="flex flex-col h-full bg-[var(--surface)] select-none">
       {/* Workspace Brand Identity */}
       <div className="h-14 flex items-center px-4 gap-2.5 border-b border-[var(--separator)] shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] font-semibold shrink-0">
-          <Shield className="w-4 h-4" />
+        <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shrink-0">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="5" cy="6" r="2.5" />
+            <circle cx="19" cy="8" r="2.5" />
+            <circle cx="12" cy="18" r="2.5" />
+            <line x1="7.2" y1="6.8" x2="16.8" y2="7.6" />
+            <line x1="6.6" y1="8.2" x2="10.8" y2="15.8" />
+            <line x1="17.6" y1="10.2" x2="13.2" y2="15.8" />
+          </svg>
         </div>
         <div className="min-w-0">
           <div className="text-sm font-semibold text-[var(--foreground)] tracking-tight leading-none truncate">
@@ -181,7 +188,7 @@ export const AppLayout: React.FC = () => {
               className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--field-background)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all cursor-pointer w-48 sm:w-64"
             >
               <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate flex-1 text-start">{t('common.searchPlaceholder')}</span>
+              <span className="truncate flex-1 text-start">{t('common.searchWorkspace')}</span>
               <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--muted)]">
                 ⌘K
               </kbd>

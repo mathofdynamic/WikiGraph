@@ -23,7 +23,14 @@ export const LoginPage: React.FC = () => {
       <div className="w-full max-w-md ui-card p-6 sm:p-8 space-y-6">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] mx-auto flex items-center justify-center text-[var(--accent)]">
-            <Shield className="w-6 h-6" />
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="5" cy="6" r="2.5" />
+              <circle cx="19" cy="8" r="2.5" />
+              <circle cx="12" cy="18" r="2.5" />
+              <line x1="7.2" y1="6.8" x2="16.8" y2="7.6" />
+              <line x1="6.6" y1="8.2" x2="10.8" y2="15.8" />
+              <line x1="17.6" y1="10.2" x2="13.2" y2="15.8" />
+            </svg>
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--foreground)]">
             {t('login.title')}
