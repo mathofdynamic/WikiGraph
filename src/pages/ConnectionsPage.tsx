@@ -213,7 +213,7 @@ print(f"Matched {len(data['items'])} knowledge units")`;
                 <button
                   type="button"
                   onClick={() => handleDeleteToken(tok.id)}
-                  className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-400 hover:bg-rose-950/20 cursor-pointer"
+                  className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] cursor-pointer"
                   title="Revoke Token"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -265,7 +265,7 @@ print(f"Matched {len(data['items'])} knowledge units")`;
               onClick={handleCopySnippet}
               className="ui-button ui-button-secondary text-xs py-1"
             >
-              {copiedSnippet ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              {copiedSnippet ? <Check className="w-3 h-3 text-[var(--accent)]" /> : <Copy className="w-3 h-3" />}
               <span>{copiedSnippet ? 'Copied' : 'Copy'}</span>
             </button>
           </div>
@@ -343,7 +343,7 @@ print(f"Matched {len(data['items'])} knowledge units")`;
 
             {generatedSecret ? (
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-300 space-y-1">
+                <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--foreground)] space-y-1">
                   <span className="font-semibold block">{t('connections.revealTitle')}</span>
                   <p className="text-[11px] text-[var(--muted)]">{t('connections.revealWarning')}</p>
                 </div>

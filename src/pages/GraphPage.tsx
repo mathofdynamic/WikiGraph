@@ -217,23 +217,9 @@ export const GraphPage: React.FC = () => {
   };
 
   const getNodeColor = (type: string, isSource?: boolean) => {
-    if (isSource) return '#10b981'; // emerald
-    switch (type) {
-      case 'procedure':
-        return '#006FEE'; // HeroUI Blue
-      case 'research_finding':
-        return '#6366f1'; // Indigo
-      case 'tip':
-        return '#06b6d4'; // Cyan
-      case 'skill':
-        return '#a855f7'; // Purple
-      case 'failure':
-        return '#f43f5e'; // Rose
-      case 'lesson':
-        return '#f59e0b'; // Amber
-      default:
-        return '#71717a'; // Zinc
-    }
+    if (isSource) return '#ededed';
+    if (type === 'procedure' || type === 'skill') return '#006FEE';
+    return '#8e8e93';
   };
 
   return (
@@ -360,19 +346,15 @@ export const GraphPage: React.FC = () => {
       <div className="absolute bottom-5 left-5 z-20 hidden md:flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[var(--surface)]/90 border border-[var(--border)] backdrop-blur-md text-[11px] text-[var(--muted)] shadow-xl">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-[#006FEE]" />
-          <span>Procedure</span>
+          <span>Core Procedure / Skill</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#6366f1]" />
-          <span>Finding</span>
+          <span className="w-2 h-2 rounded-full bg-[#ededed]" />
+          <span>Source Document</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#10b981]" />
-          <span>Source Doc</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#f43f5e]" />
-          <span>Failure</span>
+          <span className="w-2 h-2 rounded-full bg-[#8e8e93]" />
+          <span>Knowledge Node</span>
         </span>
       </div>
 

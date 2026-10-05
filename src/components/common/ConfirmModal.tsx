@@ -51,7 +51,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--separator)]">
           <div className="flex items-center gap-2 text-[var(--foreground)] font-medium text-sm">
-            {isDestructive && <AlertTriangle className="w-4 h-4 text-[var(--danger)] shrink-0" />}
+            {isDestructive && <AlertTriangle className="w-4 h-4 text-[var(--foreground)] shrink-0" />}
             <span id="confirm-modal-title">{title}</span>
           </div>
           <button
@@ -80,9 +80,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             ref={confirmBtnRef}
             type="button"
             onClick={onConfirm}
-            className={isDestructive ? 'ui-button text-xs bg-[var(--danger)] text-white hover:opacity-90' : 'ui-button ui-button-primary text-xs'}
+            className={
+              isDestructive
+                ? 'ui-button text-xs bg-[var(--surface-tertiary)] border border-[var(--border)] text-[var(--foreground)] font-semibold hover:bg-[var(--surface-secondary)]'
+                : 'ui-button ui-button-primary text-xs'
+            }
           >
-            {confirmLabel || t('common.confirm')}
+            {isDestructive && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+            <span>{confirmLabel || t('common.confirm')}</span>
           </button>
         </div>
       </div>

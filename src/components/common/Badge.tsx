@@ -1,4 +1,16 @@
 import React from 'react';
+import {
+  Check,
+  AlertTriangle,
+  X,
+  HelpCircle,
+  Wrench,
+  Lightbulb,
+  Sparkles,
+  Layers,
+  FileText,
+  BookOpen,
+} from 'lucide-react';
 import { EvidenceLevel, KnowledgeType, OutcomeResult, ReviewStatus } from '../../types';
 import { useLocale } from '../../locales/useLocale';
 
@@ -20,85 +32,91 @@ export const Badge: React.FC<BadgeProps> = ({
   const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-0.5 text-xs';
 
   let colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
-  let indicatorColor = '';
+  let IconComponent: React.ComponentType<{ className?: string }> | null = null;
+  let iconClass = 'w-3 h-3 shrink-0';
+  let indicatorDot: string | null = null;
   let label = value;
 
   if (type === 'review') {
     const val = value as ReviewStatus;
     if (val === 'reviewed') {
-      colorClasses = 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/25';
-      indicatorColor = 'bg-[var(--success)]';
+      colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
+      IconComponent = Check;
+      iconClass = 'w-3 h-3 text-[var(--accent)] shrink-0';
       label = t('reviewStatus.reviewed');
     } else if (val === 'draft') {
       colorClasses = 'bg-[var(--surface-secondary)] text-[var(--muted)] border-[var(--border)]';
-      indicatorColor = 'bg-[var(--muted)]';
       label = t('reviewStatus.draft');
     } else if (val === 'deprecated') {
-      colorClasses = 'bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/25';
-      indicatorColor = 'bg-[var(--warning)]';
+      colorClasses = 'bg-[var(--surface-secondary)] text-[var(--muted)] border-[var(--border)]';
+      IconComponent = AlertTriangle;
+      iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
       label = t('reviewStatus.deprecated');
     }
   } else if (type === 'evidence') {
     const val = value as EvidenceLevel;
     if (val === 'tested') {
-      colorClasses = 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/25';
-      indicatorColor = 'bg-[var(--success)]';
+      colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
+      IconComponent = Check;
+      iconClass = 'w-3 h-3 text-[var(--accent)] shrink-0';
       label = t('evidenceLevel.tested');
     } else if (val === 'observed') {
-      colorClasses = 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/25';
-      indicatorColor = 'bg-[var(--accent)]';
+      colorClasses = 'bg-[var(--surface-secondary)] text-[var(--accent)] border-[var(--border)]';
+      indicatorDot = 'bg-[var(--accent)]';
       label = t('evidenceLevel.observed');
     } else if (val === 'unverified') {
       colorClasses = 'bg-[var(--surface-secondary)] text-[var(--muted)] border-[var(--border)]';
-      indicatorColor = 'bg-[var(--muted)]';
       label = t('evidenceLevel.unverified');
     }
   } else if (type === 'knowledgeType') {
     const val = value as KnowledgeType;
     label = t(`types.${val}`) || val;
+    colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
+
     switch (val) {
       case 'procedure':
-        colorClasses = 'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/25';
-        indicatorColor = 'bg-[var(--accent)]';
+        IconComponent = Wrench;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
       case 'research_finding':
-        colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
-        indicatorColor = 'bg-[var(--accent)]';
+        IconComponent = Lightbulb;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
       case 'tip':
-        colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
-        indicatorColor = 'bg-[var(--accent)]';
+        IconComponent = Sparkles;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
       case 'skill':
-        colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
-        indicatorColor = 'bg-[var(--accent)]';
+        IconComponent = Layers;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
       case 'example':
-        colorClasses = 'bg-[var(--surface-secondary)] text-[var(--muted)] border-[var(--border)]';
-        indicatorColor = 'bg-[var(--muted)]';
+        IconComponent = FileText;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
       case 'failure':
-        colorClasses = 'bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/25';
-        indicatorColor = 'bg-[var(--danger)]';
+        IconComponent = X;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
       case 'lesson':
-        colorClasses = 'bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/25';
-        indicatorColor = 'bg-[var(--warning)]';
+        IconComponent = BookOpen;
+        iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
         break;
     }
   } else if (type === 'outcome') {
     const val = value as OutcomeResult;
+    colorClasses = 'bg-[var(--surface-secondary)] text-[var(--foreground)] border-[var(--border)]';
     if (val === 'success') {
-      colorClasses = 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/25';
-      indicatorColor = 'bg-[var(--success)]';
+      IconComponent = Check;
+      iconClass = 'w-3 h-3 text-[var(--accent)] shrink-0';
       label = t('results.success');
     } else if (val === 'failure') {
-      colorClasses = 'bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/25';
-      indicatorColor = 'bg-[var(--danger)]';
+      IconComponent = X;
+      iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
       label = t('results.failure');
     } else {
-      colorClasses = 'bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/25';
-      indicatorColor = 'bg-[var(--warning)]';
+      IconComponent = HelpCircle;
+      iconClass = 'w-3 h-3 text-[var(--muted)] shrink-0';
       label = t('results.uncertain');
     }
   }
@@ -107,8 +125,9 @@ export const Badge: React.FC<BadgeProps> = ({
     <span
       className={`inline-flex items-center gap-1.5 rounded-md font-medium border ${sizeClasses} ${colorClasses} ${className}`}
     >
-      {indicatorColor && (
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${indicatorColor}`} />
+      {IconComponent && <IconComponent className={iconClass} />}
+      {indicatorDot && (
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${indicatorDot}`} />
       )}
       <span className="truncate">{label}</span>
     </span>

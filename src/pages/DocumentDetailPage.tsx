@@ -197,7 +197,7 @@ export const DocumentDetailPage: React.FC = () => {
   if (!document) {
     return (
       <div className="py-20 text-center text-xs text-[var(--muted)] max-w-md mx-auto">
-        <AlertCircle className="w-7 h-7 mx-auto mb-2 text-rose-500" />
+        <AlertCircle className="w-7 h-7 mx-auto mb-2 text-[var(--muted)]" />
         <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t('sourceDetail.notFound')}</h2>
         <button
           type="button"
@@ -255,7 +255,7 @@ export const DocumentDetailPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setDeleteModalOpen(true)}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] border border-transparent hover:border-[var(--border)] transition-colors cursor-pointer"
             title={t('sourceDetail.deleteSource')}
           >
             <Trash2 className="w-4 h-4" />

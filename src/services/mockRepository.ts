@@ -372,7 +372,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       id,
       description: col.description || '',
       descriptionFa: col.descriptionFa || '',
-      color: col.color || '#059669',
+      color: col.color || '#71717a',
       count: 0,
     };
     if (!(this.data as any).collections) {

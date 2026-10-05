@@ -429,8 +429,8 @@ export const LibraryPage: React.FC = () => {
             <span>{t('common.loading')}</span>
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-xs text-[var(--danger)] ui-card">
-            <AlertCircle className="w-5 h-5 mx-auto mb-2" />
+          <div className="p-8 text-center text-xs text-[var(--foreground)] ui-card">
+            <AlertCircle className="w-5 h-5 mx-auto mb-2 text-[var(--muted)]" />
             <span>{error}</span>
           </div>
         ) : activeTab === 'knowledge' ? (
@@ -476,8 +476,9 @@ export const LibraryPage: React.FC = () => {
                               {item.title}
                             </h2>
                             {item.sourceHasChanged && (
-                              <span className="text-[11px] font-medium text-[var(--warning)] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 border border-[var(--warning)]/20">
-                                Source Updated
+                              <span className="text-[11px] font-medium text-[var(--muted)] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] border border-[var(--border)] inline-flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-[var(--muted)]" />
+                                <span>Source Updated</span>
                               </span>
                             )}
                           </div>
@@ -517,7 +518,7 @@ export const LibraryPage: React.FC = () => {
                             title="Copy Summary"
                           >
                             {copiedId === item.id ? (
-                              <Check className="w-3.5 h-3.5 text-[var(--success)]" />
+                              <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
                             ) : (
                               <Copy className="w-3.5 h-3.5" />
                             )}

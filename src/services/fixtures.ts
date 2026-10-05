@@ -14,7 +14,6 @@ export const INITIAL_COLLECTIONS: Collection[] = [
     nameFa: 'استخراج داده و جداول',
     description: 'Heuristics, OCR alignment, and table parser algorithms for unstructured documents.',
     descriptionFa: 'الگوریتم‌ها، تطبیق OCR و استخراج ساختاریافته جداول از اسناد نامنظم.',
-    color: '#0f766e', // teal-700
   },
   {
     id: 'col-research-synthesis',
@@ -22,7 +21,6 @@ export const INITIAL_COLLECTIONS: Collection[] = [
     nameFa: 'ترکیب و تحلیل پژوهش',
     description: 'Methods for digesting multi-source reports, claim validation, and context grounding.',
     descriptionFa: 'روش‌های تلخیص گزارش‌های چندمنبعی، اعتبارسنجی ادعاها و استقرار زمینه.',
-    color: '#047857', // emerald-700
   },
   {
     id: 'col-product-eval',
@@ -30,7 +28,6 @@ export const INITIAL_COLLECTIONS: Collection[] = [
     nameFa: 'ارزیابی محصول و تصمیم‌گیری',
     description: 'Decision matrices, risk heuristics, and trade-off frameworks for high-uncertainty ideas.',
     descriptionFa: 'ماتریس‌های تصمیم‌گیری، تخمین ریسک و ارزیابی ایده‌های با عدم قطعیت بالا.',
-    color: '#b45309', // amber-700
   },
   {
     id: 'col-tech-briefings',
@@ -38,7 +35,6 @@ export const INITIAL_COLLECTIONS: Collection[] = [
     nameFa: 'ارائه‌ها و گزارش‌های فنی',
     description: 'Signal-dense presentation structures and concise synthesis for leadership.',
     descriptionFa: 'ساختارهای ارائه با تراکم سیگنال بالا و انتقال فشرده تصمیمات به مدیران.',
-    color: '#4338ca', // indigo-700
   },
 ];
 

@@ -347,7 +347,7 @@ ${item.body || item.summary}
   if (!item) {
     return (
       <div className="py-20 text-center text-xs text-[var(--muted)] max-w-md mx-auto">
-        <AlertCircle className="w-7 h-7 mx-auto mb-2 text-rose-500" />
+        <AlertCircle className="w-7 h-7 mx-auto mb-2 text-[var(--muted)]" />
         <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t('knowledgeDetail.notFound')}</h2>
         <button
           type="button"
@@ -393,7 +393,7 @@ ${item.body || item.summary}
             className="ui-button ui-button-secondary text-xs"
             title="Copy Markdown"
           >
-            {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedMarkdown ? <Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedMarkdown ? t('common.copied') : 'Markdown'}</span>
           </button>
 
@@ -409,7 +409,7 @@ ${item.body || item.summary}
           <button
             type="button"
             onClick={() => setDeleteModalOpen(true)}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-rose-400 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] border border-transparent hover:border-[var(--border)] transition-colors cursor-pointer"
             title={t('knowledgeDetail.deleteKnowledge')}
           >
             <Trash2 className="w-4 h-4" />
@@ -419,15 +419,15 @@ ${item.body || item.summary}
 
       {/* Source Changed Alert Banner */}
       {item.sourceHasChanged && (
-        <div className="p-3.5 rounded-xl border border-amber-800/40 bg-amber-950/20 text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-start sm:items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-[var(--muted)] shrink-0" />
             <span>{t('knowledgeDetail.sourceChangedWarning')}</span>
           </div>
           <button
             type="button"
             onClick={handleAcknowledgeSourceChange}
-            className="px-2.5 py-1 rounded bg-amber-500 text-black font-semibold hover:bg-amber-400 shrink-0 self-end sm:self-auto cursor-pointer"
+            className="ui-button ui-button-secondary text-xs shrink-0 self-end sm:self-auto"
           >
             {t('knowledgeDetail.acknowledgeSourceChange')}
           </button>
@@ -655,8 +655,8 @@ ${item.body || item.summary}
           {/* Operational Scope (Applicability & Exclusions) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-1.5 text-xs">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5 text-[var(--foreground)] font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>{t('knowledgeDetail.fieldApplicability')}</span>
               </div>
               <p dir="auto" className="text-[var(--foreground)] leading-relaxed">
@@ -665,8 +665,8 @@ ${item.body || item.summary}
             </div>
 
             <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-1.5 text-xs">
-              <div className="flex items-center gap-1.5 text-rose-400 font-semibold">
-                <AlertCircle className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5 text-[var(--muted)] font-semibold">
+                <AlertCircle className="w-3.5 h-3.5 text-[var(--muted)]" />
                 <span>{t('knowledgeDetail.fieldExclusions')}</span>
               </div>
               <p dir="auto" className="text-[var(--foreground)] leading-relaxed">
@@ -784,7 +784,7 @@ ${item.body || item.summary}
                           e.stopPropagation();
                           handleRemoveRelationship(rel.id);
                         }}
-                        className="p-1 text-[var(--muted)] hover:text-rose-400 shrink-0"
+                        className="p-1 text-[var(--muted)] hover:text-[var(--foreground)] shrink-0"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -799,13 +799,13 @@ ${item.body || item.summary}
           <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider flex items-center gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>{t('knowledgeDetail.outcomesSection')}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setOutcomeModalOpen(true)}
-                className="text-xs font-medium text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                className="text-xs font-medium text-[var(--accent)] hover:underline cursor-pointer"
               >
                 + {t('knowledgeDetail.addOutcome')}
               </button>
@@ -821,17 +821,7 @@ ${item.body || item.summary}
                     className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 text-xs space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <span
-                        className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${
-                          out.result === 'success'
-                            ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40'
-                            : out.result === 'failure'
-                            ? 'bg-rose-950/40 text-rose-300 border border-rose-800/40'
-                            : 'bg-amber-950/40 text-amber-300 border border-amber-800/40'
-                        }`}
-                      >
-                        {t(`results.${out.result}`)}
-                      </span>
+                      <Badge type="outcome" value={out.result} size="sm" />
                       <span className="text-[10px] text-[var(--muted)] font-mono">
                         {out.recordedAt ? new Date(out.recordedAt).toLocaleDateString() : ''}
                       </span>

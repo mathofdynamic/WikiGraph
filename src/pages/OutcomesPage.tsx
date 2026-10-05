@@ -146,17 +146,17 @@ export const OutcomesPage: React.FC = () => {
           <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.total}</div>
           <div className="text-[11px] text-[var(--muted)] mt-0.5">Total Audit Runs</div>
         </div>
-        <div className="p-3.5 rounded-xl border border-emerald-800/30 bg-emerald-950/15">
-          <div className="text-xl font-bold text-emerald-400 font-mono">{stats.success}</div>
-          <div className="text-[11px] text-emerald-400/80 mt-0.5">Successful Runs</div>
+        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.success}</div>
+          <div className="text-[11px] text-[var(--muted)] mt-0.5">Successful Runs</div>
         </div>
-        <div className="p-3.5 rounded-xl border border-rose-800/30 bg-rose-950/15">
-          <div className="text-xl font-bold text-rose-400 font-mono">{stats.failure}</div>
-          <div className="text-[11px] text-rose-400/80 mt-0.5">Failure / Breakages</div>
+        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.failure}</div>
+          <div className="text-[11px] text-[var(--muted)] mt-0.5">Failure / Breakages</div>
         </div>
-        <div className="p-3.5 rounded-xl border border-amber-800/30 bg-amber-950/15">
-          <div className="text-xl font-bold text-amber-400 font-mono">{stats.uncertain}</div>
-          <div className="text-[11px] text-amber-400/80 mt-0.5">Inconclusive</div>
+        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.uncertain}</div>
+          <div className="text-[11px] text-[var(--muted)] mt-0.5">Inconclusive</div>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ export const OutcomesPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setDeleteOutcomeId(out.id)}
-                      className="text-[var(--muted)] hover:text-rose-400 cursor-pointer p-0.5"
+                      className="text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer p-0.5"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

@@ -267,15 +267,15 @@ export const ImportPage: React.FC = () => {
 
       {/* Stage Progression Indicator */}
       <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-[var(--surface-secondary)]/60 border border-[var(--border)] text-xs">
-        <div className={`p-2 rounded-lg text-center font-medium ${queue.length === 0 ? 'bg-[var(--surface-tertiary)] text-blue-400' : 'text-[var(--muted)]'}`}>
+        <div className={`p-2 rounded-lg text-center font-medium ${queue.length === 0 ? 'bg-[var(--surface-tertiary)] text-[var(--accent)]' : 'text-[var(--muted)]'}`}>
           <span className="font-mono text-[11px] block text-[var(--muted)]">Stage 01</span>
           <span>1. Select Files</span>
         </div>
-        <div className={`p-2 rounded-lg text-center font-medium ${queue.length > 0 && !importedCount ? 'bg-[var(--surface-tertiary)] text-blue-400' : 'text-[var(--muted)]'}`}>
+        <div className={`p-2 rounded-lg text-center font-medium ${queue.length > 0 && !importedCount ? 'bg-[var(--surface-tertiary)] text-[var(--accent)]' : 'text-[var(--muted)]'}`}>
           <span className="font-mono text-[11px] block text-[var(--muted)]">Stage 02</span>
           <span>2. Review Queue ({queue.length})</span>
         </div>
-        <div className={`p-2 rounded-lg text-center font-medium ${importedCount ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40' : 'text-[var(--muted)]'}`}>
+        <div className={`p-2 rounded-lg text-center font-medium ${importedCount ? 'bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)]' : 'text-[var(--muted)]'}`}>
           <span className="font-mono text-[11px] block text-[var(--muted)]">Stage 03</span>
           <span>3. Complete</span>
         </div>
@@ -283,7 +283,7 @@ export const ImportPage: React.FC = () => {
 
       {/* Ingestion limits notification */}
       <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-xs text-[var(--muted)] flex items-start gap-3">
-        <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+        <Info className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
         <div>
           <span className="font-semibold text-[var(--foreground)] me-1">
             {t('import.limitsTitle')}:
@@ -294,9 +294,9 @@ export const ImportPage: React.FC = () => {
 
       {/* Success Notification */}
       {importedCount !== null && (
-        <div className="p-4 rounded-xl border border-emerald-800/40 bg-emerald-950/20 text-emerald-300 flex items-center justify-between text-xs">
+        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />
             <span>Successfully imported {importedCount} document(s) into workspace.</span>
           </div>
           <button
@@ -312,8 +312,8 @@ export const ImportPage: React.FC = () => {
 
       {/* General Error Banner */}
       {generalError && (
-        <div className="p-3.5 rounded-xl border border-rose-900/40 bg-rose-950/20 text-xs text-rose-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] text-xs text-[var(--foreground)] flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-[var(--muted)] shrink-0" />
           <span>{generalError}</span>
         </div>
       )}
@@ -521,14 +521,14 @@ export const ImportPage: React.FC = () => {
                         </span>
                       )}
                       {item.status === 'completed' && (
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-950/40 text-emerald-300 border border-emerald-800/40 inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)] inline-flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="w-3 h-3 text-[var(--accent)]" />
                           Imported
                         </span>
                       )}
                       {item.status === 'error' && (
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-rose-950/40 text-rose-300 border border-rose-800/40 inline-flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
+                        <span className="px-2 py-0.5 rounded text-[11px] bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)] inline-flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3 h-3 text-[var(--muted)]" />
                           Failed
                         </span>
                       )}
@@ -538,7 +538,7 @@ export const ImportPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => navigate(`/documents/${item.importedId}`)}
-                          className="text-xs text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer me-2"
+                          className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1 cursor-pointer me-2"
                         >
                           <span>View</span>
                           <ChevronRight className="w-3 h-3 rtl:rotate-180" />
@@ -547,7 +547,7 @@ export const ImportPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(item.id)}
-                        className="text-[var(--muted)] hover:text-rose-400 p-1 cursor-pointer"
+                        className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 cursor-pointer"
                         title="Remove"
                       >
                         <X className="w-3.5 h-3.5" />

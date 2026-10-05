@@ -255,7 +255,7 @@ export const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDeleteColId(col.id)}
-                className="text-[var(--muted)] hover:text-rose-400 p-1 cursor-pointer"
+                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 cursor-pointer"
                 title="Delete Collection"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -318,16 +318,16 @@ export const SettingsPage: React.FC = () => {
           {/* Reset Workspace */}
           <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-xs font-medium text-rose-400 block">{t('settings.btnReset')}</span>
+              <span className="text-xs font-medium text-[var(--foreground)] block">{t('settings.btnReset')}</span>
               <span className="text-[11px] text-[var(--muted)]">Reset all documents and knowledge back to clean fixtures</span>
             </div>
 
             <button
               type="button"
               onClick={() => setResetModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-950/30 text-rose-300 hover:bg-rose-900/40 border border-rose-900/50 cursor-pointer"
+              className="ui-button ui-button-secondary text-xs"
             >
-              <RotateCcw className="w-3.5 h-3.5 inline me-1.5" />
+              <RotateCcw className="w-3.5 h-3.5 inline me-1.5 text-[var(--muted)]" />
               <span>Reset Store</span>
             </button>
           </div>

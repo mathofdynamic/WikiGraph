@@ -215,7 +215,7 @@ export const ContextPage: React.FC = () => {
             onClick={handleCopy}
             className="ui-button ui-button-secondary text-xs"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? t('common.copied') : t('common.copy')}</span>
           </button>
           <button
@@ -273,7 +273,7 @@ export const ContextPage: React.FC = () => {
                     className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/70 space-y-1.5 group"
                   >
                     {item.sourceHasChanged && (
-                      <div className="flex items-center gap-1 text-[11px] text-amber-400 font-medium">
+                      <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium">
                         <AlertTriangle className="w-3 h-3" />
                         <span>Source changed - verification recommended</span>
                       </div>
@@ -308,7 +308,7 @@ export const ContextPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
-                          className="p-1 rounded text-[var(--muted)] hover:text-rose-400 cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

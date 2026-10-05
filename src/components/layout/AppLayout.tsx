@@ -126,7 +126,7 @@ export const AppLayout: React.FC = () => {
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-[10px] text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--surface-secondary)]/50 transition-colors cursor-pointer text-start"
+          className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-[10px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)]/50 transition-colors cursor-pointer text-start"
           title={t('nav.logout')}
         >
           <LogOut className="w-[17px] h-[17px] shrink-0 rtl:rotate-180" />
@@ -221,7 +221,7 @@ export const AppLayout: React.FC = () => {
 
             {/* Workspace status badge */}
             <div className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--separator)]">
-              <div className="w-2 h-2 rounded-full bg-[var(--success)]" />
+              <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
               <span className="text-xs font-medium text-[var(--foreground)]">
                 Workspace
               </span>

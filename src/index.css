@@ -19,10 +19,6 @@
     --accent: #006FEE;
     --accent-foreground: #ffffff;
 
-    --success: #12a150;
-    --warning: #c27803;
-    --danger: #e11d48;
-
     --field-background: #ffffff;
     --field-border: rgba(0, 0, 0, 0.12);
     --field-foreground: #111827;
@@ -53,10 +49,6 @@
 
     --accent: #006FEE;
     --accent-foreground: #ffffff;
-
-    --success: #17c964;
-    --warning: #f5a524;
-    --danger: #f31260;
 
     --field-background: #0f1013;
     --field-border: rgba(255, 255, 255, 0.12);
