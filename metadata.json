@@ -1,0 +1,6 @@
+{
+  "name": "WikiGraph",
+  "description": "Private research knowledge workspace for preserving deep-research reports, extracting reusable insights, exploring relationship graphs, and assembling task-specific cited context.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,284 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #010102;
+  --color-surface-1: #0f1011;
+  --color-surface-2: #141516;
+  --color-surface-3: #18191a;
+  --color-surface-4: #191a1b;
+
+  --color-hairline: #23252a;
+  --color-hairline-strong: #34343a;
+  --color-hairline-tertiary: #3e3e44;
+
+  --color-primary: #5e6ad2;
+  --color-primary-hover: #828fff;
+  --color-primary-focus: #5e69d1;
+  --color-on-primary: #ffffff;
+
+  --color-ink: #f7f8f8;
+  --color-ink-muted: #d0d6e0;
+  --color-ink-subtle: #8a8f98;
+  --color-ink-tertiary: #62666d;
+
+  --color-brand-secure: #7a7fad;
+  --color-semantic-success: #27a644;
+  --color-semantic-overlay: #000000;
+
+  --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif;
+  --font-mono: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-xxl: 24px;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --canvas: #010102;
+    --surface-1: #0f1011;
+    --surface-2: #141516;
+    --surface-3: #18191a;
+    --hairline: #23252a;
+    --hairline-strong: #34343a;
+    --primary: #5e6ad2;
+    --primary-hover: #828fff;
+    --primary-focus: #5e69d1;
+    --ink: #f7f8f8;
+    --ink-muted: #d0d6e0;
+    --ink-subtle: #8a8f98;
+    --ink-tertiary: #62666d;
+  }
+
+  html {
+    background-color: #010102;
+    color: #f7f8f8;
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: #010102;
+    color: #f7f8f8;
+    letter-spacing: -0.05px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code, pre, kbd, samp, textarea, input {
+    font-family: var(--font-sans) !important;
+  }
+
+  /* Custom subtle dark scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #010102;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #23252a;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #34343a;
+  }
+}
+
+/* Linear typography optical tracking utilities */
+.tracking-display-xl {
+  letter-spacing: -3.0px;
+}
+.tracking-display-lg {
+  letter-spacing: -1.8px;
+}
+.tracking-display-md {
+  letter-spacing: -1.0px;
+}
+.tracking-headline {
+  letter-spacing: -0.6px;
+}
+.tracking-card-title {
+  letter-spacing: -0.4px;
+}
+.tracking-subhead {
+  letter-spacing: -0.2px;
+}
+.tracking-body {
+  letter-spacing: -0.05px;
+}
+.tracking-eyebrow {
+  letter-spacing: 0.4px;
+}
+
+/* Linear standard component primitives matching DESIGN.md specs */
+.linear-card {
+  background-color: #0f1011;
+  border: 1px solid #23252a;
+  border-radius: 12px;
+  color: #f7f8f8;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.linear-card:hover {
+  border-color: #34343a;
+}
+
+.linear-card-elevated {
+  background-color: #141516;
+  border: 1px solid #34343a;
+  border-radius: 12px;
+  color: #f7f8f8;
+}
+
+.linear-panel {
+  background-color: #0f1011;
+  border: 1px solid #23252a;
+  border-radius: 16px;
+}
+
+.linear-btn-primary {
+  background-color: #5e6ad2;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.linear-btn-primary:hover:not(:disabled) {
+  background-color: #828fff;
+}
+.linear-btn-primary:active:not(:disabled) {
+  background-color: #5e69d1;
+}
+.linear-btn-primary:focus-visible {
+  outline: 2px solid rgba(94, 105, 209, 0.5);
+  outline-offset: 2px;
+}
+.linear-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linear-btn-secondary {
+  background-color: #0f1011;
+  color: #f7f8f8;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #23252a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+.linear-btn-secondary:hover:not(:disabled) {
+  background-color: #141516;
+  border-color: #34343a;
+}
+.linear-btn-secondary:active:not(:disabled) {
+  background-color: #18191a;
+}
+.linear-btn-secondary:focus-visible {
+  outline: 2px solid rgba(94, 105, 209, 0.5);
+  outline-offset: 2px;
+}
+.linear-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linear-btn-tertiary {
+  background-color: transparent;
+  color: #8a8f98;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 8px 14px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+.linear-btn-tertiary:hover:not(:disabled) {
+  background-color: #0f1011;
+  color: #f7f8f8;
+}
+
+.linear-input {
+  background-color: #0f1011;
+  color: #f7f8f8;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #23252a;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+.linear-input::placeholder {
+  color: #62666d;
+}
+.linear-input:focus {
+  outline: none;
+  border-color: #34343a;
+  box-shadow: 0 0 0 2px rgba(94, 105, 209, 0.5);
+}
+
+.linear-tab {
+  background-color: transparent;
+  color: #8a8f98;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.linear-tab:hover {
+  color: #f7f8f8;
+}
+.linear-tab-selected {
+  background-color: #141516;
+  color: #f7f8f8;
+  border-color: #23252a;
+}
+
+.linear-badge {
+  background-color: #141516;
+  color: #d0d6e0;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid #23252a;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}

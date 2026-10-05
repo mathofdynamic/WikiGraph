@@ -1,0 +1,924 @@
+import {
+  ApiKeyGrant,
+  Collection,
+  KnowledgeItem,
+  KnowledgeOutcome,
+  KnowledgeRelationship,
+  SourceDocument,
+} from '../types';
+
+export const INITIAL_COLLECTIONS: Collection[] = [
+  {
+    id: 'col-data-extraction',
+    name: 'Data Extraction',
+    nameFa: 'استخراج داده و جداول',
+    description: 'Heuristics, OCR alignment, and table parser algorithms for unstructured documents.',
+    descriptionFa: 'الگوریتم‌ها، تطبیق OCR و استخراج ساختاریافته جداول از اسناد نامنظم.',
+    color: '#0f766e', // teal-700
+  },
+  {
+    id: 'col-research-synthesis',
+    name: 'Research Synthesis',
+    nameFa: 'ترکیب و تحلیل پژوهش',
+    description: 'Methods for digesting multi-source reports, claim validation, and context grounding.',
+    descriptionFa: 'روش‌های تلخیص گزارش‌های چندمنبعی، اعتبارسنجی ادعاها و استقرار زمینه.',
+    color: '#047857', // emerald-700
+  },
+  {
+    id: 'col-product-eval',
+    name: 'Product Evaluation',
+    nameFa: 'ارزیابی محصول و تصمیم‌گیری',
+    description: 'Decision matrices, risk heuristics, and trade-off frameworks for high-uncertainty ideas.',
+    descriptionFa: 'ماتریس‌های تصمیم‌گیری، تخمین ریسک و ارزیابی ایده‌های با عدم قطعیت بالا.',
+    color: '#b45309', // amber-700
+  },
+  {
+    id: 'col-tech-briefings',
+    name: 'Technical Briefings',
+    nameFa: 'ارائه‌ها و گزارش‌های فنی',
+    description: 'Signal-dense presentation structures and concise synthesis for leadership.',
+    descriptionFa: 'ساختارهای ارائه با تراکم سیگنال بالا و انتقال فشرده تصمیمات به مدیران.',
+    color: '#4338ca', // indigo-700
+  },
+];
+
+export const INITIAL_SOURCES: SourceDocument[] = [
+  {
+    id: 'src-table-extract-01',
+    title: 'Deep Dive: Structured Table Extraction from Messy PDFs',
+    filename: 'pdf_table_heuristics.md',
+    collectionId: 'col-data-extraction',
+    language: 'en',
+    rawSize: 18420,
+    createdAt: '2026-06-12T09:15:00Z',
+    updatedAt: '2026-08-10T14:30:00Z',
+    url: 'https://internal.research.archive/notes/pdf_table_heuristics_v2',
+    revisions: [
+      {
+        revisionId: 'rev-src-01-a',
+        timestamp: '2026-06-12T09:15:00Z',
+        changeSummary: 'Initial research dump on borderless PDF table rendering.',
+        rawSize: 14200,
+        headingsCount: 6,
+      },
+      {
+        revisionId: 'rev-src-01-b',
+        timestamp: '2026-08-10T14:30:00Z',
+        changeSummary: 'Added dual-pass bounding box benchmarks and deprecation notes for regex column splitting.',
+        rawSize: 18420,
+        headingsCount: 8,
+      },
+    ],
+    originalContent: `# Deep Dive: Structured Table Extraction from Messy PDFs
+
+*Note: Fictional synthetic research case for WikiGraph private knowledge workspace.*
+
+## 1. Problem Statement
+Extracting tables from scanned and vector PDFs without visible gridlines frequently leads to collapsed multi-line columns, orphan cells, and destroyed numerical alignments.
+
+## 2. Dual-Pass Bounding Box Heuristic
+Rather than relying on naive whitespace splitters, a robust approach requires two distinct spatial passes:
+1. Horizontal boundary projection: Group text tokens into row candidates using vertical overlap thresholds of >= 65%.
+2. Column clustering via Kernel Density Estimation on token left-x coordinates, with dynamic width expansion for right-aligned monetary values.
+
+## 3. The Failure of Legacy Regex Splitting
+Using regular expressions like \`\\s{2,}\` to determine cell boundaries fails catastrophically when headers contain long wrapped descriptions or multi-word tokens.
+
+## 4. Multi-Span Headers
+Headers often span 2 to 4 data sub-columns. Detecting these requires measuring horizontal span spans that bridge across clustered column anchors.
+`,
+  },
+  {
+    id: 'src-synth-eval-02',
+    title: 'Comparative Synthesis of Long-form Technical Evidence',
+    filename: 'research_synthesis_methods.md',
+    collectionId: 'col-research-synthesis',
+    language: 'en',
+    rawSize: 22100,
+    createdAt: '2026-05-18T11:00:00Z',
+    updatedAt: '2026-07-22T16:45:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-02-a',
+        timestamp: '2026-05-18T11:00:00Z',
+        changeSummary: 'Comparative analysis of hierarchical chunking versus dense flat summaries.',
+        rawSize: 22100,
+        headingsCount: 7,
+      },
+    ],
+    originalContent: `# Comparative Synthesis of Long-form Technical Evidence
+
+*Fictional research methodology digest.*
+
+## 1. Executive Grounding Dilemma
+When condensing 200+ pages of deep research for decision-makers, flat summarization strips critical nuance, while full context dumps overflow character budgets.
+
+## 2. Canonical Normalization Pipeline
+Before linking claims, each source report must undergo text normalization:
+- Removing page numbers, recurring running headers, and footnote markers.
+- Normalizing UTF-8 hyphens and smart quotes.
+
+## 3. Two-Stage Hierarchical Chunking
+Pass 1 constructs an outline of atomic propositions. Pass 2 attaches cited claims to distinct taxonomy nodes. This prevents conflating preliminary hypotheses with validated empirical findings.
+
+## 4. Single-Pass Flattening Pitfall
+Attempting to force an entire document into a single flattened Markdown list loses provenance anchors and causes cross-claim contamination.
+`,
+  },
+  {
+    id: 'src-opportunity-matrix-03',
+    title: 'Product Idea Evaluation and Scoring Frameworks',
+    filename: 'product_opportunity_matrix.md',
+    collectionId: 'col-product-eval',
+    language: 'en',
+    rawSize: 16500,
+    createdAt: '2026-04-10T10:20:00Z',
+    updatedAt: '2026-06-01T08:12:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-03-a',
+        timestamp: '2026-04-10T10:20:00Z',
+        changeSummary: 'Initial weighted matrix notes.',
+        rawSize: 16500,
+        headingsCount: 5,
+      },
+    ],
+    originalContent: `# Product Idea Evaluation and Scoring Frameworks
+
+*Fictional evaluation criteria for internal exploration.*
+
+## 1. Weighted Opportunity Matrix
+In early discovery, standard RICE scoring fails because reach estimates are wild guesses. We prioritize:
+- Uncertainty Discount Factor (UDF)
+- Time-to-Evidence (days to validate core hypothesis)
+- Reversibility of architectural choice
+
+## 2. Velocity vs Retention Risk
+High implementation velocity often conceals high architectural lock-in. A feature that takes 2 days to build but 6 months to deprecate has negative real velocity.
+
+## 3. Premature Market Sizing Fallacy
+Multiplying total addressable market percentages before demonstrating problem-solution resonance creates false confidence in investor and management reviews.
+`,
+  },
+  {
+    id: 'src-fa-nlp-04',
+    title: 'تحلیل الگوهای پرس‌وجوی ساختاریافته در متون پژوهشی فارسی',
+    filename: 'fa_research_query_patterns.md',
+    collectionId: 'col-data-extraction',
+    language: 'fa',
+    rawSize: 19800,
+    createdAt: '2026-05-02T13:00:00Z',
+    updatedAt: '2026-08-01T11:20:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-04-a',
+        timestamp: '2026-05-02T13:00:00Z',
+        changeSummary: 'تحلیل اولیه چالش‌های پردازش زبان طبیعی فارسی در اسناد اداری.',
+        rawSize: 19800,
+        headingsCount: 6,
+      },
+    ],
+    originalContent: `# تحلیل الگوهای پرس‌وجوی ساختاریافته در متون پژوهشی فارسی
+
+*یادداشت‌های پژوهشی ساختگی برای محیط دانشی WikiGraph.*
+
+## ۱. چالش‌های متون فارسی در اسناد پی‌دی‌اف
+فایل‌های پی‌دی‌اف فارسی به دلیل جهت‌مندی راست‌به‌چپ (RTL)، نویسه‌های متصل و جابجایی ترتیب نویسه‌ها در لایه متنی، استخراج جداول را با خطاهای شدید مواجه می‌کنند.
+
+## ۲. چینش ستون‌های دوزبانه
+جداولی که دارای عناوین فارسی و اعداد یا شناسه‌های لاتین هستند نیاز به تفکیک لایه‌های bidi دارند تا اعداد منفی یا تاریخ‌ها معکوس نشوند.
+
+## ۳. الگوهای ساختاریافته گزارش تصمیم‌گیری
+مدیران در گزارش‌های تحلیلی نیاز به ساختار سه‌بخشی دارند: زمینه مسئله، شواهد سنجش‌پذیر، و گزینه اجرایی مشخص با برآورد ریسک.
+`,
+  },
+  {
+    id: 'src-exec-briefing-05',
+    title: 'Executive Technical Briefing Architecture and Signal Density',
+    filename: 'executive_presentation_architecture.md',
+    collectionId: 'col-tech-briefings',
+    language: 'en',
+    rawSize: 14300,
+    createdAt: '2026-06-25T15:10:00Z',
+    updatedAt: '2026-07-15T18:00:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-05-a',
+        timestamp: '2026-06-25T15:10:00Z',
+        changeSummary: 'Draft principles for executive briefings.',
+        rawSize: 14300,
+        headingsCount: 5,
+      },
+    ],
+    originalContent: `# Executive Technical Briefing Architecture and Signal Density
+
+*Fictional briefing design standard.*
+
+## 1. The Three-Tier Signal Density Model
+Executive audiences require high signal-to-noise:
+- Tier 1: Actionable proposition (what is required and why now)
+- Tier 2: Supporting verification metrics (validated under test)
+- Tier 3: Known failure boundaries and trade-offs
+
+## 2. Redundancy Pitfall
+Repeating executive summaries across multiple slide transitions causes audience disengagement. Summaries must act as anchors, not repetitive filler.
+`,
+  },
+  {
+    id: 'src-ocr-edgecases-06',
+    title: 'OCR Boundary Detection in Scan Artifacts',
+    filename: 'ocr_table_edgecases.md',
+    collectionId: 'col-data-extraction',
+    language: 'en',
+    rawSize: 15800,
+    createdAt: '2026-03-14T08:30:00Z',
+    updatedAt: '2026-05-19T10:15:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-06-a',
+        timestamp: '2026-03-14T08:30:00Z',
+        changeSummary: 'Boundary analysis for low-DPI scan artifacts.',
+        rawSize: 15800,
+        headingsCount: 4,
+      },
+    ],
+    originalContent: `# OCR Boundary Detection in Scan Artifacts
+
+*Fictional engineering study.*
+
+## 1. Skew and Bleed
+Document scans with rotational skew greater than 1.8 degrees break naive row projection. Deskewing must precede bounding box clustering.
+
+## 2. Hardware Acceleration Requirements
+High-resolution coordinate alignment on dense 400+ DPI scans relies on GPU tensor pipelines (\`gpu-ocr-v2\`), which cannot run in unaccelerated worker environments.
+`,
+  },
+  {
+    id: 'src-cross-index-07',
+    title: 'Cross-Document Knowledge Grounding Failure Modes',
+    filename: 'grounding_failure_analysis.md',
+    collectionId: 'col-research-synthesis',
+    language: 'en',
+    rawSize: 21500,
+    createdAt: '2026-04-05T12:00:00Z',
+    updatedAt: '2026-07-30T17:20:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-07-a',
+        timestamp: '2026-04-05T12:00:00Z',
+        changeSummary: 'Catalog of 12 recurring grounding breakdowns in multi-hop query graphs.',
+        rawSize: 21500,
+        headingsCount: 6,
+      },
+    ],
+    originalContent: `# Cross-Document Knowledge Grounding Failure Modes
+
+*Fictional diagnostic report.*
+
+## 1. Silent Context Hallucination
+When knowledge snippets are disconnected from their source revision, AI tools synthesize plausible bridges between disparate documents that contradict actual empirical findings.
+
+## 2. Outdated Source Divergence
+When an underlying research document is revised but the extracted knowledge item retains older assumptions, the workspace outputs stale or invalid advice.
+`,
+  },
+  {
+    id: 'src-context-budget-08',
+    title: 'Deterministic Context Window Partitioning for LLM Agents',
+    filename: 'context_window_budgeting.md',
+    collectionId: 'col-research-synthesis',
+    language: 'en',
+    rawSize: 17200,
+    createdAt: '2026-06-01T14:40:00Z',
+    updatedAt: '2026-08-20T09:00:00Z',
+    revisions: [
+      {
+        revisionId: 'rev-src-08-a',
+        timestamp: '2026-06-01T14:40:00Z',
+        changeSummary: 'Exact character budget allocation formulas.',
+        rawSize: 17200,
+        headingsCount: 5,
+      },
+    ],
+    originalContent: `# Deterministic Context Window Partitioning for LLM Agents
+
+*Fictional context assembly specification.*
+
+## 1. The Fallacy of Token Estimation
+Relying on variable token estimators (e.g. 4 chars per token) leads to unexpected truncation. A dependable private workspace must measure raw characters and enforce hard ceilings.
+
+## 2. Priority Ordering
+Context must strictly order: Task definition > Strict constraints > Applicable methods > Cited evidence > Exclusions. Omitted items must be listed with explicit exclusion rationale.
+`,
+  },
+];
+
+export const INITIAL_KNOWLEDGE: KnowledgeItem[] = [
+  {
+    id: 'kno-01',
+    title: 'Dual-Pass Bounding Box Alignment for Borderless Tables',
+    summary: 'Extracts tabular columns from unbordered PDFs using horizontal row projections and KDE column clustering.',
+    body: '1. Group text fragments into row candidates where vertical intersection is >= 65%.\n2. Run 1D Kernel Density Estimation along x-coordinates to identify gutter troughs.\n3. Align cells into rectangular grid; flag cells that span multiple column troughs as multi-span headers.\n4. Validate that cell counts match the median row length.',
+    type: 'procedure',
+    collectionId: 'col-data-extraction',
+    applicability: 'Borderless PDF tables, financial filings, scanned invoices with clean typography.',
+    exclusions: 'Severely skewed scans (> 2 degrees) or non-rectangular artistic layouts.',
+    requirements: ['PDF coordinate stream', 'Float precision bounding box coordinates'],
+    sourceId: 'src-table-extract-01',
+    sourceRevisionId: 'rev-src-01-b',
+    sourceExcerpt: 'Rather than relying on naive whitespace splitters, a robust approach requires two distinct spatial passes: horizontal boundary projection and column clustering.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-06-15T10:00:00Z',
+    updatedAt: '2026-08-11T12:00:00Z',
+    reviewedAt: '2026-08-11T12:00:00Z',
+    lastSourceSyncAt: '2026-08-11T12:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-02',
+    title: 'Legacy Regex-based Cell Splitting for Markdown Tables',
+    summary: 'Splits raw text lines into columns on double or triple spaces. Prone to breakage with multi-word cells.',
+    body: 'Splits each line using `line.split(/\\s{2,}/)`. High error rate when wrapped headers or monetary formats contain irregular spacing. Deprecated in favor of Dual-Pass Bounding Box.',
+    type: 'procedure',
+    collectionId: 'col-data-extraction',
+    applicability: 'Plain ASCII text dumps where columns are aligned with fixed monospace space counts.',
+    exclusions: 'Proportional fonts, wrapped lines, modern PDF extractions.',
+    requirements: ['Monospace plain text'],
+    sourceId: 'src-table-extract-01',
+    sourceRevisionId: 'rev-src-01-a',
+    sourceExcerpt: 'Using regular expressions like \\s{2,} to determine cell boundaries fails catastrophically when headers contain long wrapped descriptions.',
+    reviewStatus: 'deprecated', // Deprecated fixture requirement
+    evidenceLevel: 'observed',
+    createdAt: '2026-06-12T10:00:00Z',
+    updatedAt: '2026-08-10T14:35:00Z',
+    reviewedAt: '2026-08-10T14:35:00Z',
+    lastSourceSyncAt: '2026-06-12T09:15:00Z',
+    sourceHasChanged: true, // Needs review indicator requirement!
+    language: 'en',
+  },
+  {
+    id: 'kno-03',
+    title: 'Rule-Based Header Detection in Multi-Span Tables',
+    summary: 'Identifies table header rows by testing font weight differentials, uppercase ratio, and horizontal span span.',
+    body: 'A row is marked as header if: (a) average character weight is bold, or (b) uppercase letter ratio exceeds 0.7, or (c) tokens span across two adjacent column anchor gutters.',
+    type: 'research_finding',
+    collectionId: 'col-data-extraction',
+    applicability: 'Multi-column financial tables, comparison matrices.',
+    exclusions: 'Documents without font weight metadata in the underlying stream.',
+    requirements: ['Font styling metadata in text stream'],
+    sourceId: 'src-table-extract-01',
+    sourceRevisionId: 'rev-src-01-b',
+    sourceExcerpt: 'Headers often span 2 to 4 data sub-columns. Detecting these requires measuring horizontal span spans that bridge across clustered column anchors.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-06-16T11:20:00Z',
+    updatedAt: '2026-08-11T12:10:00Z',
+    reviewedAt: '2026-08-11T12:10:00Z',
+    lastSourceSyncAt: '2026-08-11T12:10:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-04',
+    title: 'GPU Neural OCR Coordinate Alignment',
+    summary: 'Neural raster realignment for low-DPI damaged scans using specialized GPU inference kernels.',
+    body: 'Executes sub-pixel deskew and text baseline alignment using tensor acceleration. Requires dedicated host GPU compute.',
+    type: 'procedure',
+    collectionId: 'col-data-extraction',
+    applicability: 'Degraded photocopies, warped archival scans under 200 DPI.',
+    exclusions: 'Digital vector PDFs, standard client-side browser execution.',
+    requirements: ['gpu-ocr-v2', 'libvips-cuda'], // Unavailable tool requirement fixture!
+    sourceId: 'src-ocr-edgecases-06',
+    sourceRevisionId: 'rev-src-06-a',
+    sourceExcerpt: 'High-resolution coordinate alignment on dense 400+ DPI scans relies on GPU tensor pipelines (gpu-ocr-v2), which cannot run in unaccelerated worker environments.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'observed',
+    createdAt: '2026-03-20T09:00:00Z',
+    updatedAt: '2026-05-20T10:00:00Z',
+    reviewedAt: '2026-05-20T10:00:00Z',
+    lastSourceSyncAt: '2026-05-20T10:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-05',
+    title: 'Hierarchical Two-Stage Context Chunking',
+    summary: 'Structures long research into outline nodes before extracting proposition-level citations.',
+    body: 'Pass 1 establishes structural sections (problem, methods, results). Pass 2 binds individual evidence claims into specific section slots, preserving parent provenance and context boundaries.',
+    type: 'procedure',
+    collectionId: 'col-research-synthesis',
+    applicability: 'Synthesis of reports exceeding 40 pages with deep inter-section references.',
+    exclusions: 'Single-page memos or short tweets.',
+    requirements: ['Structured Markdown headings', 'Outline parser'],
+    sourceId: 'src-synth-eval-02',
+    sourceRevisionId: 'rev-src-02-a',
+    sourceExcerpt: 'Pass 1 constructs an outline of atomic propositions. Pass 2 attaches cited claims to distinct taxonomy nodes.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-05-20T14:00:00Z',
+    updatedAt: '2026-07-25T11:00:00Z',
+    reviewedAt: '2026-07-25T11:00:00Z',
+    lastSourceSyncAt: '2026-07-25T11:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-06',
+    title: 'Single-Pass Dense Markdown Flattening',
+    summary: 'Flattens all document sections into a single bulleted stream to maximize raw token ingestion.',
+    body: 'Strips hierarchical heading trees and concatenates all sentences with bullet prefixes. Incompatible with multi-level provenance tracing.',
+    type: 'tip',
+    collectionId: 'col-research-synthesis',
+    applicability: 'Quick search indexing where provenance hierarchy is not needed.',
+    exclusions: 'Formal research synthesis, multi-source citation verification.',
+    requirements: ['Plain Markdown text'],
+    sourceId: 'src-synth-eval-02',
+    sourceRevisionId: 'rev-src-02-a',
+    sourceExcerpt: 'Attempting to force an entire document into a single flattened Markdown list loses provenance anchors and causes cross-claim contamination.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'observed',
+    createdAt: '2026-05-21T15:30:00Z',
+    updatedAt: '2026-07-25T11:30:00Z',
+    reviewedAt: '2026-07-25T11:30:00Z',
+    lastSourceSyncAt: '2026-07-25T11:30:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-07',
+    title: 'Canonical Source Text Normalization',
+    summary: 'Sanitizes messy source markdown, stripping running headers, page numbers, and normalizing character encodings.',
+    body: '1. Strip patterns matching `Page \\d+ of \\d+` and recurring document titles.\n2. Convert smart quotes and irregular em-dashes to standard UTF-8 ASCII-safe symbols.\n3. Collapse runs of > 3 newlines.\nFoundational base for all subsequent ingestion.',
+    type: 'procedure',
+    collectionId: 'col-research-synthesis',
+    applicability: 'All raw OCR and exported PDF markdown files before digest.',
+    exclusions: 'Code blocks where whitespace and special quotes are semantically significant.',
+    requirements: ['Regex text transformation rules'],
+    sourceId: 'src-synth-eval-02',
+    sourceRevisionId: 'rev-src-02-a',
+    sourceExcerpt: 'Removing page numbers, recurring running headers, and footnote markers. Normalizing UTF-8 hyphens and smart quotes.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-05-19T09:00:00Z',
+    updatedAt: '2026-07-22T17:00:00Z',
+    reviewedAt: '2026-07-22T17:00:00Z',
+    lastSourceSyncAt: '2026-07-22T17:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-08',
+    title: 'Canonical Document Digest Generation',
+    summary: 'Produces a 2-page deterministic executive digest with linked section anchor references.',
+    body: 'Takes normalized text from kno-07 and extracts primary thesis, key empirical metrics, methodological limitations, and date stamps into a standardized digest format.',
+    type: 'procedure',
+    collectionId: 'col-research-synthesis',
+    applicability: 'Research reports exceeding 10,000 words.',
+    exclusions: 'Briefs that are already under 1,000 words.',
+    requirements: ['kno-07 (Canonical Source Text Normalization)'],
+    sourceId: 'src-synth-eval-02',
+    sourceRevisionId: 'rev-src-02-a',
+    sourceExcerpt: 'Before linking claims, each source report must undergo text normalization.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-05-20T10:00:00Z',
+    updatedAt: '2026-07-23T10:00:00Z',
+    reviewedAt: '2026-07-23T10:00:00Z',
+    lastSourceSyncAt: '2026-07-23T10:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-09',
+    title: 'Standardized Metadata and Claim Tagging',
+    summary: 'Applies controlled taxonomy tags and claim confidence badges to each digested finding.',
+    body: 'Each finding is assigned: (1) functional category, (2) empirical status, (3) explicit tool prerequisites, and (4) pinned source revision hash.',
+    type: 'procedure',
+    collectionId: 'col-research-synthesis',
+    applicability: 'All curated knowledge items in the workspace.',
+    exclusions: 'Unsorted raw bookmarks.',
+    requirements: ['kno-08 (Canonical Document Digest Generation)'],
+    sourceId: 'src-cross-index-07',
+    sourceRevisionId: 'rev-src-07-a',
+    sourceExcerpt: 'When knowledge snippets are disconnected from their source revision, AI tools synthesize plausible bridges that contradict actual empirical findings.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-05-22T11:00:00Z',
+    updatedAt: '2026-07-30T17:30:00Z',
+    reviewedAt: '2026-07-30T17:30:00Z',
+    lastSourceSyncAt: '2026-07-30T17:30:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-10',
+    title: 'Weighted Opportunity Scoring for High-Uncertainty Bets',
+    summary: 'Ranks novel product concepts using Uncertainty Discount Factor and Time-to-Evidence rather than guesswork reach.',
+    body: 'Formula: `Score = (Strategic Leverage * Evidence Speed) / (Uncertainty Discount * Reversibility Cost)`. Heavily penalizes irreversible architectural commitments that lack rapid prototype validation.',
+    type: 'procedure',
+    collectionId: 'col-product-eval',
+    applicability: 'Early product prioritization meetings, quarterly roadmapping.',
+    exclusions: 'Routine maintenance bugs or regulatory compliance mandates.',
+    requirements: ['Estimates for Time-to-Evidence (days) and Reversibility rating (1-5)'],
+    sourceId: 'src-opportunity-matrix-03',
+    sourceRevisionId: 'rev-src-03-a',
+    sourceExcerpt: 'We prioritize: Uncertainty Discount Factor, Time-to-Evidence, and Reversibility of architectural choice.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-04-15T14:00:00Z',
+    updatedAt: '2026-06-05T09:00:00Z',
+    reviewedAt: '2026-06-05T09:00:00Z',
+    lastSourceSyncAt: '2026-06-05T09:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-11',
+    title: 'Feature Velocity vs Retention Risk Heuristic',
+    summary: 'Quick development velocity is a liability if architectural lock-in prevents easy removal later.',
+    body: 'Always calculate "Deprecation Half-life". If removing a feature would take 5x longer than building it, require explicit prototype sign-off before entering production mainline.',
+    type: 'tip',
+    collectionId: 'col-product-eval',
+    applicability: 'Evaluating customer feature requests with bespoke database schema alterations.',
+    exclusions: 'Stateless frontend UI cosmetic enhancements.',
+    requirements: ['Dependency graph estimate'],
+    sourceId: 'src-opportunity-matrix-03',
+    sourceRevisionId: 'rev-src-03-a',
+    sourceExcerpt: 'High implementation velocity often conceals high architectural lock-in. A feature that takes 2 days to build but 6 months to deprecate has negative real velocity.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'observed',
+    createdAt: '2026-04-16T15:20:00Z',
+    updatedAt: '2026-06-05T09:30:00Z',
+    reviewedAt: '2026-06-05T09:30:00Z',
+    lastSourceSyncAt: '2026-06-05T09:30:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-12',
+    title: 'Premature Market Sizing Extrapolation Pitfall',
+    summary: 'Multiplying fictitious TAM percentages before product-solution fit creates fatal confirmation bias.',
+    body: 'Teams that present "$50B market at 0.1% penetration" consistently under-invest in user retention tests. Replace market size slides with verified cohort task-completion rates.',
+    type: 'failure',
+    collectionId: 'col-product-eval',
+    applicability: 'Internal pitch reviews and resource allocation gates.',
+    exclusions: 'Commodity enterprise RFP procurement submissions.',
+    requirements: ['Pre-launch hypothesis rubric'],
+    sourceId: 'src-opportunity-matrix-03',
+    sourceRevisionId: 'rev-src-03-a',
+    sourceExcerpt: 'Multiplying total addressable market percentages before demonstrating problem-solution resonance creates false confidence.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'observed',
+    createdAt: '2026-04-18T16:00:00Z',
+    updatedAt: '2026-06-05T10:00:00Z',
+    reviewedAt: '2026-06-05T10:00:00Z',
+    lastSourceSyncAt: '2026-06-05T10:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-13',
+    title: 'Three-Tier Signal Density Slide Structure for Executive Reviews',
+    summary: 'Formats technical presentations into Action Proposition, Verification Metric, and Risk Boundary.',
+    body: 'Each executive slide must contain:\n1. Top banner: Single declarative decision sentence.\n2. Left 60%: Concrete empirical test results or architecture diagram.\n3. Right 40%: Known boundary conditions, required resources, and fallback plan.',
+    type: 'procedure',
+    collectionId: 'col-tech-briefings',
+    applicability: 'Executive committee meetings, VP engineering technical reviews.',
+    exclusions: 'Informal pair-programming or sprint planning.',
+    requirements: ['Measured test data or verifiable prototype'],
+    sourceId: 'src-exec-briefing-05',
+    sourceRevisionId: 'rev-src-05-a',
+    sourceExcerpt: 'The Three-Tier Signal Density Model: Tier 1 actionable proposition, Tier 2 supporting verification metrics, Tier 3 known failure boundaries.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-06-28T14:00:00Z',
+    updatedAt: '2026-07-16T09:00:00Z',
+    reviewedAt: '2026-07-16T09:00:00Z',
+    lastSourceSyncAt: '2026-07-16T09:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-14',
+    title: 'Executive Summary Redundancy Trap',
+    summary: 'Repeating introductory takeaways across multiple transition points dilutes decision urgency.',
+    body: 'Executive briefs that present an agenda, then an executive summary, then section intro slides, lose 40% of discussion time to repetitive throat-clearing. State the decision ask on slide 1.',
+    type: 'lesson',
+    collectionId: 'col-tech-briefings',
+    applicability: 'Presentation preparation for senior leadership.',
+    exclusions: 'University lectures or pedagogical training.',
+    requirements: ['Clear decision proposal'],
+    sourceId: 'src-exec-briefing-05',
+    sourceRevisionId: 'rev-src-05-a',
+    sourceExcerpt: 'Repeating executive summaries across multiple slide transitions causes audience disengagement. Summaries must act as anchors, not repetitive filler.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'observed',
+    createdAt: '2026-06-29T11:00:00Z',
+    updatedAt: '2026-07-16T09:30:00Z',
+    reviewedAt: '2026-07-16T09:30:00Z',
+    lastSourceSyncAt: '2026-07-16T09:30:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+  {
+    id: 'kno-15',
+    title: 'رویکرد استخراج جدول از فایل‌های پی‌دی‌اف اسکن‌شده فارسی',
+    summary: 'تطبیق مرزهای ستونی و اصلاح ترتیب نویسه‌های راست‌به‌چپ در لایه‌های متنی متداخل.',
+    body: '۱. شناسایی خطوط جدول با استفاده از فیلتر افقی و محاسبه تراکم متن.\n۲. تفکیک ارقام و متون دوزبانه با اعمال ایزولاسیون Bidi جهت جلوگیری از وارونگی مبالغ مالی.\n۳. اتصال سلول‌های چندسطری بر مبنای فاصله عمودی کمتر از ۱.۲ برابر ارتفاع قلم.',
+    type: 'procedure',
+    collectionId: 'col-data-extraction',
+    applicability: 'اسناد مالی، ترازنامه‌ها و گزارش‌های اداری اسکن‌شده به زبان فارسی.',
+    exclusions: 'اسناد دارای جداول با شیب زاویه‌ای بیش از ۳ درجه بدون تصحیح اولیه.',
+    requirements: ['پشتیبانی از الگوریتم Bidi در سطح استخراج نویسه', 'فونت فارسی استاندارد'],
+    sourceId: 'src-fa-nlp-04',
+    sourceRevisionId: 'rev-src-04-a',
+    sourceExcerpt: 'جداولی که دارای عناوین فارسی و اعداد یا شناسه‌های لاتین هستند نیاز به تفکیک لایه‌های bidi دارند تا اعداد منفی یا تاریخ‌ها معکوس نشوند.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'tested',
+    createdAt: '2026-05-10T12:00:00Z',
+    updatedAt: '2026-08-02T10:00:00Z',
+    reviewedAt: '2026-08-02T10:00:00Z',
+    lastSourceSyncAt: '2026-08-02T10:00:00Z',
+    sourceHasChanged: false,
+    language: 'fa',
+  },
+  {
+    id: 'kno-16',
+    title: 'فرمول‌بندی گزارش تصمیم‌گیری برای مدیران ارشد در محیط ابهام',
+    summary: 'ساختاربندی تحلیل گزینه‌های استراتژیک در سه گام مشخص: بیان مسئله، مقایسه ریسک و طرح اقدام.',
+    body: 'در موقعیت‌های عدم قطعیت بالا، گزارش نباید به فهرست‌بندی گزینه‌ها بدون وزن‌دهی بسنده کند. باید ماتریس معاوضه (Trade-off) شفاف همراه با کمترین هزینه بازگشت (Reversibility) تدوین شود.',
+    type: 'skill',
+    collectionId: 'col-product-eval',
+    applicability: 'تدوین اسناد تصمیم‌گیری فنی و تجاری برای جلسات هیئت مدیره و مدیران ارشد.',
+    exclusions: 'مستندات درون‌تیمی با مخاطب فنی صرف.',
+    requirements: ['برآورد داده‌های کیفی و کمی ریسک'],
+    sourceId: 'src-fa-nlp-04',
+    sourceRevisionId: 'rev-src-04-a',
+    sourceExcerpt: 'مدیران در گزارش‌های تحلیلی نیاز به ساختار سه‌بخشی دارند: زمینه مسئله، شواهد سنجش‌پذیر، و گزینه اجرایی مشخص با برآورد ریسک.',
+    reviewStatus: 'reviewed',
+    evidenceLevel: 'observed',
+    createdAt: '2026-05-12T14:30:00Z',
+    updatedAt: '2026-08-02T10:30:00Z',
+    reviewedAt: '2026-08-02T10:30:00Z',
+    lastSourceSyncAt: '2026-08-02T10:30:00Z',
+    sourceHasChanged: false,
+    language: 'fa',
+  },
+  {
+    id: 'kno-17',
+    title: 'Graph-guided Prompt Pruning for Token Budget Caps',
+    summary: 'Selects the minimal subgraph of supporting items when task character budgets are constrained.',
+    body: 'Traverses required and supporting edges from selected seeds. If total character count exceeds budget, recursively prunes items with lowest evidence level and optional complements.',
+    type: 'tip',
+    collectionId: 'col-research-synthesis',
+    applicability: 'Context assembly for strict budget contexts (< 15,000 characters).',
+    exclusions: 'Comprehensive archival backups where length is unconstrained.',
+    requirements: ['Directed relationship graph'],
+    sourceId: 'src-context-budget-08',
+    sourceRevisionId: 'rev-src-08-a',
+    sourceExcerpt: 'Context must strictly order: Task definition > Strict constraints > Applicable methods > Cited evidence > Exclusions. Omitted items must be listed with explicit exclusion rationale.',
+    reviewStatus: 'draft', // Draft & unverified fixture!
+    evidenceLevel: 'unverified', // Insufficient evidence fixture!
+    createdAt: '2026-06-05T16:00:00Z',
+    updatedAt: '2026-08-21T10:00:00Z',
+    reviewedAt: undefined, // Overdue review
+    lastSourceSyncAt: '2026-06-05T16:00:00Z',
+    sourceHasChanged: true, // Needs review indicator!
+    language: 'en',
+  },
+  {
+    id: 'kno-18',
+    title: 'Silent Context Hallucination during Multi-hop Query Expansion',
+    summary: 'Autonomous search agents fabricate relationships when citation links omit exact revision hashes.',
+    body: 'Observed failure case: an LLM agent connected an unverified tip from 2024 with a 2026 benchmark, claiming empirical validation because both shared the word "table extraction". Pinned revision hashes prevent this.',
+    type: 'failure',
+    collectionId: 'col-research-synthesis',
+    applicability: 'Autonomous AI agent workflows and scoped machine API keys.',
+    exclusions: 'Manual human-curated paper reviews.',
+    requirements: ['Revision pin auditing'],
+    sourceId: 'src-cross-index-07',
+    sourceRevisionId: 'rev-src-07-a',
+    sourceExcerpt: 'When knowledge snippets are disconnected from their source revision, AI tools synthesize plausible bridges between disparate documents that contradict actual empirical findings.',
+    reviewStatus: 'draft',
+    evidenceLevel: 'observed',
+    createdAt: '2026-04-10T11:00:00Z',
+    updatedAt: '2026-07-31T09:00:00Z',
+    reviewedAt: undefined, // Overdue review
+    lastSourceSyncAt: '2026-04-10T11:00:00Z',
+    sourceHasChanged: false,
+    language: 'en',
+  },
+];
+
+export const INITIAL_RELATIONSHIPS: KnowledgeRelationship[] = [
+  {
+    id: 'rel-01',
+    sourceId: 'kno-01',
+    targetId: 'kno-02',
+    type: 'supersedes',
+    rationale: 'Dual-pass bounding box replaces brittle regex whitespace cell splitting.',
+    createdAt: '2026-08-10T15:00:00Z',
+  },
+  {
+    id: 'rel-02',
+    sourceId: 'kno-02',
+    targetId: 'kno-01',
+    type: 'alternative_to',
+    rationale: 'Legacy regex splitting can serve as a lightweight fallback for clean monospace ASCII dumps.',
+    createdAt: '2026-08-10T15:05:00Z',
+  },
+  {
+    id: 'rel-03',
+    sourceId: 'kno-03',
+    targetId: 'kno-01',
+    type: 'complements',
+    rationale: 'Multi-span header detection informs the column gutter calculation in the bounding box pass.',
+    createdAt: '2026-08-11T12:30:00Z',
+  },
+  {
+    id: 'rel-04',
+    sourceId: 'kno-04',
+    targetId: 'kno-01',
+    type: 'requires',
+    rationale: 'GPU coordinate alignment requires bounding box pre-filtering to bound region of interest.',
+    createdAt: '2026-05-20T10:30:00Z',
+  },
+  {
+    id: 'rel-05',
+    sourceId: 'kno-05',
+    targetId: 'kno-06',
+    type: 'conflicts_with',
+    rationale: 'Hierarchical chunking contradicts single-pass flattening; combining them causes duplicate fragments.',
+    createdAt: '2026-07-25T12:00:00Z',
+  },
+  {
+    id: 'rel-06',
+    sourceId: 'kno-06',
+    targetId: 'kno-05',
+    type: 'conflicts_with',
+    rationale: 'Flattening destroys the tree structure required by two-stage hierarchical chunking.',
+    createdAt: '2026-07-25T12:05:00Z',
+  },
+  {
+    id: 'rel-07',
+    sourceId: 'kno-08',
+    targetId: 'kno-07',
+    type: 'requires',
+    rationale: 'Digest generation requires sanitized, normalized source text as prerequisite.',
+    createdAt: '2026-07-23T11:00:00Z',
+  },
+  {
+    id: 'rel-08',
+    sourceId: 'kno-09',
+    targetId: 'kno-08',
+    type: 'requires',
+    rationale: 'Standardized metadata tagging operates directly on canonical digests.',
+    createdAt: '2026-07-30T18:00:00Z',
+  },
+  {
+    id: 'rel-09',
+    sourceId: 'kno-10',
+    targetId: 'kno-11',
+    type: 'complements',
+    rationale: 'The scoring matrix incorporates feature velocity vs retention risk as a core variable.',
+    createdAt: '2026-06-05T10:15:00Z',
+  },
+  {
+    id: 'rel-10',
+    sourceId: 'kno-12',
+    targetId: 'kno-10',
+    type: 'supports',
+    rationale: 'Documented failure of premature market sizing proves the need for uncertainty-discounted scoring.',
+    createdAt: '2026-06-05T10:20:00Z',
+  },
+  {
+    id: 'rel-11',
+    sourceId: 'kno-13',
+    targetId: 'kno-14',
+    type: 'complements',
+    rationale: 'Three-tier structure provides explicit slots that prevent repetitive executive summary throat-clearing.',
+    createdAt: '2026-07-16T10:00:00Z',
+  },
+  {
+    id: 'rel-12',
+    sourceId: 'kno-15',
+    targetId: 'kno-01',
+    type: 'complements',
+    rationale: 'Persian RTL table extraction extends base bounding box alignment with bidi character isolation.',
+    createdAt: '2026-08-02T11:00:00Z',
+  },
+  {
+    id: 'rel-13',
+    sourceId: 'kno-16',
+    targetId: 'kno-10',
+    type: 'complements',
+    rationale: 'Persian executive briefing formulation adapts weighted opportunity scores to executive board contexts.',
+    createdAt: '2026-08-02T11:15:00Z',
+  },
+  {
+    id: 'rel-14',
+    sourceId: 'kno-17',
+    targetId: 'kno-05',
+    type: 'supports',
+    rationale: 'Graph pruning leverages hierarchical outline slots to selectively preserve high-evidence citations.',
+    createdAt: '2026-08-21T10:30:00Z',
+  },
+  {
+    id: 'rel-15',
+    sourceId: 'kno-18',
+    targetId: 'kno-09',
+    type: 'supports',
+    rationale: 'Hallucination breakdown analysis demonstrates why revision hash pinning must be mandatory.',
+    createdAt: '2026-07-31T09:30:00Z',
+  },
+  {
+    id: 'rel-16',
+    sourceId: 'kno-03',
+    targetId: 'kno-15',
+    type: 'supports',
+    rationale: 'Multi-span header detection heuristics confirm RTL column alignment for financial tables.',
+    createdAt: '2026-08-02T11:30:00Z',
+  },
+];
+
+export const INITIAL_OUTCOMES: KnowledgeOutcome[] = [
+  {
+    id: 'out-01',
+    knowledgeId: 'kno-01',
+    taskContext: 'Extraction of 48 quarterly balance sheets from scanned annual PDF reports (1998-2010).',
+    pinnedRevisionId: 'rev-src-01-b',
+    result: 'success',
+    metrics: '99.2% column gutter recovery across 48 complex unbordered tables; 0 column merges.',
+    notes: 'KDE bandwidth parameter needed 1.1x scaling on tables with 7+ narrow decimal columns.',
+    recordedAt: '2026-08-15T16:00:00Z',
+  },
+  {
+    id: 'out-02',
+    knowledgeId: 'kno-02',
+    taskContext: 'Attempted to parse vendor invoices with irregular whitespace formatting using regex split.',
+    pinnedRevisionId: 'rev-src-01-a',
+    result: 'failure',
+    metrics: '62% of rows suffered column offset errors due to wrapped vendor company names.',
+    notes: 'Confirmed that regex column splitting is fundamentally unsuitable for multi-word fields. Superseded by kno-01.',
+    recordedAt: '2026-08-10T14:40:00Z',
+  },
+  {
+    id: 'out-03',
+    knowledgeId: 'kno-05',
+    taskContext: 'Synthesized 180-page multi-institutional climate policy research into an executive decision memo.',
+    pinnedRevisionId: 'rev-src-02-a',
+    result: 'success',
+    metrics: 'Context fit inside 12,000 char budget with 100% cited source traceability; 0 hallucinated claims.',
+    notes: 'Two-stage structure allowed reviewers to drill down from high-level assertions directly to empirical tables.',
+    recordedAt: '2026-08-18T11:30:00Z',
+  },
+  {
+    id: 'out-04',
+    knowledgeId: 'kno-10',
+    taskContext: 'Evaluated 4 candidate features for Q3 roadmap using uncertainty-discounted scoring.',
+    pinnedRevisionId: 'rev-src-03-a',
+    result: 'uncertain',
+    metrics: 'Eliminated 2 high-risk irreversible bets; validation prototype for remaining idea is still in progress.',
+    notes: 'Team found Time-to-Evidence metric very clarifying, but required subjective agreement on reversibility scale.',
+    recordedAt: '2026-08-22T09:15:00Z',
+  },
+  {
+    id: 'out-05',
+    knowledgeId: 'kno-13',
+    taskContext: 'C-suite presentation on migrating core search pipeline to hybrid vector index.',
+    pinnedRevisionId: 'rev-src-05-a',
+    result: 'success',
+    metrics: 'Presentation approved in 20 minutes with zero clarifying questions about missing context.',
+    notes: 'Placing risk boundaries on the right rail preempted skepticism regarding infrastructure costs.',
+    recordedAt: '2026-08-25T14:20:00Z',
+  },
+];
+
+export const INITIAL_API_KEYS: ApiKeyGrant[] = [
+  {
+    id: 'key-01',
+    label: 'Autonomous Synthesis Agent (Codex Sandbox)',
+    tokenPrefix: 'wg_live_7e8b91a2...',
+    allowedCollections: ['all'],
+    grants: ['search', 'read', 'compose'],
+    createdAt: '2026-08-01T10:00:00Z',
+    expiresAt: '2026-11-01T10:00:00Z',
+    lastUsedAt: '2026-09-18T14:22:00Z',
+    status: 'active',
+    isDemoSimulated: true,
+  },
+  {
+    id: 'key-02',
+    label: 'Document Ingestion Worker (Read-only)',
+    tokenPrefix: 'wg_live_3c4d5e6f...',
+    allowedCollections: ['col-data-extraction'],
+    grants: ['read'],
+    createdAt: '2026-07-15T08:30:00Z',
+    expiresAt: '2026-10-15T08:30:00Z',
+    lastUsedAt: '2026-09-10T11:05:00Z',
+    status: 'active',
+    isDemoSimulated: true,
+  },
+];
