@@ -3,29 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
   Clock,
-  Layers,
   ArrowLeft,
   ExternalLink,
-  Edit3,
-  Trash2,
-  Plus,
-  CheckCircle2,
   AlertCircle,
   Copy,
   Check,
   History,
-  X,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import { Collection, KnowledgeItem, SourceDocument, SourceRevision } from '../types';
 import { MarkdownViewer } from '../components/common/MarkdownViewer';
 import { Badge } from '../components/common/Badge';
-import { ConfirmModal } from '../components/common/ConfirmModal';
 
 export const DocumentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { repository, version, notifyMutation } = useRepository();
+  const { repository, version } = useRepository();
   const { t, locale } = useLocale();
   const navigate = useNavigate();
 
@@ -35,21 +28,6 @@ export const DocumentDetailPage: React.FC = () => {
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-
-  // Edit / Add Revision Modal
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState('');
-  const [editRevisionSummary, setEditRevisionSummary] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-
-  // Extract Knowledge Modal
-  const [extractModalOpen, setExtractModalOpen] = useState(false);
-  const [selectedExcerpt, setSelectedExcerpt] = useState('');
-  const [extractTitle, setExtractTitle] = useState('');
-  const [extractSummary, setExtractSummary] = useState('');
-
-  // Delete modal
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -101,94 +79,16 @@ export const DocumentDetailPage: React.FC = () => {
 
   const activeContent: string = activeRevision?.content || document?.originalContent || '';
 
-  const handleSelection = () => {
-    const sel = window.getSelection()?.toString().trim();
-    if (sel && sel.length > 5) {
-      setSelectedExcerpt(sel);
-    }
-  };
-
   const handleCopyContent = () => {
     navigator.clipboard.writeText(activeContent || '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleOpenEdit = () => {
-    if (!document) return;
-    setEditTitle(document.title);
-    setEditContent(activeContent || '');
-    setEditRevisionSummary('');
-    setIsEditing(true);
-  };
-
-  const handleSaveRevision = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!document || !id) return;
-
-    try {
-      await repository.updateSource(
-        id,
-        { title: editTitle },
-        editContent,
-        editRevisionSummary || `Updated document on ${new Date().toISOString()}`
-      );
-      setIsEditing(false);
-      notifyMutation();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleExtractKnowledge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!document || !extractTitle.trim()) return;
-
-    try {
-      const created = await repository.createKnowledge({
-        title: extractTitle,
-        summary: extractSummary || selectedExcerpt.slice(0, 140),
-        body: selectedExcerpt,
-        type: 'procedure',
-        collectionId: document.collectionId,
-        sourceId: document.id,
-        sourceRevisionId: activeRevision?.revisionId || 'rev-src-01-a',
-        sourceExcerpt: selectedExcerpt || document.title,
-        applicability: 'Derived from source report.',
-        exclusions: '',
-        requirements: [],
-        reviewStatus: 'draft',
-        evidenceLevel: 'observed',
-        language: document.language,
-        sourceHasChanged: false,
-      });
-
-      setExtractModalOpen(false);
-      setSelectedExcerpt('');
-      setExtractTitle('');
-      setExtractSummary('');
-      notifyMutation();
-      navigate(`/knowledge/${created.id}`);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!document || !id) return;
-    try {
-      await repository.deleteSource(id);
-      notifyMutation();
-      navigate('/library?tab=sources');
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="py-20 text-center text-xs text-[var(--muted)]">
-        <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-500" />
+      <div className="py-24 text-center text-xs text-[var(--muted)]">
+        <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--accent)]" />
         <span>{t('common.loading')}</span>
       </div>
     );
@@ -196,13 +96,18 @@ export const DocumentDetailPage: React.FC = () => {
 
   if (!document) {
     return (
-      <div className="py-20 text-center text-xs text-[var(--muted)] max-w-md mx-auto">
-        <AlertCircle className="w-7 h-7 mx-auto mb-2 text-[var(--muted)]" />
-        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">{t('sourceDetail.notFound')}</h2>
+      <div className="py-24 text-center text-xs text-[var(--muted)] max-w-md mx-auto space-y-3">
+        <AlertCircle className="w-8 h-8 mx-auto text-[var(--muted)]" />
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">
+            {t('sourceDetail.notFound')}
+          </h2>
+          <p className="text-[var(--muted)]">This source document could not be located in workspace.</p>
+        </div>
         <button
           type="button"
           onClick={() => navigate('/library?tab=sources')}
-          className="ui-button ui-button-secondary mt-3"
+          className="ui-button ui-button-secondary text-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
           <span>{t('common.backToLibrary')}</span>
@@ -212,431 +117,306 @@ export const DocumentDetailPage: React.FC = () => {
   }
 
   return (
-    <div
-      onMouseUp={handleSelection}
-      className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6"
-    >
-      {/* Back button & Breadcrumbs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
-        <button
-          type="button"
-          onClick={() => navigate('/library?tab=sources')}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer w-fit"
-        >
-          <ArrowLeft className="w-4 h-4 rtl:rotate-180 text-blue-400" />
-          <span>{t('common.backToLibrary')}</span>
-        </button>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Top Header & Contextual Actions Bar */}
+      <div className="space-y-3 pb-4 border-b border-[var(--separator)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/library?tab=sources')}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer w-fit"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
+            <span>{t('common.backToLibrary')}</span>
+          </button>
 
-        <div className="flex items-center gap-2">
-          {selectedExcerpt && (
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={() => {
-                setExtractTitle('');
-                setExtractSummary(selectedExcerpt.slice(0, 120));
-                setExtractModalOpen(true);
-              }}
-              className="ui-button ui-button-primary text-xs"
+              onClick={handleCopyContent}
+              className="ui-button ui-button-secondary text-xs"
+              title={t('common.copy')}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t('sourceDetail.extractKnowledge')}</span>
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+              )}
+              <span>{copied ? t('common.copied') : t('common.copy')}</span>
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleOpenEdit}
-            className="ui-button ui-button-secondary text-xs"
-          >
-            <Edit3 className="w-3.5 h-3.5 text-[var(--muted)]" />
-            <span>{t('sourceDetail.editSource')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setDeleteModalOpen(true)}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] border border-transparent hover:border-[var(--border)] transition-colors cursor-pointer"
-            title={t('sourceDetail.deleteSource')}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Layout: Left Document Body, Right Meta and Revisions */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Document Content View (Left 8 cols) */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="p-5 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-4">
-            {/* Header info */}
-            <div className="space-y-2 pb-4 border-b border-[var(--border)]">
-              <div className="flex items-center justify-between text-xs text-[var(--muted)]">
-                <span className="font-mono">{document.filename}</span>
-                <button
-                  type="button"
-                  onClick={handleCopyContent}
-                  className="inline-flex items-center gap-1 hover:text-[var(--foreground)] cursor-pointer"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-blue-400" />
-                      <span className="text-blue-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{t('common.copy')}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <h1
-                dir="auto"
-                className="text-lg sm:text-2xl font-bold tracking-tight text-[var(--foreground)] leading-snug"
-              >
-                {document.title}
-              </h1>
-
-              {activeRevision && (
-                <div className="flex items-center gap-2 text-xs text-[var(--muted)] pt-1">
-                  <span className="bg-[var(--surface-secondary)] border border-[var(--border)] px-2 py-0.5 rounded text-[var(--foreground)] font-mono text-[11px]">
-                    {activeRevision.revisionId}
-                  </span>
-                  <span>•</span>
-                  <span>{activeRevision.changeSummary || activeRevision.summary || 'Snapshot'}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Hint for excerpt extraction */}
-            <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/80 border border-[var(--border)] text-[11px] text-[var(--muted)] flex items-center justify-between">
-              <span>
-                Tip: Highlight any sentence or paragraph with your mouse to extract a draft knowledge item.
-              </span>
-              {selectedExcerpt && (
-                <span className="text-blue-400 font-medium">
-                  {selectedExcerpt.length} chars selected
-                </span>
-              )}
-            </div>
-
-            {/* Markdown Reader */}
-            <div className="pt-2 text-[var(--foreground)] text-xs sm:text-sm">
-              <MarkdownViewer content={activeContent} />
-            </div>
           </div>
         </div>
 
-        {/* Right Sidebar: Metadata, Revisions list, Extracted Knowledge (4 cols) */}
-        <div className="lg:col-span-4 space-y-4">
-          {/* Metadata Card */}
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
-            <h3 className="text-[11px] uppercase tracking-wider text-[var(--muted)] font-semibold">
-              {t('sourceDetail.metadata')}
-            </h3>
-
-            <div className="space-y-2 text-xs divide-y divide-[var(--separator)]">
-              <div className="pt-1 flex items-center justify-between">
-                <span className="text-[var(--muted)]">{t('knowledgeDetail.fieldCollection')}</span>
+        {/* Title & Metadata Line */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap text-xs text-[var(--muted)]">
+            <span className="font-mono text-[11px] text-[var(--foreground)] bg-[var(--surface-secondary)] px-2 py-0.5 rounded border border-[var(--border)]">
+              {document.filename}
+            </span>
+            {collection && (
+              <>
+                <span className="text-[var(--separator)]">•</span>
                 <span className="font-medium text-[var(--foreground)]">
-                  {collection ? (locale === 'fa' ? collection.nameFa : collection.name) : '-'}
+                  {locale === 'fa' ? collection.nameFa : collection.name}
                 </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[var(--muted)]">{t('sourceDetail.language')}</span>
-                <span className="font-medium text-[var(--foreground)]">
-                  {document.language === 'fa' ? 'فارسی' : 'English'}
-                </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[var(--muted)]">{t('sourceDetail.size')}</span>
-                <span className="text-[var(--foreground)] font-mono">
-                  {((document.rawSize || 0) / 1024).toFixed(1)} KiB
-                </span>
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[var(--muted)]">{t('sourceDetail.importedAt')}</span>
-                <span className="text-[var(--muted)]">
-                  {new Date(document.importedAt || document.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              {(document.sourceUrl || document.url) && (
-                <div className="pt-2 flex items-center justify-between">
-                  <span className="text-[var(--muted)]">{t('sourceDetail.originalUrl')}</span>
-                  <a
-                    href={document.sourceUrl || document.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-blue-400 hover:underline"
-                  >
-                    <span>Link</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Revisions History Card */}
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] uppercase tracking-wider text-[var(--muted)] font-semibold flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5 text-[var(--muted)]" />
-                <span>{t('sourceDetail.revisions')}</span>
-              </h3>
-              <span className="text-[11px] text-[var(--muted)] font-mono">
-                {document.revisions.length} total
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              {document.revisions.map((rev) => {
-                const isSelected = rev.revisionId === activeRevision?.revisionId;
-                return (
-                  <button
-                    key={rev.revisionId}
-                    type="button"
-                    onClick={() => setSelectedRevisionId(rev.revisionId)}
-                    className={`w-full text-start p-2.5 rounded-lg border text-xs transition-colors cursor-pointer ${
-                      isSelected
-                        ? 'border-blue-500 bg-[var(--surface-tertiary)] text-[var(--foreground)] ring-1 ring-blue-500/20'
-                        : 'border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:border-[var(--border)] text-[var(--muted)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[11px] mb-0.5">
-                      <span className="font-semibold text-blue-400 font-mono">
-                        {rev.revisionId}
-                      </span>
-                      <span className="text-[var(--muted)] text-[10px]">
-                        {new Date(rev.timestamp).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-[var(--foreground)] line-clamp-1 text-[11px]">
-                      {rev.changeSummary || rev.summary || 'Snapshot'}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Related Knowledge Items Card */}
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] uppercase tracking-wider text-[var(--muted)] font-semibold">
-                {t('sourceDetail.relatedKnowledge')}
-              </h3>
-              <span className="text-[11px] text-[var(--muted)] font-mono">
-                {relatedKnowledge.length}
-              </span>
-            </div>
-
-            {relatedKnowledge.length === 0 ? (
-              <p className="text-xs text-[var(--muted)] italic">
-                {t('sourceDetail.noRelatedKnowledge')}
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {relatedKnowledge.map((k) => (
-                  <div
-                    key={k.id}
-                    onClick={() => navigate(`/knowledge/${k.id}`)}
-                    className="p-2 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:bg-[var(--surface-secondary)] hover:border-[var(--border)] transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Badge type="knowledgeType" value={k.type} size="sm" />
-                      <Badge type="review" value={k.reviewStatus} size="sm" />
-                    </div>
-                    <h4
-                      dir="auto"
-                      className="text-xs font-medium text-[var(--foreground)] group-hover:text-blue-400 truncate"
-                    >
-                      {k.title}
-                    </h4>
-                  </div>
-                ))}
-              </div>
+              </>
             )}
+            <span className="text-[var(--separator)]">•</span>
+            <span className="text-[11px] font-mono">
+              {((document.rawSize || 0) / 1024).toFixed(1)} KiB
+            </span>
+            <span className="text-[var(--separator)]">•</span>
+            <span className="text-[11px]">
+              {document.revisions.length} revision{document.revisions.length === 1 ? '' : 's'}
+            </span>
           </div>
+
+          <h1
+            dir="auto"
+            className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)] leading-snug"
+          >
+            {document.title}
+          </h1>
         </div>
       </div>
 
-      {/* Edit / New Revision Modal */}
-      {isEditing && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in"
-        >
-          <div className="w-full max-w-2xl bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--foreground)]">
-                {t('sourceDetail.editSource')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveRevision} className="p-5 space-y-3.5 overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="ui-input"
-                />
+      {/* Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Main Column (8 cols on lg ~ 67%) */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="ui-card p-6 sm:p-8 space-y-8">
+            {/* 1. Document Overview & Active Content */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--separator)]">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
+                    Document Content
+                  </h2>
+                  {activeRevision && (
+                    <span className="text-[11px] font-mono bg-[var(--surface-secondary)] px-2 py-0.5 rounded border border-[var(--border)] text-[var(--muted)]">
+                      Rev: {activeRevision.revisionId}
+                    </span>
+                  )}
+                </div>
+                {activeRevision && (
+                  <span className="text-xs text-[var(--muted)] truncate max-w-[280px]">
+                    {activeRevision.changeSummary || activeRevision.summary || 'Initial snapshot'}
+                  </span>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Revision Summary (What changed?) *
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  required
-                  placeholder="e.g. Corrected benchmark parameter tables and cited updated sources"
-                  value={editRevisionSummary}
-                  onChange={(e) => setEditRevisionSummary(e.target.value)}
-                  className="ui-input"
-                />
+              {/* Rendered Markdown Document View */}
+              <div className="text-[13px] sm:text-[14px] text-[var(--foreground)] leading-relaxed select-text">
+                <MarkdownViewer content={activeContent} />
+              </div>
+            </section>
+
+            {/* 2. Extracted Grounded Knowledge Units */}
+            <section className="space-y-4 pt-6 border-t border-[var(--separator)]">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
+                  Extracted Knowledge Units ({relatedKnowledge.length})
+                </h2>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Markdown Content
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={10}
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="ui-input font-mono text-xs"
-                />
+              {relatedKnowledge.length === 0 ? (
+                <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/30 text-xs text-[var(--muted)] italic">
+                  No knowledge items have been derived from this document yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {relatedKnowledge.map((k) => (
+                    <div
+                      key={k.id}
+                      onClick={() => navigate(`/knowledge/${k.id}`)}
+                      className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/40 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer space-y-2 group"
+                    >
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge type="knowledgeType" value={k.type} size="sm" />
+                        <Badge type="evidence" value={k.evidenceLevel} size="sm" />
+                      </div>
+                      <h3
+                        dir="auto"
+                        className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors line-clamp-2"
+                      >
+                        {k.title}
+                      </h3>
+                      <p
+                        dir="auto"
+                        className="text-[11px] text-[var(--muted)] line-clamp-2 leading-relaxed"
+                      >
+                        {k.summary}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* 3. Revision Timeline History (Read-Only Viewer) */}
+            <section className="space-y-4 pt-6 border-t border-[var(--separator)]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-[var(--muted)]" />
+                  <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
+                    Revision History ({document.revisions.length})
+                  </h2>
+                </div>
+                <span className="text-xs text-[var(--muted)]">
+                  Select a snapshot to inspect past text
+                </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="ui-button ui-button-secondary"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="ui-button ui-button-primary"
-                >
-                  {t('common.save')}
-                </button>
+              <div className="space-y-2">
+                {document.revisions.map((rev) => {
+                  const isSelected = rev.revisionId === selectedRevisionId;
+                  return (
+                    <div
+                      key={rev.revisionId}
+                      onClick={() => setSelectedRevisionId(rev.revisionId)}
+                      className={`p-3.5 rounded-xl border transition-colors cursor-pointer text-xs space-y-1.5 ${
+                        isSelected
+                          ? 'bg-[var(--surface-secondary)] border-[var(--accent)] shadow-xs'
+                          : 'bg-[var(--surface-secondary)]/30 border-[var(--border)] hover:bg-[var(--surface-secondary)]/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-semibold text-[var(--foreground)]">
+                            {rev.revisionId}
+                          </span>
+                          <span className="text-[var(--separator)]">•</span>
+                          <span className="text-[var(--muted)] truncate max-w-sm">
+                            {rev.changeSummary || rev.summary || 'Initial revision baseline.'}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[10px] text-[var(--muted)]">
+                          {((rev.content?.length || 0) / 1024).toFixed(1)} KiB
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-[var(--muted)] pt-0.5">
+                        <span className="font-mono">
+                          {new Date(rev.timestamp).toLocaleString()}
+                        </span>
+                        {isSelected && (
+                          <span className="inline-flex items-center gap-1 text-[var(--accent)] font-medium">
+                            <Check className="w-3 h-3" />
+                            <span>Active View</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </form>
+            </section>
           </div>
         </div>
-      )}
 
-      {/* Extract Knowledge Modal */}
-      {extractModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in"
-        >
-          <div className="w-full max-w-lg bg-[var(--surface)] rounded-xl border border-[var(--border)] p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-              <h3 className="text-sm font-semibold text-[var(--foreground)]">
-                {t('sourceDetail.extractKnowledge')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setExtractModalOpen(false)}
-                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleExtractKnowledge} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Selected Excerpt
-                </label>
-                <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--foreground)] font-mono max-h-32 overflow-y-auto">
-                  "{selectedExcerpt}"
+        {/* Supporting Inspector Sidebar (4 cols on lg ~ 33%) */}
+        <div className="lg:col-span-4 sticky top-6 space-y-4">
+          <div className="ui-panel p-5 space-y-6 shadow-xs">
+            {/* Document Properties */}
+            <div className="space-y-3 pb-5 border-b border-[var(--separator)]">
+              <div className="text-[12px] font-medium text-[var(--muted)]">
+                Document Properties
+              </div>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">Filename</span>
+                  <span className="font-mono text-[11px] text-[var(--foreground)] truncate max-w-[170px]" title={document.filename}>
+                    {document.filename}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">{t('knowledgeDetail.fieldCollection')}</span>
+                  <span className="font-medium text-[var(--foreground)]">
+                    {collection ? (locale === 'fa' ? collection.nameFa : collection.name) : '-'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">{t('sourceDetail.language')}</span>
+                  <span className="font-medium text-[var(--foreground)]">
+                    {document.language === 'fa' ? 'فارسی' : 'English'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">{t('sourceDetail.size')}</span>
+                  <span className="font-mono text-[11px] text-[var(--foreground)]">
+                    {((document.rawSize || 0) / 1024).toFixed(1)} KiB
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">Document ID</span>
+                  <span className="font-mono text-[11px] text-[var(--muted)] truncate max-w-[170px]" title={document.id}>
+                    {document.id}
+                  </span>
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  required
-                  placeholder="e.g. Heuristic Row Projection Alignment"
-                  value={extractTitle}
-                  onChange={(e) => setExtractTitle(e.target.value)}
-                  className="ui-input"
-                />
+            {/* Ingestion & Provenance */}
+            <div className="space-y-3 pb-5 border-b border-[var(--separator)]">
+              <div className="text-[12px] font-medium text-[var(--muted)]">
+                Ingestion & Provenance
               </div>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">{t('sourceDetail.importedAt')}</span>
+                  <span className="font-mono text-[11px] text-[var(--foreground)]">
+                    {new Date(document.importedAt || document.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--muted)]">Last Updated</span>
+                  <span className="font-mono text-[11px] text-[var(--foreground)]">
+                    {document.updatedAt ? new Date(document.updatedAt).toLocaleDateString() : '-'}
+                  </span>
+                </div>
+                {(document.sourceUrl || document.url) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--muted)]">{t('sourceDetail.originalUrl')}</span>
+                    <a
+                      href={document.sourceUrl || document.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline font-mono text-[11px]"
+                    >
+                      <span>External Source</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Summary
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={2}
-                  value={extractSummary}
-                  onChange={(e) => setExtractSummary(e.target.value)}
-                  placeholder="Brief summary..."
-                  className="ui-input"
-                />
+            {/* Active Revision Snapshot */}
+            <div className="space-y-2.5 text-xs">
+              <div className="text-[12px] font-medium text-[var(--muted)]">
+                Selected Snapshot
               </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setExtractModalOpen(false)}
-                  className="ui-button ui-button-secondary"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="ui-button ui-button-primary"
-                >
-                  {t('common.create')}
-                </button>
-              </div>
-            </form>
+              {activeRevision ? (
+                <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[11px] text-[var(--foreground)] font-semibold">
+                      {activeRevision.revisionId}
+                    </span>
+                    <span className="text-[10px] text-[var(--muted)] font-mono">
+                      {new Date(activeRevision.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-[var(--muted)] leading-relaxed">
+                    {activeRevision.changeSummary || activeRevision.summary || 'Initial revision baseline.'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--muted)] italic">No active revision loaded.</p>
+              )}
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmModal
-        isOpen={deleteModalOpen}
-        title={t('sourceDetail.deleteSource')}
-        description="Are you sure you want to delete this source document? All extracted knowledge items will remain intact."
-        confirmLabel={t('common.delete')}
-        cancelLabel={t('common.cancel')}
-        isDestructive
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteModalOpen(false)}
-      />
+      </div>
     </div>
   );
 };

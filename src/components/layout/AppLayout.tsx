@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Layers,
-  UploadCloud,
   Network,
   Cpu,
   CheckCircle2,
@@ -12,10 +11,8 @@ import {
   Languages,
   Sun,
   Moon,
-  LogOut,
   Menu,
   X,
-  Shield,
 } from 'lucide-react';
 import { useLocale } from '../../locales/useLocale';
 import { useTheme } from '../../context/ThemeContext';
@@ -25,7 +22,6 @@ export const AppLayout: React.FC = () => {
   const { t, locale, setLocale } = useLocale();
   const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -49,16 +45,11 @@ export const AppLayout: React.FC = () => {
 
   const navItems = [
     { to: '/library', label: t('nav.library'), icon: Layers },
-    { to: '/import', label: t('nav.import'), icon: UploadCloud },
     { to: '/graph', label: t('nav.graph'), icon: Network },
     { to: '/context', label: t('nav.context'), icon: Cpu },
     { to: '/outcomes', label: t('nav.outcomes'), icon: CheckCircle2 },
-    { to: '/connections', label: t('nav.connections'), icon: KeyRound },
+    { to: '/connections', label: 'API & Agent Access', icon: KeyRound },
   ];
-
-  const handleLogout = () => {
-    navigate('/login');
-  };
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-[var(--surface)] select-none">
@@ -79,7 +70,7 @@ export const AppLayout: React.FC = () => {
             WikiGraph
           </div>
           <div className="text-[11px] text-[var(--muted)] font-mono leading-none mt-1 truncate">
-            Research Workspace
+            Public Knowledge Platform
           </div>
         </div>
       </div>
@@ -107,8 +98,8 @@ export const AppLayout: React.FC = () => {
         })}
       </nav>
 
-      {/* Bottom Section: Settings & User Profile / Exit */}
-      <div className="p-3 border-t border-[var(--separator)] space-y-1 shrink-0">
+      {/* Bottom Section: Settings */}
+      <div className="p-3 border-t border-[var(--separator)] shrink-0">
         <NavLink
           to="/settings"
           className={({ isActive }) =>
@@ -122,16 +113,6 @@ export const AppLayout: React.FC = () => {
           <Settings className="w-[17px] h-[17px] shrink-0" />
           <span className="truncate">{t('nav.settings')}</span>
         </NavLink>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-[10px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)]/50 transition-colors cursor-pointer text-start"
-          title={t('nav.logout')}
-        >
-          <LogOut className="w-[17px] h-[17px] shrink-0 rtl:rotate-180" />
-          <span className="truncate">{t('nav.logout')}</span>
-        </button>
       </div>
     </div>
   );
@@ -219,11 +200,11 @@ export const AppLayout: React.FC = () => {
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Workspace status badge */}
+            {/* Public status badge */}
             <div className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--separator)]">
               <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
               <span className="text-xs font-medium text-[var(--foreground)]">
-                Workspace
+                Public Platform
               </span>
             </div>
           </div>

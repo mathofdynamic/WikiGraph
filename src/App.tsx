@@ -8,13 +8,11 @@ import { AppLayout } from './components/layout/AppLayout';
 import { LibraryPage } from './pages/LibraryPage';
 import { GraphPage } from './pages/GraphPage';
 import { ContextPage } from './pages/ContextPage';
-import { ImportPage } from './pages/ImportPage';
 import { OutcomesPage } from './pages/OutcomesPage';
 import { ConnectionsPage } from './pages/ConnectionsPage';
 import { DocumentDetailPage } from './pages/DocumentDetailPage';
 import { KnowledgeDetailPage } from './pages/KnowledgeDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { LoginPage } from './pages/LoginPage';
 
 export default function App() {
   return (
@@ -23,13 +21,13 @@ export default function App() {
         <RepositoryProvider>
           <BrowserRouter>
             <Routes>
-              {/* Main Application Shell with Persistent Left Sidebar */}
+              {/* Main Public Application Shell with Persistent Left Sidebar */}
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Navigate to="/library" replace />} />
                 <Route path="library" element={<LibraryPage />} />
                 <Route path="graph" element={<GraphPage />} />
                 <Route path="context" element={<ContextPage />} />
-                <Route path="import" element={<ImportPage />} />
+                <Route path="import" element={<Navigate to="/library" replace />} />
                 <Route path="outcomes" element={<OutcomesPage />} />
                 <Route path="connections" element={<ConnectionsPage />} />
                 <Route path="documents/:id" element={<DocumentDetailPage />} />
@@ -37,8 +35,8 @@ export default function App() {
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
 
-              {/* Login route */}
-              <Route path="/login" element={<LoginPage />} />
+              {/* Obsolete routes redirect directly to public library */}
+              <Route path="/login" element={<Navigate to="/library" replace />} />
               <Route path="*" element={<Navigate to="/library" replace />} />
             </Routes>
           </BrowserRouter>
@@ -47,4 +45,3 @@ export default function App() {
     </ThemeProvider>
   );
 }
-

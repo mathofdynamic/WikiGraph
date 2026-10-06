@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-  Cpu,
   Search,
   Plus,
   Trash2,
@@ -12,18 +11,15 @@ import {
   MoveDown,
   Layers,
   FileCode,
-  FileText,
-  Info,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import {
   Collection,
-  ContextRecipe,
-  EvidenceLevel,
   KnowledgeItem,
   KnowledgeType,
-  ReviewStatus,
   SourceDocument,
 } from '../types';
 import { Badge } from '../components/common/Badge';
@@ -116,6 +112,10 @@ export const ContextPage: React.FC = () => {
     }
   };
 
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
   // Assembled payload preview
   const assembledPayload = useMemo(() => {
     const sourceMap = new Map(sources.map((s) => [s.id, s]));
@@ -178,6 +178,10 @@ export const ContextPage: React.FC = () => {
     return md;
   }, [format, selectedItems, taskGoal, sources]);
 
+  const estimatedTokens = useMemo(() => {
+    return Math.round(assembledPayload.length / 4);
+  }, [assembledPayload]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(assembledPayload);
     setCopied(true);
@@ -197,95 +201,238 @@ export const ContextPage: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[var(--border)]">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
-            {t('context.title')}
-          </h1>
-          <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
-            {t('context.subtitle')}
-          </p>
-        </div>
+      {/* Top Header & Global Actions */}
+      <div className="space-y-3 pb-4 border-b border-[var(--separator)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)] leading-snug">
+              {t('context.title')}
+            </h1>
+            <p className="text-[13px] text-[var(--muted)] mt-0.5">
+              {t('context.subtitle')}
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="ui-button ui-button-secondary text-xs"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? t('common.copied') : t('common.copy')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="ui-button ui-button-primary text-xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{t('common.download')}</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedIds.length > 0 && (
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="ui-button ui-button-secondary text-xs"
+                title="Clear selected sequence"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Clear</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="ui-button ui-button-secondary text-xs"
+              title={t('common.copy')}
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+              )}
+              <span>{copied ? t('common.copied') : t('common.copy')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="ui-button ui-button-primary text-xs"
+              title={t('common.download')}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{t('common.download')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Two-Column Layout */}
+      {/* Main Three-Zone Studio Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Left: Configuration & Knowledge Selection (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          
-          {/* Task Goal Input */}
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2">
-            <label className="block text-xs font-semibold text-[var(--foreground)]">
-              Task Objective / Downstream Purpose
-            </label>
-            <input
-              type="text"
-              value={taskGoal}
-              onChange={(e) => setTaskGoal(e.target.value)}
-              placeholder="e.g. Table Extraction Heuristics for Financial Filings"
-              className="ui-input"
-            />
-          </div>
-
-          {/* Selected Knowledge Items in Packet */}
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground)] flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-blue-400" />
-                <span>Assembled Knowledge Sequence</span>
-              </span>
-              <span className="text-xs font-medium text-blue-400 font-mono">
-                {selectedItems.length} units
+        {/* Zone 1: Available Knowledge Browser (4 cols on lg ~ 33%) */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="ui-panel p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--separator)]">
+              <div>
+                <h2 className="text-[13px] sm:text-[14px] font-semibold text-[var(--foreground)] tracking-tight">
+                  Available Knowledge
+                </h2>
+                <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                  Browse repository items to stage into context.
+                </p>
+              </div>
+              <span className="text-[11px] font-mono text-[var(--muted)]">
+                {availableItems.length} units
               </span>
             </div>
 
+            {/* Filter Inputs */}
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-2.5 top-2 pointer-events-none" />
+                <input
+                  type="text"
+                  dir="auto"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Filter available items..."
+                  className="ui-input ps-8 py-1 text-xs h-8"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={selectedCollection}
+                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  className="ui-select text-xs h-8"
+                >
+                  <option value="all">All Collections</option>
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {locale === 'fa' ? c.nameFa : c.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value as any)}
+                  className="ui-select text-xs h-8"
+                >
+                  <option value="all">All Types</option>
+                  <option value="procedure">{t('types.procedure')}</option>
+                  <option value="skill">{t('types.skill')}</option>
+                  <option value="research_finding">{t('types.research_finding')}</option>
+                  <option value="tip">{t('types.tip')}</option>
+                  <option value="example">{t('types.example')}</option>
+                  <option value="failure">{t('types.failure')}</option>
+                  <option value="lesson">{t('types.lesson')}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* List of Available Items */}
+            <div className="max-h-[580px] overflow-y-auto space-y-2 pt-1">
+              {availableItems.length === 0 ? (
+                <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/40 text-center text-xs text-[var(--muted)]">
+                  <p className="italic">No additional items match filter.</p>
+                </div>
+              ) : (
+                availableItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/40 hover:bg-[var(--surface-secondary)] transition-colors space-y-1.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Badge type="knowledgeType" value={item.type} size="sm" />
+                          <Badge type="evidence" value={item.evidenceLevel} size="sm" />
+                        </div>
+                        <h3
+                          dir="auto"
+                          className="text-xs font-semibold text-[var(--foreground)] truncate"
+                        >
+                          {item.title}
+                        </h3>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => addItem(item.id)}
+                        className="ui-button ui-button-secondary text-xs px-2.5 py-1 shrink-0"
+                        title="Add to context packet"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add</span>
+                      </button>
+                    </div>
+
+                    <p
+                      dir="auto"
+                      className="text-[11px] text-[var(--muted)] line-clamp-2 leading-relaxed"
+                    >
+                      {item.summary}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Zone 2: Selected Context Assembly Workspace (4 cols on lg ~ 33%) */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="ui-card p-5 sm:p-6 space-y-5">
+            {/* Task Objective Input */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-[var(--muted)]">
+                Task Objective / Ingestion Goal *
+              </label>
+              <input
+                type="text"
+                dir="auto"
+                value={taskGoal}
+                onChange={(e) => setTaskGoal(e.target.value)}
+                placeholder="e.g. Heuristic Table Alignment for SEC Filings"
+                className="ui-input text-xs"
+              />
+            </div>
+
+            {/* Sequence Workspace Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--separator)]">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[var(--muted)]" />
+                <h2 className="text-[13px] sm:text-[14px] font-semibold text-[var(--foreground)] tracking-tight">
+                  Staged Sequence ({selectedItems.length})
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-[var(--muted)]">
+                Ordered by execution
+              </span>
+            </div>
+
+            {/* Selected Sequence Stack */}
             {selectedItems.length === 0 ? (
-              <p className="text-xs text-[var(--muted)] py-3 text-center italic">
-                No items selected yet. Choose items below to assemble your context packet.
-              </p>
+              <div className="p-8 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/30 text-center text-xs text-[var(--muted)] space-y-2">
+                <p className="font-medium text-[var(--foreground)]">No items in context package</p>
+                <p className="leading-relaxed">
+                  Choose units from the Available Knowledge list on the left to assemble this package.
+                </p>
+              </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[580px] overflow-y-auto">
                 {selectedItems.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/70 space-y-1.5 group"
+                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:bg-[var(--surface-secondary)] transition-colors space-y-2 group"
                   >
                     {item.sourceHasChanged && (
-                      <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium">
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>Source changed - verification recommended</span>
+                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-[var(--surface-tertiary)] border border-[var(--border)] text-[11px] text-[var(--foreground)]">
+                        <AlertTriangle className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
+                        <span>Source document has changed since citation</span>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs text-[var(--muted)] font-mono">#{idx + 1}</span>
+                        <span className="text-[11px] text-[var(--muted)] font-mono font-semibold px-1 rounded bg-[var(--surface-tertiary)]">
+                          #{idx + 1}
+                        </span>
                         <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <h4 dir="auto" className="text-xs font-medium text-[var(--foreground)] truncate">
+                        <h3
+                          dir="auto"
+                          className="text-xs font-semibold text-[var(--foreground)] truncate"
+                        >
                           {item.title}
-                        </h4>
+                        </h3>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
@@ -293,7 +440,8 @@ export const ContextPage: React.FC = () => {
                           type="button"
                           disabled={idx === 0}
                           onClick={() => moveItem(idx, 'up')}
-                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-20 cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] disabled:opacity-20 cursor-pointer"
+                          title="Move up in sequence"
                         >
                           <MoveUp className="w-3.5 h-3.5" />
                         </button>
@@ -301,21 +449,26 @@ export const ContextPage: React.FC = () => {
                           type="button"
                           disabled={idx === selectedItems.length - 1}
                           onClick={() => moveItem(idx, 'down')}
-                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-20 cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] disabled:opacity-20 cursor-pointer"
+                          title="Move down in sequence"
                         >
                           <MoveDown className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
-                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
+                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] cursor-pointer"
+                          title="Remove from package"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
-                    <p dir="auto" className="text-[11px] text-[var(--muted)] line-clamp-1">
+                    <p
+                      dir="auto"
+                      className="text-[11px] text-[var(--muted)] line-clamp-1 leading-relaxed"
+                    >
                       {item.summary}
                     </p>
                   </div>
@@ -323,127 +476,80 @@ export const ContextPage: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Available Knowledge Picker */}
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground)] block">
-              Available Knowledge Units
-            </span>
-
-            {/* Filter Inputs */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-2.5 top-2 pointer-events-none" />
-                <input
-                  type="text"
-                  dir="auto"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter available knowledge..."
-                  className="ui-input ps-8 py-1 text-xs"
-                />
-              </div>
-
-              <select
-                value={selectedCollection}
-                onChange={(e) => setSelectedCollection(e.target.value)}
-                className="ui-select text-xs py-1"
-              >
-                <option value="all">All Collections</option>
-                {collections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {locale === 'fa' ? c.nameFa : c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* List of Available Items */}
-            <div className="max-h-64 overflow-y-auto space-y-1.5 divide-y divide-[var(--separator)]">
-              {availableItems.length === 0 ? (
-                <p className="text-xs text-[var(--muted)] py-3 text-center italic">
-                  No additional units match filter.
-                </p>
-              ) : (
-                availableItems.map((item) => (
-                  <div key={item.id} className="pt-2 flex items-center justify-between gap-2">
-                    <div className="min-w-0 pr-2">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <span dir="auto" className="text-xs font-medium text-[var(--foreground)] truncate">
-                          {item.title}
-                        </span>
-                      </div>
-                      <p dir="auto" className="text-[11px] text-[var(--muted)] line-clamp-1">
-                        {item.summary}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => addItem(item.id)}
-                      className="ui-button ui-button-secondary text-xs px-2.5 py-1 shrink-0"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Add</span>
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
         </div>
 
-        {/* Right: Output Format & Assembled Live Preview (5 cols) */}
-        <div className="lg:col-span-5 space-y-4 sticky top-20">
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3 shadow-xs">
-            
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-              <span className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
-                <FileCode className="w-3.5 h-3.5 text-blue-400" />
-                <span>Assembled Context Preview</span>
-              </span>
+        {/* Zone 3: Generated Context Preview & Output (4 cols on lg ~ 33%) */}
+        <div className="lg:col-span-4 space-y-4 sticky top-6">
+          <div className="ui-panel p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--separator)]">
+              <div className="flex items-center gap-1.5">
+                <FileCode className="w-4 h-4 text-[var(--muted)]" />
+                <h2 className="text-[13px] sm:text-[14px] font-semibold text-[var(--foreground)] tracking-tight">
+                  Generated Package
+                </h2>
+              </div>
 
-              {/* Segmented Format Switch */}
+              {/* Segmented Format Switcher */}
               <div className="inline-flex items-center p-0.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)]">
                 {(['markdown', 'json', 'briefing'] as OutputFormat[]).map((fmt) => (
                   <button
                     key={fmt}
                     type="button"
                     onClick={() => setFormat(fmt)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-medium transition-colors cursor-pointer ${
                       format === fmt
-                        ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs'
+                        ? 'bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] shadow-xs'
                         : 'text-[var(--muted)] hover:text-[var(--foreground)]'
                     }`}
                   >
-                    {fmt.toUpperCase()}
+                    {fmt}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Assembled Output Code Box */}
-            <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] font-mono text-xs text-[var(--foreground)] max-h-[550px] overflow-y-auto leading-relaxed">
+            {/* Metrics Metadata Ribbon */}
+            <div className="flex items-center justify-between text-[11px] text-[var(--muted)] px-3 py-2 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border)] font-mono">
+              <span>{selectedItems.length} units</span>
+              <span>&bull;</span>
+              <span>~{estimatedTokens.toLocaleString()} tokens</span>
+              <span>&bull;</span>
+              <span>{assembledPayload.length.toLocaleString()} chars</span>
+            </div>
+
+            {/* Assembled Output Body */}
+            <div className="p-3.5 rounded-lg bg-[var(--surface-secondary)]/40 border border-[var(--border)] font-mono text-[11px] text-[var(--foreground)] max-h-[460px] overflow-y-auto leading-relaxed select-text">
               <pre className="whitespace-pre-wrap">{assembledPayload}</pre>
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-[var(--muted)] pt-1">
-              <span>{assembledPayload.length} characters</span>
+            {/* Action Group */}
+            <div className="flex items-center justify-between gap-2 pt-2">
               <button
                 type="button"
                 onClick={handleCopy}
-                className="text-blue-400 hover:underline cursor-pointer"
+                className="ui-button ui-button-secondary text-xs flex-1 justify-center"
               >
-                Copy to Clipboard
+                {copied ? (
+                  <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+                )}
+                <span>{copied ? t('common.copied') : 'Copy Package'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="ui-button ui-button-primary text-xs flex-1 justify-center"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export File</span>
               </button>
             </div>
           </div>
         </div>
 
       </div>
-
     </div>
   );
 };

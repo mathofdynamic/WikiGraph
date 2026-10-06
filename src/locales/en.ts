@@ -52,7 +52,6 @@ export const en = {
     outcomes: 'Outcomes',
     connections: 'Machine Connections',
     settings: 'Settings',
-    logout: 'Exit Demo',
   },
   library: {
     title: 'Research Library',
@@ -316,14 +315,5 @@ export const en = {
     backendStatusDesc: 'Current state of the production serverless API integration.',
     backendNotConnected: 'Not Connected (Static Frontend Prototype Mode)',
     backendHandoffDoc: 'See FRONTEND_HANDOFF.md for complete D1 schema and Cloudflare Pages Functions implementation instructions.',
-  },
-  login: {
-    title: 'Owner Authentication',
-    subtitle: 'Single-owner private workspace access.',
-    emailLabel: 'Owner Identifier / Email',
-    passwordLabel: 'Access Passphrase',
-    btnSignIn: 'Authenticate',
-    btnDemo: 'Enter Demo Workspace',
-    demoNotice: 'Prototype Notice: Enter "demo" or click the button above to enter the local research workspace. Production authentication will be handled by Cloudflare Access / Pages backend.',
   },
 };

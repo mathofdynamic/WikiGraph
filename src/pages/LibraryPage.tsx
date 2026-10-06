@@ -7,7 +7,6 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
-  Plus,
   X,
   Check,
   AlertCircle,
@@ -16,7 +15,6 @@ import {
   ShieldCheck,
   ArrowRight,
   FileCode,
-  FolderOpen,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -62,18 +60,6 @@ export const LibraryPage: React.FC = () => {
   // Quick copied feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // New Knowledge Modal state
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newSummary, setNewSummary] = useState('');
-  const [newBody, setNewBody] = useState('');
-  const [newType, setNewType] = useState<KnowledgeType>('procedure');
-  const [newCollectionId, setNewCollectionId] = useState('');
-  const [newEvidenceLevel, setNewEvidenceLevel] = useState<EvidenceLevel>('tested');
-  const [newApplicability, setNewApplicability] = useState('');
-  const [newExclusions, setNewExclusions] = useState('');
-  const [newRequirements, setNewRequirements] = useState('');
-
   // Fetch data
   const fetchData = async () => {
     try {
@@ -87,9 +73,6 @@ export const LibraryPage: React.FC = () => {
       ]);
 
       setCollections(cols);
-      if (cols.length > 0 && !newCollectionId) {
-        setNewCollectionId(cols[0].id);
-      }
       setSourcesList(allS);
 
       // Filter knowledge items
@@ -181,47 +164,6 @@ export const LibraryPage: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleCreateKnowledge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newSummary.trim()) return;
-
-    try {
-      const reqArray = newRequirements
-        .split('\n')
-        .map((r) => r.trim())
-        .filter(Boolean);
-
-      const created = await repository.createKnowledge({
-        title: newTitle.trim(),
-        summary: newSummary.trim(),
-        body: newBody.trim() || '',
-        type: newType,
-        collectionId: newCollectionId || collections[0]?.id || 'col-01',
-        evidenceLevel: newEvidenceLevel,
-        reviewStatus: 'draft',
-        applicability: newApplicability.trim() || '',
-        exclusions: newExclusions.trim() || '',
-        requirements: reqArray,
-        sourceId: '',
-        sourceExcerpt: '',
-        sourceRevisionId: '',
-        language: locale,
-      });
-
-      setCreateModalOpen(false);
-      setNewTitle('');
-      setNewSummary('');
-      setNewBody('');
-      setNewApplicability('');
-      setNewExclusions('');
-      setNewRequirements('');
-      notifyMutation();
-      setActiveKnowledgeId(created.id);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   // Currently active knowledge item for the inspector panel
   const activeItem = useMemo(() => {
     if (!activeKnowledgeId) return knowledgeList[0] || null;
@@ -243,7 +185,7 @@ export const LibraryPage: React.FC = () => {
 
   return (
     <div className="p-6 sm:p-8 space-y-6 min-h-full flex flex-col">
-      {/* Top Section: Page Title + Actions */}
+      {/* Top Section: Page Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)]">
@@ -252,26 +194,6 @@ export const LibraryPage: React.FC = () => {
           <p className="text-[13px] text-[var(--muted)] mt-1">
             {t('library.subtitle')}
           </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => navigate('/import')}
-            className="ui-button ui-button-secondary"
-          >
-            <FolderOpen className="w-4 h-4 text-[var(--muted)]" />
-            <span>{t('library.importResearch')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCreateModalOpen(true)}
-            className="ui-button ui-button-primary"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('library.newKnowledge')}</span>
-          </button>
         </div>
       </div>
 
@@ -442,8 +364,6 @@ export const LibraryPage: React.FC = () => {
                 <EmptyState
                   title={t('library.noKnowledgeFound')}
                   description={t('common.emptyDesc')}
-                  actionLabel={t('library.newKnowledge')}
-                  onAction={() => setCreateModalOpen(true)}
                 />
               ) : (
                 knowledgeList.map((item) => {
@@ -762,186 +682,6 @@ export const LibraryPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* New Knowledge Modal */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="ui-card max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between p-4 border-b border-[var(--separator)]">
-              <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[var(--accent)]" />
-                <span>{t('library.newKnowledge')}</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setCreateModalOpen(false)}
-                className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateKnowledge} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[var(--foreground)]">
-                  Title (Imperative or Claim)
-                </label>
-                <input
-                  type="text"
-                  dir="auto"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Always normalize vector dimensions before dot-product scoring"
-                  className="ui-input"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[var(--foreground)]">
-                    Knowledge Type
-                  </label>
-                  <select
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value as any)}
-                    className="ui-select w-full"
-                  >
-                    <option value="procedure">Procedure</option>
-                    <option value="research_finding">Research Finding</option>
-                    <option value="tip">Tip</option>
-                    <option value="skill">Skill</option>
-                    <option value="example">Example</option>
-                    <option value="failure">Failure</option>
-                    <option value="lesson">Lesson</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[var(--foreground)]">
-                    Evidence Level
-                  </label>
-                  <select
-                    value={newEvidenceLevel}
-                    onChange={(e) => setNewEvidenceLevel(e.target.value as any)}
-                    className="ui-select w-full"
-                  >
-                    <option value="tested">Empirically Tested</option>
-                    <option value="observed">Observed</option>
-                    <option value="unverified">Unverified</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[var(--foreground)]">
-                  Collection
-                </label>
-                <select
-                  value={newCollectionId}
-                  onChange={(e) => setNewCollectionId(e.target.value)}
-                  className="ui-select w-full"
-                >
-                  {collections.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {locale === 'fa' ? c.nameFa : c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[var(--foreground)]">
-                  Executive Summary
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={3}
-                  value={newSummary}
-                  onChange={(e) => setNewSummary(e.target.value)}
-                  placeholder="Concise 1-2 sentence explanation of the finding or rule..."
-                  className="ui-input"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[var(--foreground)]">
-                  Full Technical Body (Markdown)
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={4}
-                  value={newBody}
-                  onChange={(e) => setNewBody(e.target.value)}
-                  placeholder="Detailed markdown specification, execution steps, or code..."
-                  className="ui-input font-mono text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[var(--foreground)]">
-                    Applicability Scope
-                  </label>
-                  <input
-                    type="text"
-                    dir="auto"
-                    value={newApplicability}
-                    onChange={(e) => setNewApplicability(e.target.value)}
-                    placeholder="When to apply..."
-                    className="ui-input text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-[var(--foreground)]">
-                    Exclusions / Negative Conditions
-                  </label>
-                  <input
-                    type="text"
-                    dir="auto"
-                    value={newExclusions}
-                    onChange={(e) => setNewExclusions(e.target.value)}
-                    placeholder="When NOT to apply..."
-                    className="ui-input text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-[var(--foreground)]">
-                  Prerequisites (One per line)
-                </label>
-                <textarea
-                  dir="auto"
-                  rows={2}
-                  value={newRequirements}
-                  onChange={(e) => setNewRequirements(e.target.value)}
-                  placeholder="Node.js 20+&#10;HNSW index configuration"
-                  className="ui-input text-xs"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-[var(--separator)] flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="ui-button ui-button-secondary text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="ui-button ui-button-primary text-xs"
-                >
-                  Create Knowledge Item
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

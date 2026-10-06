@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle2,
-  AlertCircle,
-  Plus,
-  Trash2,
-  ExternalLink,
+  Check,
   X,
-  History,
+  AlertCircle,
+  ExternalLink,
+  Search,
   ShieldCheck,
-  TrendingUp,
+  FileText,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -18,29 +16,18 @@ import {
   KnowledgeOutcome,
   OutcomeResult,
 } from '../types';
-import { Badge } from '../components/common/Badge';
-import { ConfirmModal } from '../components/common/ConfirmModal';
 
 export const OutcomesPage: React.FC = () => {
-  const { repository, version, notifyMutation } = useRepository();
-  const { t, locale } = useLocale();
+  const { repository, version } = useRepository();
+  const { t } = useLocale();
   const navigate = useNavigate();
 
   const [outcomes, setOutcomes] = useState<KnowledgeOutcome[]>([]);
   const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [resultFilter, setResultFilter] = useState<OutcomeResult | 'all'>('all');
-
-  // New Outcome Modal
-  const [logModalOpen, setLogModalOpen] = useState(false);
-  const [taskName, setTaskName] = useState('');
-  const [promptNotes, setPromptNotes] = useState('');
-  const [appliedKnowledgeIds, setAppliedKnowledgeIds] = useState<string[]>([]);
-  const [result, setResult] = useState<OutcomeResult>('success');
-  const [reviewNotes, setReviewNotes] = useState('');
-
-  // Delete modal
-  const [deleteOutcomeId, setDeleteOutcomeId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +41,9 @@ export const OutcomesPage: React.FC = () => {
         if (!active) return;
         setOutcomes(oList);
         setKnowledgeList(kList);
+        if (oList.length > 0 && !selectedOutcomeId) {
+          setSelectedOutcomeId(oList[0].id);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -67,47 +57,21 @@ export const OutcomesPage: React.FC = () => {
   }, [repository, version]);
 
   const filteredOutcomes = outcomes.filter((o) => {
-    if (resultFilter === 'all') return true;
-    return o.result === resultFilter;
+    if (resultFilter !== 'all' && o.result !== resultFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTask = (o.task || o.taskContext || '').toLowerCase().includes(q);
+      const matchNotes = (o.notes || o.reviewNotes || o.prompt || '').toLowerCase().includes(q);
+      const matchMetrics = (o.metrics || '').toLowerCase().includes(q);
+      return matchTask || matchNotes || matchMetrics;
+    }
+    return true;
   });
 
-  const handleCreateOutcome = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskName.trim()) return;
-
-    try {
-      await repository.createOutcome({
-        task: taskName,
-        taskContext: taskName,
-        prompt: promptNotes || undefined,
-        appliedKnowledgeIds,
-        result,
-        notes: reviewNotes || undefined,
-        reviewNotes: reviewNotes || 'Executed task in workspace.',
-      });
-
-      setLogModalOpen(false);
-      setTaskName('');
-      setPromptNotes('');
-      setAppliedKnowledgeIds([]);
-      setResult('success');
-      setReviewNotes('');
-      notifyMutation();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteOutcome = async () => {
-    if (!deleteOutcomeId) return;
-    try {
-      await repository.deleteOutcome(deleteOutcomeId);
-      setDeleteOutcomeId(null);
-      notifyMutation();
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const selectedOutcome =
+    outcomes.find((o) => o.id === selectedOutcomeId) ||
+    filteredOutcomes[0] ||
+    null;
 
   const stats = {
     total: outcomes.length,
@@ -117,276 +81,296 @@ export const OutcomesPage: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[var(--border)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--separator)]">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
+          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)] leading-snug">
             {t('outcomes.title')}
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
+          <p className="text-[13px] text-[var(--muted)] mt-0.5">
             {t('outcomes.subtitle')}
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setLogModalOpen(true)}
-          className="ui-button ui-button-primary"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{t('outcomes.recordBtn')}</span>
-        </button>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.total}</div>
-          <div className="text-[11px] text-[var(--muted)] mt-0.5">Total Audit Runs</div>
+      {/* Summary Metadata Strip (Neutral, Compact, Non-KPI) */}
+      <div className="flex items-center gap-3 sm:gap-6 px-4 py-2.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border)] text-xs font-mono overflow-x-auto">
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--muted)]">Total Runs:</span>
+          <span className="font-semibold text-[var(--foreground)]">{stats.total}</span>
         </div>
-        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.success}</div>
-          <div className="text-[11px] text-[var(--muted)] mt-0.5">Successful Runs</div>
+        <span className="text-[var(--separator)]">•</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--muted)]">Successful:</span>
+          <span className="font-semibold text-[var(--foreground)]">{stats.success}</span>
         </div>
-        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.failure}</div>
-          <div className="text-[11px] text-[var(--muted)] mt-0.5">Failure / Breakages</div>
+        <span className="text-[var(--separator)]">•</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--muted)]">Failure / Breakages:</span>
+          <span className="font-semibold text-[var(--foreground)]">{stats.failure}</span>
         </div>
-        <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="text-xl font-bold text-[var(--foreground)] font-mono">{stats.uncertain}</div>
-          <div className="text-[11px] text-[var(--muted)] mt-0.5">Inconclusive</div>
+        <span className="text-[var(--separator)]">•</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--muted)]">Inconclusive:</span>
+          <span className="font-semibold text-[var(--foreground)]">{stats.uncertain}</span>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] w-fit">
-        {(['all', 'success', 'failure', 'uncertain'] as (OutcomeResult | 'all')[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setResultFilter(f)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              resultFilter === f
-                ? 'bg-[var(--surface-tertiary)] text-[var(--foreground)] shadow-xs border border-[var(--border)]'
-                : 'text-[var(--muted)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            {f === 'all' ? t('common.all') : t(`results.${f}`)}
-          </button>
-        ))}
+      {/* Unified Filter Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-sm">
+          <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-2.5 top-2 pointer-events-none" />
+          <input
+            type="text"
+            dir="auto"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search evaluation runs..."
+            className="ui-input ps-8 py-1 text-xs h-8"
+          />
+        </div>
+
+        {/* Result Filter Segmented Switch */}
+        <div className="inline-flex items-center p-0.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] self-start sm:self-auto">
+          {(['all', 'success', 'failure', 'uncertain'] as (OutcomeResult | 'all')[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setResultFilter(f)}
+              className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer capitalize ${
+                resultFilter === f
+                  ? 'bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] shadow-xs'
+                  : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              {f === 'all' ? t('common.all') : t(`results.${f}`)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Outcomes List */}
-      <div className="space-y-3">
-        {filteredOutcomes.length === 0 ? (
-          <div className="p-12 text-center text-xs text-[var(--muted)] rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            <p>{t('outcomes.noOutcomes')}</p>
-          </div>
-        ) : (
-          filteredOutcomes.map((out) => {
-            const dateStr = out.recordedAt || out.executedAt;
-            return (
-              <div
-                key={out.id}
-                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2.5 hover:border-[var(--border)] transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge type="outcome" value={out.result} size="sm" />
-                    <span className="text-xs font-semibold text-[var(--foreground)]">
-                      {out.task || out.taskContext}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <span className="text-[11px] text-[var(--muted)] font-mono">
-                      {dateStr ? new Date(dateStr).toLocaleDateString() : 'Recent'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteOutcomeId(out.id)}
-                      className="text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer p-0.5"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {out.metrics && (
-                  <div className="p-2 rounded bg-[var(--surface-secondary)] border border-[var(--border)] font-mono text-[11px] text-[var(--foreground)]">
-                    <span className="text-[var(--muted)] me-2">Measured:</span>
-                    <span>{out.metrics}</span>
-                  </div>
-                )}
-
-                {(out.notes || out.reviewNotes || out.prompt) && (
-                  <p className="text-xs text-[var(--muted)] leading-relaxed">
-                    {out.notes || out.reviewNotes || out.prompt}
-                  </p>
-                )}
-
-                {/* Linked Knowledge Items */}
-                {out.appliedKnowledgeIds && out.appliedKnowledgeIds.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[var(--border)]">
-                    <span className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Applied:</span>
-                    {out.appliedKnowledgeIds.map((kId) => {
-                      const k = knowledgeList.find((item) => item.id === kId);
-                      return (
-                        <button
-                          key={kId}
-                          type="button"
-                          onClick={() => navigate(`/knowledge/${kId}`)}
-                          className="px-2 py-0.5 rounded text-[11px] bg-[var(--surface-secondary)] text-blue-400 hover:text-blue-300 border border-[var(--border)] inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>{k?.title || kId}</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Log Outcome Modal */}
-      {logModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-              <h3 className="text-sm font-semibold text-[var(--foreground)]">
-                {t('outcomes.modalTitle')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setLogModalOpen(false)}
-                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
+      {/* Main Two-Column Layout: History List (70%) + Selected Inspector (30%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Outcome History Table / List (~70%) */}
+        <div className="lg:col-span-8 space-y-3">
+          {filteredOutcomes.length === 0 ? (
+            <div className="p-12 text-center text-xs text-[var(--muted)] rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] space-y-2">
+              <ShieldCheck className="w-7 h-7 text-[var(--muted)] mx-auto" />
+              <p className="font-medium text-[var(--foreground)]">{t('outcomes.noOutcomes')}</p>
+              <p className="text-[11px] leading-relaxed">
+                Empirical evaluation records ground model reliability across real-world workloads.
+              </p>
             </div>
+          ) : (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden divide-y divide-[var(--separator)]">
+              {filteredOutcomes.map((out) => {
+                const dateStr = out.recordedAt || out.executedAt;
+                const isSelected = selectedOutcome?.id === out.id;
 
-            <form onSubmit={handleCreateOutcome} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Task / Execution Context *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={taskName}
-                  onChange={(e) => setTaskName(e.target.value)}
-                  placeholder="e.g. Scanned SEC 10-K tables extraction batch"
-                  className="ui-input"
-                />
-              </div>
+                return (
+                  <div
+                    key={out.id}
+                    onClick={() => setSelectedOutcomeId(out.id)}
+                    className={`p-4 transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
+                      isSelected
+                        ? 'bg-[var(--surface-secondary)]/80 border-s-2 border-s-[var(--accent)]'
+                        : 'hover:bg-[var(--surface-secondary)]/40 border-s-2 border-s-transparent'
+                    }`}
+                  >
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Neutral Result Badge with Distinct Icons */}
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)]">
+                          {out.result === 'success' && (
+                            <Check className="w-3 h-3 text-[var(--accent)]" />
+                          )}
+                          {out.result === 'failure' && (
+                            <X className="w-3 h-3 text-[var(--muted)]" />
+                          )}
+                          {out.result === 'uncertain' && (
+                            <AlertCircle className="w-3 h-3 text-[var(--muted)]" />
+                          )}
+                          <span className="capitalize">{t(`results.${out.result}`)}</span>
+                        </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Result
-                </label>
-                <select
-                  value={result}
-                  onChange={(e) => setResult(e.target.value as OutcomeResult)}
-                  className="ui-select w-full"
-                >
-                  <option value="success">{t('results.success')}</option>
-                  <option value="failure">{t('results.failure')}</option>
-                  <option value="uncertain">{t('results.uncertain')}</option>
-                </select>
-              </div>
+                        <h3
+                          dir="auto"
+                          className="text-xs sm:text-[13px] font-semibold text-[var(--foreground)] truncate"
+                        >
+                          {out.task || out.taskContext}
+                        </h3>
+                      </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Applied Knowledge Items
-                </label>
-                <div className="max-h-36 overflow-y-auto space-y-1 p-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs">
-                  {knowledgeList.map((k) => {
-                    const isChecked = appliedKnowledgeIds.includes(k.id);
-                    return (
-                      <label
-                        key={k.id}
-                        className="flex items-center gap-2 p-1 rounded hover:bg-[var(--surface-tertiary)]/50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setAppliedKnowledgeIds((prev) => [...prev, k.id]);
-                            } else {
-                              setAppliedKnowledgeIds((prev) => prev.filter((id) => id !== k.id));
-                            }
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-[var(--foreground)] truncate">{k.title}</span>
-                      </label>
-                    );
-                  })}
+                      {/* Observations / Prompt Snippet */}
+                      {(out.notes || out.reviewNotes || out.prompt) && (
+                        <p
+                          dir="auto"
+                          className="text-[12px] text-[var(--muted)] line-clamp-2 leading-relaxed"
+                        >
+                          {out.notes || out.reviewNotes || out.prompt}
+                        </p>
+                      )}
+
+                      {/* Metrics and Applied Knowledge Meta */}
+                      <div className="flex items-center gap-3 pt-1 text-[11px] text-[var(--muted)] font-mono flex-wrap">
+                        {out.metrics && (
+                          <span>
+                            <span className="text-[var(--foreground)] font-medium">Metric:</span> {out.metrics}
+                          </span>
+                        )}
+                        {out.appliedKnowledgeIds && out.appliedKnowledgeIds.length > 0 && (
+                          <span>
+                            <span className="text-[var(--foreground)] font-medium">Applied:</span>{' '}
+                            {out.appliedKnowledgeIds.length} knowledge node(s)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Timestamp */}
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 text-xs shrink-0">
+                      <span className="text-[11px] text-[var(--muted)] font-mono">
+                        {dateStr ? new Date(dateStr).toLocaleDateString() : 'Recent'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Selected Outcome Inspector Panel (~30%) */}
+        <div className="lg:col-span-4 sticky top-6 space-y-4">
+          <div className="ui-panel p-5 space-y-5 shadow-xs">
+            {selectedOutcome ? (
+              <>
+                {/* Header */}
+                <div className="flex items-start justify-between pb-3 border-b border-[var(--separator)] gap-2">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">
+                      Outcome Inspector
+                    </span>
+                    <h2
+                      dir="auto"
+                      className="text-sm font-semibold text-[var(--foreground)] leading-snug mt-0.5"
+                    >
+                      {selectedOutcome.task || selectedOutcome.taskContext}
+                    </h2>
+                  </div>
+
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)] shrink-0">
+                    {selectedOutcome.result === 'success' && (
+                      <Check className="w-3 h-3 text-[var(--accent)]" />
+                    )}
+                    {selectedOutcome.result === 'failure' && (
+                      <X className="w-3 h-3 text-[var(--muted)]" />
+                    )}
+                    {selectedOutcome.result === 'uncertain' && (
+                      <AlertCircle className="w-3 h-3 text-[var(--muted)]" />
+                    )}
+                    <span className="capitalize">{t(`results.${selectedOutcome.result}`)}</span>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Measured Benchmarks / Metrics
-                </label>
-                <input
-                  type="text"
-                  value={promptNotes}
-                  onChange={(e) => setPromptNotes(e.target.value)}
-                  placeholder="e.g. 99.1% column alignment, 0 unparsed cells"
-                  className="ui-input"
-                />
-              </div>
+                {/* Execution Metadata */}
+                <div className="space-y-2 text-xs">
+                  <div className="text-[11px] font-medium text-[var(--muted)]">
+                    Execution Details
+                  </div>
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--muted)]">Recorded Date</span>
+                      <span className="text-[var(--foreground)]">
+                        {selectedOutcome.recordedAt || selectedOutcome.executedAt
+                          ? new Date(
+                              selectedOutcome.recordedAt || selectedOutcome.executedAt!
+                            ).toLocaleString()
+                          : 'Recorded recently'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[var(--muted)]">Outcome ID</span>
+                      <span
+                        className="text-[var(--muted)] truncate max-w-[170px]"
+                        title={selectedOutcome.id}
+                      >
+                        {selectedOutcome.id}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[var(--muted)] mb-1">
-                  Observations / Review Notes
-                </label>
-                <textarea
-                  rows={2}
-                  value={reviewNotes}
-                  onChange={(e) => setReviewNotes(e.target.value)}
-                  placeholder="Key empirical lessons or failure symptoms..."
-                  className="ui-input"
-                />
-              </div>
+                {/* Measured Benchmark / Metrics */}
+                {selectedOutcome.metrics && (
+                  <div className="space-y-1.5 pt-3 border-t border-[var(--separator)] text-xs">
+                    <div className="text-[11px] font-medium text-[var(--muted)]">
+                      Measured Benchmark
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border)] font-mono text-xs text-[var(--foreground)]">
+                      {selectedOutcome.metrics}
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setLogModalOpen(false)}
-                  className="ui-button ui-button-secondary"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="ui-button ui-button-primary"
-                >
-                  {t('common.save')}
-                </button>
+                {/* Observations & Notes */}
+                {(selectedOutcome.notes || selectedOutcome.reviewNotes || selectedOutcome.prompt) && (
+                  <div className="space-y-1.5 pt-3 border-t border-[var(--separator)] text-xs">
+                    <div className="text-[11px] font-medium text-[var(--muted)]">
+                      Observations & Findings
+                    </div>
+                    <p
+                      dir="auto"
+                      className="text-[13px] text-[var(--foreground)] leading-relaxed p-3 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border)] whitespace-pre-wrap"
+                    >
+                      {selectedOutcome.notes || selectedOutcome.reviewNotes || selectedOutcome.prompt}
+                    </p>
+                  </div>
+                )}
+
+                {/* Applied Knowledge Provenance */}
+                <div className="space-y-2 pt-3 border-t border-[var(--separator)] text-xs">
+                  <div className="text-[11px] font-medium text-[var(--muted)]">
+                    Applied Knowledge Units ({selectedOutcome.appliedKnowledgeIds?.length || 0})
+                  </div>
+
+                  {!selectedOutcome.appliedKnowledgeIds ||
+                  selectedOutcome.appliedKnowledgeIds.length === 0 ? (
+                    <p className="text-xs text-[var(--muted)] italic">
+                      No linked knowledge items recorded.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {selectedOutcome.appliedKnowledgeIds.map((kId) => {
+                        const k = knowledgeList.find((item) => item.id === kId);
+                        return (
+                          <div
+                            key={kId}
+                            onClick={() => navigate(`/knowledge/${kId}`)}
+                            className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer flex items-center justify-between gap-2 group"
+                          >
+                            <span className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors truncate block">
+                              {k?.title || kId}
+                            </span>
+                            <ExternalLink className="w-3.5 h-3.5 text-[var(--muted)] group-hover:text-[var(--accent)] shrink-0" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="p-8 text-center text-xs text-[var(--muted)]">
+                <FileText className="w-6 h-6 text-[var(--muted)] mx-auto mb-2" />
+                <p>Select an outcome record to inspect provenance and measurement notes.</p>
               </div>
-            </form>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmModal
-        isOpen={Boolean(deleteOutcomeId)}
-        title="Delete Outcome Record"
-        description="Are you sure you want to delete this recorded empirical outcome?"
-        confirmLabel={t('common.delete')}
-        cancelLabel={t('common.cancel')}
-        isDestructive
-        onConfirm={handleDeleteOutcome}
-        onCancel={() => setDeleteOutcomeId(null)}
-      />
+      </div>
     </div>
   );
 };

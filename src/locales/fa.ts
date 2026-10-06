@@ -52,7 +52,6 @@ export const fa = {
     outcomes: 'نتایج کاربردی',
     connections: 'اتصالات ماشینی',
     settings: 'تنظیمات',
-    logout: 'خروج از پیش‌نمایش',
   },
   library: {
     title: 'کتابخانه پژوهشی',
@@ -316,14 +315,5 @@ export const fa = {
     backendStatusDesc: 'وضعیت فعلی اتصال به سرویس ابری بدون سرور (Serverless).',
     backendNotConnected: 'متصل نیست (حالت نمونه اولیه و مستقل فرانت‌اند)',
     backendHandoffDoc: 'برای مشاهده ساختار کامل پایگاه داده D1 و توابع Pages، مستند FRONTEND_HANDOFF.md را مطالعه فرمایید.',
-  },
-  login: {
-    title: 'ورود مالک محیط کار',
-    subtitle: 'دسترسی اختصاصی به میز کار پژوهشی خصوصی.',
-    emailLabel: 'شناسه یا رایانامه مالک',
-    passwordLabel: 'رمز عبور دسترسی',
-    btnSignIn: 'احراز هویت و ورود',
-    btnDemo: 'ورود به محیط دمو',
-    demoNotice: 'یادداشت نسخه آزمایشی: عبارت "demo" را وارد کنید یا بر روی دکمه بالا کلیک نمایید تا وارد محیط محلی شوید. امنیت نهایی توسط سرویس Cloudflare تأمین خواهد شد.',
   },
 };
