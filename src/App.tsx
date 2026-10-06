@@ -6,7 +6,6 @@ import { RepositoryProvider } from './services/RepositoryContext';
 import { AppLayout } from './components/layout/AppLayout';
 
 import { LibraryPage } from './pages/LibraryPage';
-import { GraphPage } from './pages/GraphPage';
 import { ContextPage } from './pages/ContextPage';
 import { OutcomesPage } from './pages/OutcomesPage';
 import { ConnectionsPage } from './pages/ConnectionsPage';
@@ -25,7 +24,7 @@ export default function App() {
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Navigate to="/library" replace />} />
                 <Route path="library" element={<LibraryPage />} />
-                <Route path="graph" element={<GraphPage />} />
+                <Route path="graph" element={<Navigate to="/library" replace />} />
                 <Route path="context" element={<ContextPage />} />
                 <Route path="import" element={<Navigate to="/library" replace />} />
                 <Route path="outcomes" element={<OutcomesPage />} />
@@ -36,6 +35,7 @@ export default function App() {
               </Route>
 
               {/* Obsolete routes redirect directly to public library */}
+              <Route path="/graph" element={<Navigate to="/library" replace />} />
               <Route path="/login" element={<Navigate to="/library" replace />} />
               <Route path="*" element={<Navigate to="/library" replace />} />
             </Routes>

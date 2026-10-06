@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Layers,
-  Network,
   Cpu,
   CheckCircle2,
   KeyRound,
@@ -45,7 +44,6 @@ export const AppLayout: React.FC = () => {
 
   const navItems = [
     { to: '/library', label: t('nav.library'), icon: Layers },
-    { to: '/graph', label: t('nav.graph'), icon: Network },
     { to: '/context', label: t('nav.context'), icon: Cpu },
     { to: '/outcomes', label: t('nav.outcomes'), icon: CheckCircle2 },
     { to: '/connections', label: 'API & Agent Access', icon: KeyRound },
