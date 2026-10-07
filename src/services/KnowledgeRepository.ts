@@ -1,20 +1,39 @@
 import {
   ApiKeyGrant,
+  ApiToken,
+  AuthLoginRequest,
+  AuthLoginResponse,
+  AuthSessionResponse,
   Collection,
   ContextAssemblyRequest,
   ContextAssemblyResult,
+  CreateApiTokenRequest,
+  CreateApiTokenResponse,
   KnowledgeFilter,
   KnowledgeItem,
   KnowledgeOutcome,
   KnowledgeRelationship,
+  KnowledgeRevision,
   SourceDocument,
+  SourceRevision,
   StorageStats,
+  WikiGraphBundle,
+  ImportBundleOptions,
+  ImportBundleResult,
+  ContextRequest,
+  ContextResult,
 } from '../types';
 
 export interface KnowledgeRepository {
+  // Auth (single owner)
+  login(password: string): Promise<AuthLoginResponse>;
+  logout(): Promise<void>;
+  getSession(): Promise<AuthSessionResponse>;
+
   // Sources
   listSources(): Promise<SourceDocument[]>;
   getSource(id: string): Promise<SourceDocument | null>;
+  getSourceRevisions(sourceId: string): Promise<SourceRevision[]>;
   createSource(
     source: Omit<SourceDocument, 'id' | 'createdAt' | 'updatedAt' | 'revisions'> & {
       initialRevisionSummary?: string;
@@ -32,18 +51,37 @@ export interface KnowledgeRepository {
   listKnowledge(filters?: KnowledgeFilter): Promise<KnowledgeItem[]>;
   getKnowledge(id: string): Promise<KnowledgeItem | null>;
   createKnowledge(
-    item: Omit<KnowledgeItem, 'id' | 'createdAt' | 'updatedAt'>
+    item: Omit<KnowledgeItem, 'id' | 'createdAt' | 'updatedAt'>,
+    changeNote?: string
   ): Promise<KnowledgeItem>;
-  updateKnowledge(id: string, updates: Partial<KnowledgeItem>): Promise<KnowledgeItem>;
+  updateKnowledge(
+    id: string,
+    updates: Partial<KnowledgeItem>,
+    changeNote?: string
+  ): Promise<KnowledgeItem>;
   deleteKnowledge(id: string): Promise<void>;
+  retireKnowledge(id: string, changeNote?: string): Promise<KnowledgeItem>;
+  restoreKnowledge(id: string, changeNote?: string): Promise<KnowledgeItem>;
+
+  // Knowledge Revisions (Edit History)
+  getKnowledgeRevisions(knowledgeId: string): Promise<KnowledgeRevision[]>;
+  restoreKnowledgeRevision(
+    knowledgeId: string,
+    revisionId: string,
+    changeNote?: string
+  ): Promise<KnowledgeItem>;
 
   // Relationships
-  listRelationships(): Promise<KnowledgeRelationship[]>;
+  listRelationships(knowledgeId?: string): Promise<KnowledgeRelationship[]>;
   createRelationship(
     rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
   ): Promise<KnowledgeRelationship>;
   addRelationship(
     rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
+  ): Promise<KnowledgeRelationship>;
+  updateRelationship(
+    id: string,
+    updates: Partial<KnowledgeRelationship>
   ): Promise<KnowledgeRelationship>;
   deleteRelationship(id: string): Promise<void>;
   removeRelationship(id: string): Promise<void>;
@@ -58,9 +96,15 @@ export interface KnowledgeRepository {
   // Collections
   listCollections(): Promise<Collection[]>;
   createCollection(col: Omit<Collection, 'id'>): Promise<Collection>;
-  deleteCollection(id: string): Promise<void>;
+  deleteCollection(id: string, targetCollectionIdForMove?: string): Promise<void>;
+  moveCollectionItems(fromCollectionId: string, toCollectionId: string): Promise<void>;
 
-  // Scoped API Keys (Machine Connections)
+  // API Tokens (External AI Tools & CLI Access)
+  listTokens(): Promise<ApiToken[]>;
+  createToken(data: CreateApiTokenRequest): Promise<CreateApiTokenResponse>;
+  deleteToken(id: string): Promise<void>;
+
+  // Scoped API Keys (Machine Connections - Legacy Compatibility)
   listApiKeys(): Promise<ApiKeyGrant[]>;
   createApiKey(data: {
     label: string;
@@ -72,10 +116,14 @@ export interface KnowledgeRepository {
 
   // Context Assembly
   assembleContext(req: ContextAssemblyRequest): Promise<ContextAssemblyResult>;
+  buildContext(request: ContextRequest): Promise<ContextResult>;
 
   // Demo store management / Backup
   getStorageStats(): Promise<StorageStats>;
   resetDemoStore(): Promise<void>;
   exportData(): Promise<string>;
   importData(jsonString: string): Promise<boolean>;
+
+  // Bundle Ingestion
+  importBundle(bundle: WikiGraphBundle, options?: ImportBundleOptions): Promise<ImportBundleResult>;
 }

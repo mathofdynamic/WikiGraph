@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/storage';
 
 export type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
 export type InterfaceContrast = 'low' | 'normal' | 'high';
@@ -83,12 +84,12 @@ export function getContrastColor(hex: string): string {
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [appearance, setAppearanceState] = useState<AppearanceConfig>(() => {
     try {
-      const saved = localStorage.getItem(APPEARANCE_STORAGE_KEY);
+      const saved = safeLocalStorageGet(APPEARANCE_STORAGE_KEY);
       if (saved) {
         return { ...DEFAULT_APPEARANCE, ...JSON.parse(saved) };
       }
       // Migrate legacy theme if present
-      const legacy = localStorage.getItem(LEGACY_THEME_STORAGE_KEY) as ThemeMode | null;
+      const legacy = safeLocalStorageGet(LEGACY_THEME_STORAGE_KEY) as ThemeMode | null;
       if (legacy && (legacy === 'light' || legacy === 'dark' || legacy === 'system')) {
         return { ...DEFAULT_APPEARANCE, themeMode: legacy };
       }
@@ -192,12 +193,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     applyConfiguration();
 
     // Persist to storage
-    try {
-      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
-      localStorage.setItem(LEGACY_THEME_STORAGE_KEY, appearance.themeMode);
-    } catch (e) {
-      console.warn('Failed to persist appearance config:', e);
-    }
+    safeLocalStorageSet(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
+    safeLocalStorageSet(LEGACY_THEME_STORAGE_KEY, appearance.themeMode);
 
     const listener = () => {
       if (appearance.themeMode === 'system') applyConfiguration();

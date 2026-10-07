@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { KnowledgeRepository } from './KnowledgeRepository';
 import { MockKnowledgeRepository } from './mockRepository';
 import { ApiKnowledgeRepository } from './apiRepository';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/storage';
 
 interface RepositoryContextType {
   repository: KnowledgeRepository;
@@ -21,7 +22,7 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // By default, this frontend prototype explicitly enables demo mode.
   // In production, when exported, it can be set to false or configured via env.
   const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem(DEMO_MODE_STORAGE_KEY);
+    const saved = safeLocalStorageGet(DEMO_MODE_STORAGE_KEY);
     return saved !== null ? saved === 'true' : true;
   });
 
@@ -33,7 +34,7 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const handleSetDemoMode = (demo: boolean) => {
     setIsDemoMode(demo);
-    localStorage.setItem(DEMO_MODE_STORAGE_KEY, String(demo));
+    safeLocalStorageSet(DEMO_MODE_STORAGE_KEY, String(demo));
     notifyMutation();
   };
 

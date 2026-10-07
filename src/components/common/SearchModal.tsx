@@ -5,6 +5,7 @@ import { useRepository } from '../../services/RepositoryContext';
 import { useLocale } from '../../locales/useLocale';
 import { KnowledgeItem, SourceDocument } from '../../types';
 import { Badge } from './Badge';
+import { useFocusTrap } from '../../lib/useFocusTrap';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -13,13 +14,16 @@ interface SearchModalProps {
 
 export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
   const { repository, version } = useRepository();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const navigate = useNavigate();
 
   const [query, setQuery] = useState('');
   const [knowledgeResults, setKnowledgeResults] = useState<KnowledgeItem[]>([]);
   const [sourceResults, setSourceResults] = useState<SourceDocument[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(modalRef, isOpen, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -111,6 +115,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
       onClick={onClose}
     >
       <div
+        ref={modalRef}
         className="w-full max-w-2xl rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         onClick={(e) => e.stopPropagation()}
       >
@@ -131,6 +136,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
               type="button"
               onClick={() => setQuery('')}
               className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
+              aria-label={locale === 'fa' ? 'پاک کردن جستجو' : 'Clear search query'}
             >
               <X className="w-4 h-4" />
             </button>

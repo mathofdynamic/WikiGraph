@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { en } from './en';
 import { fa } from './fa';
 import { AppLanguage } from '../types';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/storage';
 
 type LocaleDict = typeof en;
 
@@ -19,7 +20,7 @@ const LOCALE_STORAGE_KEY = 'wikigraph_pref_locale';
 
 export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<AppLanguage>(() => {
-    const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+    const saved = safeLocalStorageGet(LOCALE_STORAGE_KEY);
     return saved === 'fa' ? 'fa' : 'en';
   });
 
@@ -28,7 +29,7 @@ export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dir = direction;
-    localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    safeLocalStorageSet(LOCALE_STORAGE_KEY, locale);
   }, [locale, direction]);
 
   const setLocale = (newLocale: AppLanguage) => {

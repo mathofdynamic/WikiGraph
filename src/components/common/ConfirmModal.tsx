@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { useLocale } from '../../locales/useLocale';
 import { AlertTriangle, X } from 'lucide-react';
+import { useFocusTrap } from '../../lib/useFocusTrap';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   isDestructive?: boolean;
+  children?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,22 +22,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmLabel,
   cancelLabel,
   isDestructive = false,
+  children,
   onConfirm,
   onCancel,
 }) => {
   const { t } = useLocale();
-  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      confirmBtnRef.current?.focus();
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onCancel();
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, onCancel]);
+  useFocusTrap(modalRef, isOpen, onCancel);
 
   if (!isOpen) return null;
 
@@ -47,6 +41,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
     >
       <div
+        ref={modalRef}
         className="w-full max-w-md rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--separator)]">
@@ -64,8 +59,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </button>
         </div>
 
-        <div className="p-5 text-xs sm:text-sm text-[var(--muted)] leading-relaxed">
-          {description}
+        <div className="p-5 text-xs sm:text-sm text-[var(--muted)] leading-relaxed space-y-3">
+          <p>{description}</p>
+          {children}
         </div>
 
         <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-[var(--surface-secondary)]/50 border-t border-[var(--separator)]">
@@ -77,7 +73,6 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             {cancelLabel || t('common.cancel')}
           </button>
           <button
-            ref={confirmBtnRef}
             type="button"
             onClick={onConfirm}
             className={

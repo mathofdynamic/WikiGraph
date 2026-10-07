@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Check,
   X,
@@ -8,6 +8,9 @@ import {
   Search,
   ShieldCheck,
   FileText,
+  Plus,
+  Info,
+  CheckCircle2,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -18,9 +21,10 @@ import {
 } from '../types';
 
 export const OutcomesPage: React.FC = () => {
-  const { repository, version } = useRepository();
+  const { repository, version, notifyMutation } = useRepository();
   const { t } = useLocale();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [outcomes, setOutcomes] = useState<KnowledgeOutcome[]>([]);
   const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
@@ -29,6 +33,30 @@ export const OutcomesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<string | null>(null);
 
+  // Create outcome form modal state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newTask, setNewTask] = useState('');
+  const [newAppliedKnowledgeIds, setNewAppliedKnowledgeIds] = useState<string[]>([]);
+  const [newResult, setNewResult] = useState<OutcomeResult>('success');
+  const [newMetrics, setNewMetrics] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Check for prefill from ContextPage packet
+  useEffect(() => {
+    if (location.state && (location.state as any).openCreate) {
+      const state = location.state as {
+        openCreate: boolean;
+        task?: string;
+        appliedKnowledgeIds?: string[];
+      };
+      setNewTask(state.task || '');
+      setNewAppliedKnowledgeIds(state.appliedKnowledgeIds || []);
+      setIsCreateOpen(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -36,7 +64,7 @@ export const OutcomesPage: React.FC = () => {
         setLoading(true);
         const [oList, kList] = await Promise.all([
           repository.listOutcomes(),
-          repository.listKnowledge(),
+          repository.listKnowledge({ includeRetired: true }),
         ]);
         if (!active) return;
         setOutcomes(oList);
@@ -55,6 +83,35 @@ export const OutcomesPage: React.FC = () => {
       active = false;
     };
   }, [repository, version]);
+
+  const handleCreateOutcome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTask.trim()) return;
+    try {
+      setSubmitting(true);
+      const created = await repository.createOutcome({
+        task: newTask.trim(),
+        taskContext: newTask.trim(),
+        appliedKnowledgeIds: newAppliedKnowledgeIds,
+        result: newResult,
+        metrics: newMetrics.trim() || undefined,
+        notes: newNotes.trim() || undefined,
+      });
+      notifyMutation();
+      setIsCreateOpen(false);
+      setSelectedOutcomeId(created.id);
+      // reset form
+      setNewTask('');
+      setNewAppliedKnowledgeIds([]);
+      setNewMetrics('');
+      setNewNotes('');
+      setNewResult('success');
+    } catch (err) {
+      console.error('Failed to create outcome', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const filteredOutcomes = outcomes.filter((o) => {
     if (resultFilter !== 'all' && o.result !== resultFilter) return false;
@@ -92,27 +149,36 @@ export const OutcomesPage: React.FC = () => {
             {t('outcomes.subtitle')}
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsCreateOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[var(--foreground)] text-[var(--surface)] hover:opacity-90 transition-opacity cursor-pointer shadow-xs self-start sm:self-auto"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{t('outcomes.recordBtn')}</span>
+        </button>
       </div>
 
       {/* Summary Metadata Strip (Neutral, Compact, Non-KPI) */}
       <div className="flex items-center gap-3 sm:gap-6 px-4 py-2.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border)] text-xs font-mono overflow-x-auto">
         <div className="flex items-center gap-2">
-          <span className="text-[var(--muted)]">Total Runs:</span>
+          <span className="text-[var(--muted)]">{t('outcomes.totalRuns')}:</span>
           <span className="font-semibold text-[var(--foreground)]">{stats.total}</span>
         </div>
         <span className="text-[var(--separator)]">•</span>
         <div className="flex items-center gap-2">
-          <span className="text-[var(--muted)]">Successful:</span>
+          <span className="text-[var(--muted)]">{t('outcomes.successfulRuns')}:</span>
           <span className="font-semibold text-[var(--foreground)]">{stats.success}</span>
         </div>
         <span className="text-[var(--separator)]">•</span>
         <div className="flex items-center gap-2">
-          <span className="text-[var(--muted)]">Failure / Breakages:</span>
+          <span className="text-[var(--muted)]">{t('outcomes.failureRuns')}:</span>
           <span className="font-semibold text-[var(--foreground)]">{stats.failure}</span>
         </div>
         <span className="text-[var(--separator)]">•</span>
         <div className="flex items-center gap-2">
-          <span className="text-[var(--muted)]">Inconclusive:</span>
+          <span className="text-[var(--muted)]">{t('outcomes.inconclusiveRuns')}:</span>
           <span className="font-semibold text-[var(--foreground)]">{stats.uncertain}</span>
         </div>
       </div>
@@ -127,7 +193,7 @@ export const OutcomesPage: React.FC = () => {
             dir="auto"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search evaluation runs..."
+            placeholder={t('outcomes.searchOutcomesPlaceholder')}
             className="ui-input ps-8 py-1 text-xs h-8"
           />
         </div>
@@ -307,7 +373,7 @@ export const OutcomesPage: React.FC = () => {
                 {selectedOutcome.metrics && (
                   <div className="space-y-1.5 pt-3 border-t border-[var(--separator)] text-xs">
                     <div className="text-[11px] font-medium text-[var(--muted)]">
-                      Measured Benchmark
+                      {t('outcomes.measuredBenchmark')}
                     </div>
                     <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border)] font-mono text-xs text-[var(--foreground)]">
                       {selectedOutcome.metrics}
@@ -319,7 +385,7 @@ export const OutcomesPage: React.FC = () => {
                 {(selectedOutcome.notes || selectedOutcome.reviewNotes || selectedOutcome.prompt) && (
                   <div className="space-y-1.5 pt-3 border-t border-[var(--separator)] text-xs">
                     <div className="text-[11px] font-medium text-[var(--muted)]">
-                      Observations & Findings
+                      {t('outcomes.observationsTitle')}
                     </div>
                     <p
                       dir="auto"
@@ -333,13 +399,13 @@ export const OutcomesPage: React.FC = () => {
                 {/* Applied Knowledge Provenance */}
                 <div className="space-y-2 pt-3 border-t border-[var(--separator)] text-xs">
                   <div className="text-[11px] font-medium text-[var(--muted)]">
-                    Applied Knowledge Units ({selectedOutcome.appliedKnowledgeIds?.length || 0})
+                    {t('outcomes.appliedKnowledgeUnits')} ({selectedOutcome.appliedKnowledgeIds?.length || 0})
                   </div>
 
                   {!selectedOutcome.appliedKnowledgeIds ||
                   selectedOutcome.appliedKnowledgeIds.length === 0 ? (
                     <p className="text-xs text-[var(--muted)] italic">
-                      No linked knowledge items recorded.
+                      {t('outcomes.noLinkedKnowledge')}
                     </p>
                   ) : (
                     <div className="space-y-1.5">
@@ -351,9 +417,16 @@ export const OutcomesPage: React.FC = () => {
                             onClick={() => navigate(`/knowledge/${kId}`)}
                             className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer flex items-center justify-between gap-2 group"
                           >
-                            <span className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors truncate block">
-                              {k?.title || kId}
-                            </span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors truncate block">
+                                {k?.title || kId}
+                              </span>
+                              {k?.status === 'retired' && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[var(--surface-tertiary)] text-[var(--muted)] border border-[var(--border)] shrink-0">
+                                  {t('outcomes.retiredBadge')}
+                                </span>
+                              )}
+                            </div>
                             <ExternalLink className="w-3.5 h-3.5 text-[var(--muted)] group-hover:text-[var(--accent)] shrink-0" />
                           </div>
                         );
@@ -365,12 +438,187 @@ export const OutcomesPage: React.FC = () => {
             ) : (
               <div className="p-8 text-center text-xs text-[var(--muted)]">
                 <FileText className="w-6 h-6 text-[var(--muted)] mx-auto mb-2" />
-                <p>Select an outcome record to inspect provenance and measurement notes.</p>
+                <p>{t('outcomes.selectOutcomePrompt')}</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Log Outcome Modal */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-5 py-4 border-b border-[var(--separator)] flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">
+                {t('outcomes.modalTitle')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded-lg hover:bg-[var(--surface-secondary)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOutcome} className="p-5 overflow-y-auto space-y-4 text-xs">
+              {/* Task context */}
+              <div className="space-y-1.5">
+                <label className="font-medium text-[var(--foreground)] block">
+                  {t('outcomes.taskContext')} <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  dir="auto"
+                  required
+                  rows={2}
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  placeholder="Task or evaluation run context..."
+                  className="ui-input py-2 text-xs w-full resize-none"
+                />
+              </div>
+
+              {/* Observed Result */}
+              <div className="space-y-1.5">
+                <label className="font-medium text-[var(--foreground)] block">
+                  {t('outcomes.result')}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['success', 'failure', 'uncertain'] as OutcomeResult[]).map((res) => (
+                    <button
+                      key={res}
+                      type="button"
+                      onClick={() => setNewResult(res)}
+                      className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer capitalize ${
+                        newResult === res
+                          ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] font-semibold'
+                          : 'border-[var(--border)] bg-[var(--surface-secondary)]/50 text-[var(--muted)] hover:text-[var(--foreground)]'
+                      }`}
+                    >
+                      {res === 'success' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                      {res === 'failure' && <X className="w-3.5 h-3.5 text-rose-600" />}
+                      {res === 'uncertain' && <AlertCircle className="w-3.5 h-3.5 text-amber-600" />}
+                      <span>{t(`results.${res}`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Applied Knowledge Units */}
+              <div className="space-y-1.5">
+                <label className="font-medium text-[var(--foreground)] block">
+                  {t('outcomes.appliedKnowledgeUnits')} ({newAppliedKnowledgeIds.length})
+                </label>
+                <div className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/30 space-y-2 max-h-36 overflow-y-auto">
+                  {newAppliedKnowledgeIds.length === 0 ? (
+                    <p className="text-[11px] text-[var(--muted)] italic">
+                      {t('outcomes.noLinkedKnowledge')}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {newAppliedKnowledgeIds.map((id) => {
+                        const item = knowledgeList.find((k) => k.id === id);
+                        return (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[11px] text-[var(--foreground)] max-w-full"
+                          >
+                            <span className="truncate max-w-[200px]">{item?.title || id}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewAppliedKnowledgeIds((prev) => prev.filter((i) => i !== id))
+                              }
+                              className="text-[var(--muted)] hover:text-rose-600 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add more knowledge items */}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !newAppliedKnowledgeIds.includes(e.target.value)) {
+                        setNewAppliedKnowledgeIds([...newAppliedKnowledgeIds, e.target.value]);
+                      }
+                    }}
+                    className="ui-select text-[11px] py-1 w-full"
+                  >
+                    <option value="">+ {t('outcomes.selectKnowledge')}...</option>
+                    {knowledgeList
+                      .filter((k) => !newAppliedKnowledgeIds.includes(k.id))
+                      .map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Metrics */}
+              <div className="space-y-1">
+                <label className="font-medium text-[var(--foreground)] block">
+                  {t('outcomes.metrics')}
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={newMetrics}
+                  onChange={(e) => setNewMetrics(e.target.value)}
+                  placeholder="e.g. 98.4% precision on financial tables, latency: 120ms"
+                  className="ui-input py-1.5 text-xs"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1">
+                <label className="font-medium text-[var(--foreground)] block">
+                  {t('outcomes.notes')}
+                </label>
+                <textarea
+                  dir="auto"
+                  rows={3}
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  placeholder="Observations, lessons, edge cases encountered..."
+                  className="ui-input py-1.5 text-xs w-full resize-none"
+                />
+              </div>
+
+              {/* Rigor Notice */}
+              <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/60 border border-[var(--border)] text-[11px] text-[var(--muted)] flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 text-[var(--muted)] shrink-0 mt-0.5" />
+                <span>{t('outcomes.rigorNotice')}</span>
+              </div>
+
+              {/* Modal footer */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[var(--separator)]">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-secondary)] cursor-pointer"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !newTask.trim()}
+                  className="px-4 py-1.5 rounded-lg bg-[var(--foreground)] text-[var(--surface)] font-semibold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                >
+                  {submitting ? t('common.loading') : t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

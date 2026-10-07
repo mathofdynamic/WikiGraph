@@ -7,7 +7,7 @@ export type KnowledgeType =
   | 'failure'
   | 'lesson';
 
-export type ReviewStatus = 'draft' | 'reviewed' | 'deprecated';
+export type ReviewStatus = 'draft' | 'reviewed' | 'deprecated' | 'needs_review';
 
 export type EvidenceLevel = 'unverified' | 'observed' | 'tested';
 
@@ -38,6 +38,8 @@ export interface Collection {
   count?: number;
 }
 
+export type SourceDocumentKind = 'research_report' | 'skill' | 'note';
+
 export interface SourceRevision {
   revisionId: string;
   timestamp: string;
@@ -56,12 +58,46 @@ export interface SourceDocument {
   rawSize?: number;
   language: AppLanguage;
   collectionId: string;
+  kind?: SourceDocumentKind;
+  tags?: string[];
+  contentSha256?: string;
+  content_sha256?: string;
   createdAt: string;
   updatedAt: string;
   url?: string;
   sourceUrl?: string;
   importedAt?: string;
   revisions: SourceRevision[];
+}
+
+export type KnowledgeOrigin = 'bundle' | 'manual';
+export type KnowledgeStatus = 'active' | 'retired';
+
+export interface KnowledgeSnapshot {
+  title: string;
+  summary: string;
+  body: string;
+  type: KnowledgeType;
+  collectionId: string;
+  applicability: string;
+  exclusions: string;
+  requirements: string[];
+  sourceId?: string | null;
+  sourceRevisionId?: string | null;
+  sourceExcerpt?: string | null;
+  reviewStatus: ReviewStatus;
+  evidenceLevel: EvidenceLevel;
+  language: AppLanguage;
+  origin?: KnowledgeOrigin;
+  status?: KnowledgeStatus;
+}
+
+export interface KnowledgeRevision {
+  id: string;
+  knowledgeId: string;
+  snapshot: KnowledgeSnapshot;
+  changeNote?: string | null;
+  createdAt: string;
 }
 
 export interface KnowledgeItem {
@@ -74,9 +110,12 @@ export interface KnowledgeItem {
   applicability: string;
   exclusions: string;
   requirements: string[];
-  sourceId: string;
-  sourceRevisionId: string;
-  sourceExcerpt: string;
+  sourceId?: string | null;
+  sourceRevisionId?: string | null;
+  sourceExcerpt?: string | null;
+  origin?: KnowledgeOrigin;
+  status?: KnowledgeStatus;
+  retiredAt?: string | null;
   reviewStatus: ReviewStatus;
   evidenceLevel: EvidenceLevel;
   createdAt: string;
@@ -122,8 +161,75 @@ export interface ApiToken {
   name: string;
   tokenMasked: string;
   scope: 'read_only' | 'read_write';
+  collectionIds?: string[] | null; // null = all collections
   createdAt: string;
-  lastUsedAt?: string;
+  lastUsedAt?: string | null;
+}
+
+export interface CreateApiTokenRequest {
+  name: string;
+  scope: 'read_only' | 'read_write';
+  collectionIds?: string[] | null;
+}
+
+export interface CreateApiTokenResponse {
+  token: ApiToken;
+  secret: string; // The secret is returned ONLY once on creation
+}
+
+export type RepositoryErrorCode =
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'validation_failed'
+  | 'conflict'
+  | 'rate_limited'
+  | 'server_error'
+  | 'network_error';
+
+export interface ApiErrorPayload {
+  error: {
+    code: RepositoryErrorCode;
+    message: string;
+    details?: Record<string, unknown> | unknown[];
+  };
+}
+
+export class RepositoryError extends Error {
+  code: RepositoryErrorCode;
+  details?: Record<string, unknown> | unknown[];
+  status?: number;
+
+  constructor(
+    code: RepositoryErrorCode,
+    message: string,
+    details?: Record<string, unknown> | unknown[],
+    status?: number
+  ) {
+    super(message);
+    this.name = 'RepositoryError';
+    this.code = code;
+    this.details = details;
+    this.status = status;
+  }
+}
+
+export interface AuthSessionResponse {
+  authenticated: boolean;
+  user?: {
+    role: 'owner';
+  };
+}
+
+export interface AuthLoginRequest {
+  password: string;
+}
+
+export interface AuthLoginResponse {
+  success: boolean;
+  user?: {
+    role: 'owner';
+  };
 }
 
 export interface ContextRecipe {
@@ -157,6 +263,53 @@ export interface KnowledgeFilter {
   reviewStatus?: ReviewStatus | 'all';
   evidenceLevel?: EvidenceLevel | 'all';
   freshness?: 'all' | 'needs_review' | 'fresh' | 'stale';
+  status?: 'all' | 'active' | 'retired';
+  includeRetired?: boolean;
+  origin?: 'all' | 'bundle' | 'manual';
+}
+
+export interface ContextRequest {
+  task: string;
+  requirements?: {
+    tools?: string[];
+    inputs?: string;
+    outputFormat?: string;
+    language?: 'en' | 'fa';
+    constraints?: string;
+  };
+  collectionIds?: string[];
+  maxTokens?: number;
+  includeUnreviewed?: boolean;
+}
+
+export interface ContextResult {
+  request: ContextRequest;
+  sufficiency: 'sufficient' | 'partial' | 'insufficient';
+  sufficiencyNote: string;
+  selected: Array<{
+    item: KnowledgeItem;
+    score: number;
+    reasons: string[];
+    role: 'primary' | 'prerequisite' | 'supporting';
+    warnings: string[];
+    source?: {
+      id: string;
+      title: string;
+      excerpt: string;
+    };
+  }>;
+  conflicts: Array<{
+    itemIds: [string, string];
+    note?: string;
+  }>;
+  excluded: Array<{
+    itemId: string;
+    reason: 'superseded' | 'retired' | 'unreviewed' | 'over_budget' | 'exclusion_matched';
+  }>;
+  tokenEstimate: {
+    used: number;
+    budget: number;
+  };
 }
 
 export interface ContextAssemblyRequest {
@@ -194,3 +347,75 @@ export interface StorageStats {
   estimatedBytes: number;
   isDemoStore: boolean;
 }
+
+export interface BundleSource {
+  title: string;
+  filename: string;
+  kind: SourceDocumentKind;
+  language: 'en' | 'fa';
+  tags: string[];
+  content: string;
+  content_sha256: string;
+}
+
+export interface BundleKnowledgeItem {
+  local_id: string;
+  title: string;
+  summary: string;
+  body?: string;
+  type: KnowledgeType;
+  language: 'en' | 'fa';
+  applicability?: string;
+  exclusions?: string;
+  requirements?: string[];
+  evidence_level: 'theoretical' | 'tested' | 'production_proven';
+  review_status: 'needs_review';
+  source_excerpt: string;
+}
+
+export interface BundleRelationship {
+  source_local_id: string;
+  relationship_type: RelationshipType;
+  target_local_id: string;
+  notes?: string;
+}
+
+export interface WikiGraphBundle {
+  schema_version: 'wikigraph.bundle/1';
+  generated_at?: string;
+  generator?: {
+    tool: string;
+    version: string;
+  };
+  source: BundleSource;
+  collection_suggestion?: {
+    name: string;
+    name_fa?: string;
+  };
+  knowledge_items: BundleKnowledgeItem[];
+  relationships?: BundleRelationship[];
+}
+
+export interface BundleValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface ImportBundleOptions {
+  collectionId?: string;
+  createCollection?: {
+    name: string;
+    name_fa?: string;
+  };
+  onDuplicate?: 'skip' | 'new_revision' | 'overwrite';
+}
+
+export interface ImportBundleResult {
+  sourceId: string;
+  createdItemIds: string[];
+  createdRelationshipIds: string[];
+  skipped?: boolean;
+  isNewRevision?: boolean;
+}
+

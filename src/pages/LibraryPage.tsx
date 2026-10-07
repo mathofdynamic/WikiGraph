@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   ArrowRight,
   FileCode,
+  Plus,
+  FileUp,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -28,6 +30,7 @@ import {
 } from '../types';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
+import { CreateNoteModal } from '../components/common/CreateNoteModal';
 
 export const LibraryPage: React.FC = () => {
   const { repository, version, notifyMutation } = useRepository();
@@ -45,7 +48,21 @@ export const LibraryPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<KnowledgeType | 'all'>('all');
   const [selectedReview, setSelectedReview] = useState<ReviewStatus | 'all'>('all');
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceLevel | 'all'>('all');
-  const [selectedFreshness, setSelectedFreshness] = useState<'all' | 'needs_review' | 'fresh' | 'stale'>('all');
+  const [selectedFreshness, setSelectedFreshness] = useState<'all' | 'needs_review' | 'fresh' | 'stale'>(
+    (searchParams.get('freshness') as any) || 'all'
+  );
+  const [selectedSource, setSelectedSource] = useState<string>(searchParams.get('sourceId') || 'all');
+  const [showRetired, setShowRetired] = useState<boolean>(false);
+
+  useEffect(() => {
+    const sId = searchParams.get('sourceId');
+    if (sId) setSelectedSource(sId);
+    const fresh = searchParams.get('freshness');
+    if (fresh) setSelectedFreshness(fresh as any);
+  }, [searchParams]);
+
+  // Modal state
+  const [isNewNoteModalOpen, setIsNewNoteModalOpen] = useState<boolean>(false);
 
   // Data state
   const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
@@ -68,7 +85,7 @@ export const LibraryPage: React.FC = () => {
 
       const [cols, allK, allS] = await Promise.all([
         repository.listCollections(),
-        repository.listKnowledge(),
+        repository.listKnowledge({ includeRetired: showRetired }),
         repository.listSources(),
       ]);
 
@@ -94,6 +111,9 @@ export const LibraryPage: React.FC = () => {
       if (selectedCollection !== 'all') {
         filtered = filtered.filter((k) => k.collectionId === selectedCollection);
       }
+      if (selectedSource !== 'all') {
+        filtered = filtered.filter((k) => k.sourceId === selectedSource);
+      }
       if (selectedType !== 'all') {
         filtered = filtered.filter((k) => k.type === selectedType);
       }
@@ -105,7 +125,9 @@ export const LibraryPage: React.FC = () => {
       }
       if (selectedFreshness !== 'all') {
         if (selectedFreshness === 'needs_review') {
-          filtered = filtered.filter((k) => k.sourceHasChanged || k.reviewStatus === 'draft');
+          filtered = filtered.filter(
+            (k) => k.sourceHasChanged || k.reviewStatus === 'draft' || k.reviewStatus === 'needs_review'
+          );
         } else if (selectedFreshness === 'fresh') {
           filtered = filtered.filter((k) => !k.sourceHasChanged && k.reviewStatus === 'reviewed');
         } else if (selectedFreshness === 'stale') {
@@ -131,6 +153,14 @@ export const LibraryPage: React.FC = () => {
     }
   };
 
+  const handleCreateNote = async (
+    itemData: Omit<KnowledgeItem, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
+    const created = await repository.createKnowledge(itemData, 'Initial manual note creation');
+    notifyMutation();
+    setActiveKnowledgeId(created.id);
+  };
+
   useEffect(() => {
     fetchData();
   }, [
@@ -138,10 +168,12 @@ export const LibraryPage: React.FC = () => {
     version,
     searchQuery,
     selectedCollection,
+    selectedSource,
     selectedType,
     selectedReview,
     selectedEvidence,
     selectedFreshness,
+    showRetired,
   ]);
 
   const setTab = (tab: 'knowledge' | 'sources') => {
@@ -178,14 +210,14 @@ export const LibraryPage: React.FC = () => {
   };
 
   // Find source document for an item
-  const getSourceDoc = (sourceId?: string) => {
+  const getSourceDoc = (sourceId?: string | null) => {
     if (!sourceId) return null;
     return sourcesList.find((s) => s.id === sourceId) || null;
   };
 
   return (
     <div className="p-6 sm:p-8 space-y-6 min-h-full flex flex-col">
-      {/* Top Section: Page Title */}
+      {/* Top Section: Page Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)]">
@@ -194,6 +226,25 @@ export const LibraryPage: React.FC = () => {
           <p className="text-[13px] text-[var(--muted)] mt-1">
             {t('library.subtitle')}
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/import')}
+            className="ui-button ui-button-secondary text-xs"
+          >
+            <FileUp className="w-3.5 h-3.5" />
+            <span>{t('library.importResearch')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsNewNoteModalOpen(true)}
+            className="ui-button ui-button-primary text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{t('library.newNote')}</span>
+          </button>
         </div>
       </div>
 
@@ -318,21 +369,67 @@ export const LibraryPage: React.FC = () => {
               <option value="stale">{t('library.stale')}</option>
             </select>
 
+            {/* Show Retired Filter */}
+            <label className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer select-none px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)]/50">
+              <input
+                type="checkbox"
+                checked={showRetired}
+                onChange={(e) => setShowRetired(e.target.checked)}
+                className="accent-[var(--accent)] rounded cursor-pointer"
+              />
+              <span>{t('library.showRetired')}</span>
+            </label>
+
+            {/* Active Source Filter Pill */}
+            {selectedSource !== 'all' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30">
+                <FileText className="w-3 h-3 shrink-0" />
+                <span className="truncate max-w-[180px]">
+                  {sourcesList.find((s) => s.id === selectedSource)?.filename || selectedSource}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSource('all');
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.delete('sourceId');
+                      return next;
+                    });
+                  }}
+                  className="hover:opacity-75 cursor-pointer ms-0.5"
+                  title="Remove source filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
             {(searchQuery ||
               selectedCollection !== 'all' ||
+              selectedSource !== 'all' ||
               selectedType !== 'all' ||
               selectedReview !== 'all' ||
               selectedEvidence !== 'all' ||
-              selectedFreshness !== 'all') && (
+              selectedFreshness !== 'all' ||
+              showRetired) && (
               <button
                 type="button"
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedCollection('all');
+                  setSelectedSource('all');
                   setSelectedType('all');
                   setSelectedReview('all');
                   setSelectedEvidence('all');
                   setSelectedFreshness('all');
+                  setShowRetired(false);
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('sourceId');
+                    next.delete('freshness');
+                    return next;
+                  });
                 }}
                 className="text-xs text-[var(--accent)] hover:underline ms-auto cursor-pointer"
               >
@@ -416,16 +513,28 @@ export const LibraryPage: React.FC = () => {
                             <Badge type="knowledgeType" value={item.type} size="sm" />
                             <Badge type="evidence" value={item.evidenceLevel} size="sm" />
                             <Badge type="review" value={item.reviewStatus} size="sm" />
+                            {item.status === 'retired' && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[var(--surface-tertiary)] text-[var(--muted)] border border-[var(--border)]">
+                                {t('library.retired')}
+                              </span>
+                            )}
 
                             <span className="text-[var(--separator)]">•</span>
                             <span className="truncate">{getCollectionName(item.collectionId)}</span>
 
-                            {sourceDoc && (
+                            {sourceDoc ? (
                               <>
                                 <span className="text-[var(--separator)]">•</span>
                                 <span className="font-mono truncate">{sourceDoc.filename}</span>
                               </>
-                            )}
+                            ) : !item.sourceId ? (
+                              <>
+                                <span className="text-[var(--separator)]">•</span>
+                                <span className="italic truncate text-[var(--muted)]">
+                                  {t('library.manualNote')}
+                                </span>
+                              </>
+                            ) : null}
                           </div>
                         </div>
 
@@ -501,7 +610,7 @@ export const LibraryPage: React.FC = () => {
                   {/* Summary */}
                   <div className="space-y-1">
                     <div className="text-[12px] font-medium text-[var(--muted)]">
-                      Summary
+                      {t('knowledgeDetail.fieldSummary')}
                     </div>
                     <p
                       dir="auto"
@@ -515,7 +624,7 @@ export const LibraryPage: React.FC = () => {
                   {activeItem.applicability && (
                     <div className="space-y-1">
                       <div className="text-[12px] font-medium text-[var(--muted)]">
-                        Applicability
+                        {t('knowledgeDetail.fieldApplicability')}
                       </div>
                       <p
                         dir="auto"
@@ -530,7 +639,7 @@ export const LibraryPage: React.FC = () => {
                   {activeItem.exclusions && (
                     <div className="space-y-1">
                       <div className="text-[12px] font-medium text-[var(--muted)]">
-                        Exclusions
+                        {t('knowledgeDetail.fieldExclusions')}
                       </div>
                       <p
                         dir="auto"
@@ -545,7 +654,7 @@ export const LibraryPage: React.FC = () => {
                   {activeItem.requirements && activeItem.requirements.length > 0 && (
                     <div className="space-y-1.5">
                       <div className="text-[12px] font-medium text-[var(--muted)]">
-                        Prerequisites & Requirements ({activeItem.requirements.length})
+                        {t('knowledgeDetail.fieldRequirements')} ({activeItem.requirements.length})
                       </div>
                       <ul className="space-y-1 text-[13px] text-[var(--foreground)] list-disc list-inside ps-1">
                         {activeItem.requirements.map((r, i) => (
@@ -558,10 +667,10 @@ export const LibraryPage: React.FC = () => {
                   )}
 
                   {/* Source Citation */}
-                  {activeItem.sourceExcerpt && (
+                  {activeItem.sourceExcerpt ? (
                     <div className="space-y-1 pt-1 border-t border-[var(--separator)]">
                       <div className="text-[12px] font-medium text-[var(--muted)]">
-                        Grounding Citation
+                        {t('knowledgeDetail.groundingCitationTitle')}
                       </div>
                       <blockquote
                         dir="auto"
@@ -570,7 +679,11 @@ export const LibraryPage: React.FC = () => {
                         "{activeItem.sourceExcerpt}"
                       </blockquote>
                     </div>
-                  )}
+                  ) : !activeItem.sourceId ? (
+                    <div className="space-y-1 pt-1 border-t border-[var(--separator)] text-xs text-[var(--muted)] italic">
+                      {t('library.manualNote')}
+                    </div>
+                  ) : null}
 
                   {/* Inspector Footer Actions */}
                   <div className="pt-3 border-t border-[var(--separator)] flex items-center gap-2">
@@ -579,14 +692,14 @@ export const LibraryPage: React.FC = () => {
                       onClick={() => navigate(`/knowledge/${activeItem.id}`)}
                       className="flex-1 ui-button ui-button-secondary text-xs"
                     >
-                      <span>Open Full Knowledge Node</span>
+                      <span>{t('common.openDetail')}</span>
                       <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180 text-[var(--muted)]" />
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="ui-panel p-8 text-center text-xs text-[var(--muted)]">
-                  Select a knowledge item to inspect details.
+                  {t('outcomes.selectOutcomePrompt')}
                 </div>
               )}
             </div>

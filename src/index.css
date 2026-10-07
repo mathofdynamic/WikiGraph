@@ -289,3 +289,19 @@ header,
     scroll-behavior: auto !important;
   }
 }
+
+/* Accessibility: Universally visible focus rings for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+

@@ -22,41 +22,62 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
             </span>
           ),
           h1: ({ children }) => (
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)] mt-6 mb-3 pb-2 border-b border-[var(--separator)]">
+            <h1 dir="auto" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--foreground)] mt-6 mb-3 pb-2 border-b border-[var(--separator)]">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)] mt-5 mb-2.5">
+            <h2 dir="auto" className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)] mt-5 mb-2.5">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-sm sm:text-base font-medium text-[var(--foreground)] mt-4 mb-2">
+            <h3 dir="auto" className="text-sm sm:text-base font-medium text-[var(--foreground)] mt-4 mb-2">
               {children}
             </h3>
           ),
-          p: ({ children }) => <p className="mb-3 text-[13px] sm:text-sm leading-relaxed text-[var(--foreground)]">{children}</p>,
+          h4: ({ children }) => (
+            <h4 dir="auto" className="text-xs sm:text-sm font-medium text-[var(--foreground)] mt-3 mb-1.5">
+              {children}
+            </h4>
+          ),
+          p: ({ children }) => (
+            <p dir="auto" className="mb-3 text-[13px] sm:text-sm leading-relaxed text-[var(--foreground)]">
+              {children}
+            </p>
+          ),
           ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1 mb-3 text-[13px] sm:text-sm pl-2 text-[var(--foreground)]">{children}</ul>
+            <ul className="list-disc list-inside space-y-1 mb-3 text-[13px] sm:text-sm ps-2 text-[var(--foreground)]">
+              {children}
+            </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1 mb-3 text-[13px] sm:text-sm pl-2 text-[var(--foreground)]">{children}</ol>
+            <ol className="list-decimal list-inside space-y-1 mb-3 text-[13px] sm:text-sm ps-2 text-[var(--foreground)]">
+              {children}
+            </ol>
+          ),
+          li: ({ children }) => (
+            <li dir="auto" className="leading-relaxed">
+              {children}
+            </li>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-[var(--accent)] rtl:border-l-0 rtl:border-r-2 rtl:border-[var(--accent)] ps-3.5 my-3 text-[var(--muted)] bg-[var(--surface-secondary)]/50 py-2 rounded-r rtl:rounded-r-none rtl:rounded-l text-xs border-y border-r rtl:border-r-0 rtl:border-l border-[var(--border)]">
+            <blockquote
+              dir="auto"
+              className="border-s-2 border-[var(--accent)] ps-3.5 my-3 text-[var(--muted)] bg-[var(--surface-secondary)]/50 py-2 rounded-e text-xs border-y border-e border-[var(--border)]"
+            >
               {children}
             </blockquote>
           ),
           code: ({ children, className: codeClass }) => {
             const isInline = !codeClass;
             return isInline ? (
-              <code className="px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--foreground)] text-xs font-mono border border-[var(--border)]">
+              <code dir="ltr" className="px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--foreground)] text-xs font-mono border border-[var(--border)] inline-block text-left">
                 {children}
               </code>
             ) : (
-              <pre className="p-3.5 rounded-lg bg-[var(--field-background)] text-[var(--field-foreground)] text-xs font-mono overflow-x-auto my-3 border border-[var(--border)]">
-                <code>{children}</code>
+              <pre dir="ltr" className="p-3.5 rounded-lg bg-[var(--field-background)] text-[var(--field-foreground)] text-xs font-mono overflow-x-auto my-3 border border-[var(--border)] text-left">
+                <code dir="ltr" className="text-left">{children}</code>
               </pre>
             );
           },

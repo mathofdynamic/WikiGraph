@@ -1,554 +1,800 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
-  Plus,
-  Trash2,
   Copy,
   Check,
   Download,
   AlertTriangle,
-  MoveUp,
-  MoveDown,
+  AlertCircle,
+  CheckCircle2,
   Layers,
   FileCode,
-  RotateCcw,
+  FileText,
+  Sliders,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Bookmark,
+  ShieldAlert,
+  ArrowRight,
+  ExternalLink,
+  ClipboardList,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import {
   Collection,
+  ContextRequest,
+  ContextResult,
   KnowledgeItem,
-  KnowledgeType,
   SourceDocument,
 } from '../types';
 import { Badge } from '../components/common/Badge';
-
-type OutputFormat = 'markdown' | 'json' | 'briefing' | 'plain';
+import { formatContextMarkdown } from '../lib/retrieval';
 
 export const ContextPage: React.FC = () => {
   const { repository, version } = useRepository();
   const { t, locale } = useLocale();
+  const navigate = useNavigate();
 
-  const [allKnowledge, setAllKnowledge] = useState<KnowledgeItem[]>([]);
-  const [sources, setSources] = useState<SourceDocument[]>([]);
+  // Collections & Metadata
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [allKnowledgeMap, setAllKnowledgeMap] = useState<Map<string, KnowledgeItem>>(new Map());
 
-  // Selection & Assembly state
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [format, setFormat] = useState<OutputFormat>('markdown');
-  const [taskGoal, setTaskGoal] = useState<string>('Production Readiness Review & Implementation');
+  // Form State
+  const [task, setTask] = useState<string>(
+    'Extract complex tables from research documents into structured markdown'
+  );
+  const [tools, setTools] = useState<string>('python, pdfplumber');
+  const [inputs, setInputs] = useState<string>('scanned PDF files');
+  const [outputFormat, setOutputFormat] = useState<string>('structured markdown');
+  const [language, setLanguage] = useState<'any' | 'en' | 'fa'>('any');
+  const [constraints, setConstraints] = useState<string>('cpu-only execution');
+  const [selectedCollection, setSelectedCollection] = useState<string>('all');
+  const [maxTokens, setMaxTokens] = useState<number>(4000);
+  const [includeUnreviewed, setIncludeUnreviewed] = useState<boolean>(false);
 
-  // Search & Filter for Knowledge picker
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollection, setSelectedCollection] = useState('all');
-  const [selectedType, setSelectedType] = useState<KnowledgeType | 'all'>('all');
+  // Retrieval Result State
+  const [loading, setLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<ContextResult | null>(null);
+  const [showExcluded, setShowExcluded] = useState<boolean>(false);
 
-  // Copy & Download states
-  const [copied, setCopied] = useState(false);
+  // Copy Feedback
+  const [copiedMd, setCopiedMd] = useState<boolean>(false);
+  const [copiedJson, setCopiedJson] = useState<boolean>(false);
 
-  // Initial data load
+  // Load collections and knowledge map
   useEffect(() => {
     let active = true;
-    const load = async () => {
-      const [kList, sList, cList] = await Promise.all([
-        repository.listKnowledge(),
-        repository.listSources(),
-        repository.listCollections(),
-      ]);
-      if (!active) return;
-      setAllKnowledge(kList);
-      setSources(sList);
-      setCollections(cList);
-
-      if (kList.length > 0 && selectedIds.length === 0) {
-        setSelectedIds(kList.slice(0, 4).map((k) => k.id));
+    const loadMeta = async () => {
+      try {
+        const [cols, kList] = await Promise.all([
+          repository.listCollections(),
+          repository.listKnowledge({ includeRetired: true }),
+        ]);
+        if (!active) return;
+        setCollections(cols);
+        setAllKnowledgeMap(new Map(kList.map((k) => [k.id, k])));
+      } catch (err) {
+        console.error('Failed to load collections', err);
       }
     };
-    load();
+    loadMeta();
     return () => {
       active = false;
     };
   }, [repository, version]);
 
-  const selectedItems = useMemo(() => {
-    const map = new Map(allKnowledge.map((k) => [k.id, k]));
-    return selectedIds.map((id) => map.get(id)).filter(Boolean) as KnowledgeItem[];
-  }, [selectedIds, allKnowledge]);
+  // Execute retrieval query
+  const executeQuery = useCallback(async () => {
+    if (!task.trim()) return;
+    try {
+      setLoading(true);
 
-  const availableItems = useMemo(() => {
-    let filtered = allKnowledge.filter((k) => !selectedIds.includes(k.id));
-    if (selectedCollection !== 'all') {
-      filtered = filtered.filter((k) => k.collectionId === selectedCollection);
-    }
-    if (selectedType !== 'all') {
-      filtered = filtered.filter((k) => k.type === selectedType);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (k) => k.title.toLowerCase().includes(q) || k.summary.toLowerCase().includes(q)
-      );
-    }
-    return filtered;
-  }, [allKnowledge, selectedIds, selectedCollection, selectedType, searchQuery]);
+      const parsedTools = tools
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-  const moveItem = (index: number, direction: 'up' | 'down') => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= selectedIds.length) return;
-    const next = [...selectedIds];
-    const [moved] = next.splice(index, 1);
-    next.splice(targetIndex, 0, moved);
-    setSelectedIds(next);
-  };
-
-  const removeItem = (id: string) => {
-    setSelectedIds((prev) => prev.filter((item) => item !== id));
-  };
-
-  const addItem = (id: string) => {
-    if (!selectedIds.includes(id)) {
-      setSelectedIds((prev) => [...prev, id]);
-    }
-  };
-
-  const clearSelection = () => {
-    setSelectedIds([]);
-  };
-
-  // Assembled payload preview
-  const assembledPayload = useMemo(() => {
-    const sourceMap = new Map(sources.map((s) => [s.id, s]));
-
-    if (format === 'json') {
-      const bundle = {
-        contextAssemblyVersion: '1.0',
-        timestamp: new Date().toISOString(),
-        taskObjective: taskGoal,
-        totalItems: selectedItems.length,
-        items: selectedItems.map((item, idx) => ({
-          priority: idx + 1,
-          id: item.id,
-          title: item.title,
-          type: item.type,
-          evidenceLevel: item.evidenceLevel,
-          summary: item.summary,
-          applicability: item.applicability,
-          exclusions: item.exclusions,
-          requirements: item.requirements,
-          procedure: item.body || item.summary,
-          sourceCitation: {
-            document: sourceMap.get(item.sourceId)?.filename || item.sourceId,
-            excerpt: item.sourceExcerpt,
-          },
-        })),
+      const request: ContextRequest = {
+        task: task.trim(),
+        requirements: {
+          tools: parsedTools.length > 0 ? parsedTools : undefined,
+          inputs: inputs.trim() || undefined,
+          outputFormat: outputFormat.trim() || undefined,
+          language: language === 'any' ? undefined : language,
+          constraints: constraints.trim() || undefined,
+        },
+        collectionIds: selectedCollection !== 'all' ? [selectedCollection] : undefined,
+        maxTokens: maxTokens > 0 ? maxTokens : 4000,
+        includeUnreviewed,
       };
-      return JSON.stringify(bundle, null, 2);
+
+      const res = await repository.buildContext(request);
+      setResult(res);
+    } catch (err) {
+      console.error('Retrieval error', err);
+    } finally {
+      setLoading(false);
     }
+  }, [
+    repository,
+    task,
+    tools,
+    inputs,
+    outputFormat,
+    language,
+    constraints,
+    selectedCollection,
+    maxTokens,
+    includeUnreviewed,
+  ]);
 
-    if (format === 'briefing') {
-      let b = `# Technical Context Briefing: ${taskGoal}\n\n`;
-      b += `*Generated: ${new Date().toLocaleDateString()} | Grounded Knowledge Units: ${selectedItems.length}*\n\n`;
-      b += `## Executive Summary & Applicable Heuristics\n\n`;
-      selectedItems.forEach((item, idx) => {
-        b += `### ${idx + 1}. ${item.title} [${item.type}]\n`;
-        b += `**Core Insight:** ${item.summary}\n`;
-        if (item.applicability) b += `**When to Apply:** ${item.applicability}\n`;
-        if (item.exclusions) b += `**Constraints:** ${item.exclusions}\n`;
-        b += `\n`;
-      });
-      return b;
-    }
+  // Run initial query once on load
+  useEffect(() => {
+    executeQuery();
+  }, [repository, version]);
 
-    // Default: Markdown
-    let md = `# Context Package: ${taskGoal}\n\n`;
-    md += `> Assembled for autonomous agent ingestion or human technical review.\n\n`;
-    selectedItems.forEach((item, idx) => {
-      const srcDoc = sourceMap.get(item.sourceId);
-      md += `## Section ${idx + 1}: ${item.title}\n`;
-      md += `**Type:** ${item.type} | **Evidence Grade:** ${item.evidenceLevel}\n\n`;
-      md += `${item.summary}\n\n`;
-      if (item.body) {
-        md += `### Execution Steps\n${item.body}\n\n`;
-      }
-      if (item.sourceExcerpt) {
-        md += `> "${item.sourceExcerpt}"\n> — *Source: ${srcDoc?.filename || item.sourceId}*\n\n`;
-      }
-    });
-    return md;
-  }, [format, selectedItems, taskGoal, sources]);
+  // Markdown packet string
+  const markdownPacket = useMemo(() => {
+    if (!result) return '';
+    return formatContextMarkdown(result);
+  }, [result]);
 
-  const estimatedTokens = useMemo(() => {
-    return Math.round(assembledPayload.length / 4);
-  }, [assembledPayload]);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(assembledPayload);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyMarkdown = async () => {
+    if (!markdownPacket) return;
+    await navigator.clipboard.writeText(markdownPacket);
+    setCopiedMd(true);
+    setTimeout(() => setCopiedMd(false), 2000);
   };
 
-  const handleDownload = () => {
-    const ext = format === 'json' ? 'json' : 'md';
-    const blob = new Blob([assembledPayload], { type: 'text/plain;charset=utf-8' });
+  const handleCopyJson = async () => {
+    if (!result) return;
+    await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (!markdownPacket) return;
+    const blob = new Blob([markdownPacket], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `context_${taskGoal.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)}.${ext}`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `context-packet-${Date.now()}.md`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
+  const handleLogOutcome = () => {
+    if (!result) return;
+    const appliedIds = result.selected.map((s) => s.item.id);
+    navigate('/outcomes', {
+      state: {
+        openCreate: true,
+        task: result.request.task,
+        appliedKnowledgeIds: appliedIds,
+      },
+    });
+  };
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header & Global Actions */}
-      <div className="space-y-3 pb-4 border-b border-[var(--separator)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)] leading-snug">
-              {t('context.title')}
-            </h1>
-            <p className="text-[13px] text-[var(--muted)] mt-0.5">
-              {t('context.subtitle')}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {selectedIds.length > 0 && (
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="ui-button ui-button-secondary text-xs"
-                title="Clear selected sequence"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Clear</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="ui-button ui-button-secondary text-xs"
-              title={t('common.copy')}
-            >
-              {copied ? (
-                <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
-              )}
-              <span>{copied ? t('common.copied') : t('common.copy')}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="ui-button ui-button-primary text-xs"
-              title={t('common.download')}
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>{t('common.download')}</span>
-            </button>
-          </div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
+      {/* Top Header */}
+      <div className="pb-4 border-b border-[var(--separator)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)] leading-snug">
+            {t('context.title')}
+          </h1>
+          <p className="text-[13px] text-[var(--muted)] mt-0.5">
+            {t('context.subtitle')}
+          </p>
         </div>
+
+        {/* Global Export & Actions Header Strip */}
+        {result && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleCopyMarkdown}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+            >
+              {copiedMd ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{t('common.copied')}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+                  <span>{t('context.copyMarkdown')}</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadMarkdown}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-[var(--muted)]" />
+              <span>{t('context.downloadMarkdown')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyJson}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+            >
+              {copiedJson ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{t('common.copied')}</span>
+                </>
+              ) : (
+                <>
+                  <FileCode className="w-3.5 h-3.5 text-[var(--muted)]" />
+                  <span>{t('context.copyJson')}</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogOutcome}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--foreground)] text-[var(--surface)] hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>{t('context.logOutcome')}</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Main Three-Zone Studio Workspace */}
+      {/* Main Two-Pane Split Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Zone 1: Available Knowledge Browser (4 cols on lg ~ 33%) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="ui-panel p-5 space-y-4 shadow-xs">
+        {/* Left Pane: Task & Retrieval Requirements Form (approx 38%) */}
+        <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 space-y-4 shadow-xs">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--separator)]">
-              <div>
-                <h2 className="text-[13px] sm:text-[14px] font-semibold text-[var(--foreground)] tracking-tight">
-                  Available Knowledge
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-[var(--accent)]" />
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">
+                  {t('context.leftTitle')}
                 </h2>
-                <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                  Browse repository items to stage into context.
-                </p>
               </div>
-              <span className="text-[11px] font-mono text-[var(--muted)]">
-                {availableItems.length} units
-              </span>
+              <span className="text-[11px] font-mono text-[var(--muted)]">API /query Contract</span>
             </div>
 
-            {/* Filter Inputs */}
-            <div className="space-y-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-2.5 top-2 pointer-events-none" />
-                <input
-                  type="text"
-                  dir="auto"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter available items..."
-                  className="ui-input ps-8 py-1 text-xs h-8"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={selectedCollection}
-                  onChange={(e) => setSelectedCollection(e.target.value)}
-                  className="ui-select text-xs h-8"
-                >
-                  <option value="all">All Collections</option>
-                  {collections.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {locale === 'fa' ? c.nameFa : c.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value as any)}
-                  className="ui-select text-xs h-8"
-                >
-                  <option value="all">All Types</option>
-                  <option value="procedure">{t('types.procedure')}</option>
-                  <option value="skill">{t('types.skill')}</option>
-                  <option value="research_finding">{t('types.research_finding')}</option>
-                  <option value="tip">{t('types.tip')}</option>
-                  <option value="example">{t('types.example')}</option>
-                  <option value="failure">{t('types.failure')}</option>
-                  <option value="lesson">{t('types.lesson')}</option>
-                </select>
-              </div>
-            </div>
-
-            {/* List of Available Items */}
-            <div className="max-h-[580px] overflow-y-auto space-y-2 pt-1">
-              {availableItems.length === 0 ? (
-                <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/40 text-center text-xs text-[var(--muted)]">
-                  <p className="italic">No additional items match filter.</p>
-                </div>
-              ) : (
-                availableItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/40 hover:bg-[var(--surface-secondary)] transition-colors space-y-1.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Badge type="knowledgeType" value={item.type} size="sm" />
-                          <Badge type="evidence" value={item.evidenceLevel} size="sm" />
-                        </div>
-                        <h3
-                          dir="auto"
-                          className="text-xs font-semibold text-[var(--foreground)] truncate"
-                        >
-                          {item.title}
-                        </h3>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => addItem(item.id)}
-                        className="ui-button ui-button-secondary text-xs px-2.5 py-1 shrink-0"
-                        title="Add to context packet"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Add</span>
-                      </button>
-                    </div>
-
-                    <p
-                      dir="auto"
-                      className="text-[11px] text-[var(--muted)] line-clamp-2 leading-relaxed"
-                    >
-                      {item.summary}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Zone 2: Selected Context Assembly Workspace (4 cols on lg ~ 33%) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="ui-card p-5 sm:p-6 space-y-5">
-            {/* Task Objective Input */}
+            {/* Task Description */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[var(--muted)]">
-                Task Objective / Ingestion Goal *
+              <label className="block text-xs font-semibold text-[var(--foreground)]">
+                {t('context.taskField')} <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
+              <textarea
                 dir="auto"
-                value={taskGoal}
-                onChange={(e) => setTaskGoal(e.target.value)}
-                placeholder="e.g. Heuristic Table Alignment for SEC Filings"
-                className="ui-input text-xs"
+                rows={3}
+                value={task}
+                onChange={(e) => setTask(e.target.value)}
+                placeholder={t('context.taskPlaceholder')}
+                className="ui-input py-2 text-xs leading-relaxed w-full resize-none"
               />
             </div>
 
-            {/* Sequence Workspace Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--separator)]">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-[var(--muted)]" />
-                <h2 className="text-[13px] sm:text-[14px] font-semibold text-[var(--foreground)] tracking-tight">
-                  Staged Sequence ({selectedItems.length})
-                </h2>
+            {/* Requirements Sub-form */}
+            <div className="pt-2 border-t border-[var(--separator)] space-y-3">
+              <div className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
+                {t('context.requirementsTitle')}
               </div>
-              <span className="text-[11px] font-mono text-[var(--muted)]">
-                Ordered by execution
-              </span>
+
+              {/* Tools */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-[var(--muted)]">
+                  {t('context.toolsField')}
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={tools}
+                  onChange={(e) => setTools(e.target.value)}
+                  placeholder={t('context.toolsPlaceholder')}
+                  className="ui-input text-xs py-1.5"
+                />
+              </div>
+
+              {/* Inputs */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-[var(--muted)]">
+                  {t('context.inputsField')}
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={inputs}
+                  onChange={(e) => setInputs(e.target.value)}
+                  placeholder={t('context.inputsPlaceholder')}
+                  className="ui-input text-xs py-1.5"
+                />
+              </div>
+
+              {/* Output Format */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-[var(--muted)]">
+                  {t('context.outputFormatField')}
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={outputFormat}
+                  onChange={(e) => setOutputFormat(e.target.value)}
+                  placeholder={t('context.outputFormatPlaceholder')}
+                  className="ui-input text-xs py-1.5"
+                />
+              </div>
+
+              {/* Constraints */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-[var(--muted)]">
+                  {t('context.constraintsField')}
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={constraints}
+                  onChange={(e) => setConstraints(e.target.value)}
+                  placeholder={t('context.constraintsPlaceholder')}
+                  className="ui-input text-xs py-1.5"
+                />
+              </div>
+
+              {/* Language Selection */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-[var(--muted)]">
+                  {t('context.languageField')}
+                </label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as any)}
+                  className="ui-select text-xs py-1.5"
+                >
+                  <option value="any">{t('context.languageAny')}</option>
+                  <option value="en">{t('context.languageEn')}</option>
+                  <option value="fa">{t('context.languageFa')}</option>
+                </select>
+              </div>
             </div>
 
-            {/* Selected Sequence Stack */}
-            {selectedItems.length === 0 ? (
-              <div className="p-8 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/30 text-center text-xs text-[var(--muted)] space-y-2">
-                <p className="font-medium text-[var(--foreground)]">No items in context package</p>
-                <p className="leading-relaxed">
-                  Choose units from the Available Knowledge list on the left to assemble this package.
-                </p>
+            {/* Scope & Budget Parameters */}
+            <div className="pt-2 border-t border-[var(--separator)] space-y-3">
+              {/* Collection Scope */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-[var(--muted)]">
+                  {t('context.collectionsFilter')}
+                </label>
+                <select
+                  value={selectedCollection}
+                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  className="ui-select text-xs py-1.5"
+                >
+                  <option value="all">{t('context.allCollections')}</option>
+                  {collections.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {locale === 'fa' ? col.nameFa || col.name : col.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <div className="space-y-2 max-h-[580px] overflow-y-auto">
-                {selectedItems.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/60 hover:bg-[var(--surface-secondary)] transition-colors space-y-2 group"
-                  >
-                    {item.sourceHasChanged && (
-                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-[var(--surface-tertiary)] border border-[var(--border)] text-[11px] text-[var(--foreground)]">
-                        <AlertTriangle className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
-                        <span>Source document has changed since citation</span>
-                      </div>
-                    )}
 
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] text-[var(--muted)] font-mono font-semibold px-1 rounded bg-[var(--surface-tertiary)]">
-                          #{idx + 1}
-                        </span>
-                        <Badge type="knowledgeType" value={item.type} size="sm" />
-                        <h3
-                          dir="auto"
-                          className="text-xs font-semibold text-[var(--foreground)] truncate"
-                        >
-                          {item.title}
-                        </h3>
-                      </div>
+              {/* Token Budget Control */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <label className="font-medium text-[var(--muted)]">
+                    {t('context.budgetField')}
+                  </label>
+                  <span className="font-mono font-semibold text-[var(--foreground)]">
+                    {maxTokens.toLocaleString()} tokens
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={1000}
+                  max={12000}
+                  step={500}
+                  value={maxTokens}
+                  onChange={(e) => setMaxTokens(Number(e.target.value))}
+                  className="w-full accent-[var(--accent)] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--muted)] font-mono">
+                  <span>1,000</span>
+                  <span>4,000 (Default)</span>
+                  <span>12,000</span>
+                </div>
+              </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => moveItem(idx, 'up')}
-                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] disabled:opacity-20 cursor-pointer"
-                          title="Move up in sequence"
-                        >
-                          <MoveUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === selectedItems.length - 1}
-                          onClick={() => moveItem(idx, 'down')}
-                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] disabled:opacity-20 cursor-pointer"
-                          title="Move down in sequence"
-                        >
-                          <MoveDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] cursor-pointer"
-                          title="Remove from package"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+              {/* Include Unreviewed Toggle */}
+              <div className="pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer p-2 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeUnreviewed}
+                    onChange={(e) => setIncludeUnreviewed(e.target.checked)}
+                    className="mt-0.5 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-medium text-[var(--foreground)]">
+                      {t('context.includeUnreviewed')}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted)] leading-tight">
+                      {t('context.includeUnreviewedHint')}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Run Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={executeQuery}
+                disabled={loading || !task.trim()}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>{t('context.retrieving')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-3.5 h-3.5" />
+                    <span>{t('context.retrieveBtn')}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Pane: Context Package Results & Analysis (approx 62%) */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+          {!result ? (
+            <div className="p-12 text-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] space-y-2">
+              <Search className="w-7 h-7 mx-auto text-[var(--muted)]" />
+              <p className="text-xs font-medium text-[var(--foreground)]">
+                {t('context.noItemsSelected')}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 1. Sufficiency Banner */}
+              <div
+                className={`p-4 rounded-xl border transition-colors ${
+                  result.sufficiency === 'sufficient'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200'
+                    : result.sufficiency === 'partial'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-200'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {result.sufficiency === 'sufficient' && (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  )}
+                  {result.sufficiency === 'partial' && (
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  )}
+                  {result.sufficiency === 'insufficient' && (
+                    <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  )}
+
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        {t(`context.sufficiency.${result.sufficiency}`)}
+                      </span>
+                      <span className="text-[11px] font-mono opacity-75">
+                        ({result.selected.length} units selected)
+                      </span>
                     </div>
 
-                    <p
-                      dir="auto"
-                      className="text-[11px] text-[var(--muted)] line-clamp-1 leading-relaxed"
-                    >
-                      {item.summary}
+                    <p className="text-xs leading-relaxed opacity-90">
+                      {result.sufficiencyNote}
                     </p>
+
+                    {result.sufficiency === 'insufficient' && (
+                      <p className="text-xs font-medium pt-1 text-rose-700 dark:text-rose-300">
+                        {t('context.insufficientNotice')}
+                      </p>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Zone 3: Generated Context Preview & Output (4 cols on lg ~ 33%) */}
-        <div className="lg:col-span-4 space-y-4 sticky top-6">
-          <div className="ui-panel p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--separator)]">
-              <div className="flex items-center gap-1.5">
-                <FileCode className="w-4 h-4 text-[var(--muted)]" />
-                <h2 className="text-[13px] sm:text-[14px] font-semibold text-[var(--foreground)] tracking-tight">
-                  Generated Package
-                </h2>
+                </div>
               </div>
 
-              {/* Segmented Format Switcher */}
-              <div className="inline-flex items-center p-0.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)]">
-                {(['markdown', 'json', 'briefing'] as OutputFormat[]).map((fmt) => (
-                  <button
-                    key={fmt}
-                    type="button"
-                    onClick={() => setFormat(fmt)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-medium transition-colors cursor-pointer ${
-                      format === fmt
-                        ? 'bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] shadow-xs'
-                        : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+              {/* 2. Conflicts Box (if any exist) */}
+              {result.conflicts && result.conflicts.length > 0 && (
+                <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-200 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <h3 className="text-xs font-semibold uppercase tracking-wider">
+                      {t('context.conflictsTitle')} ({result.conflicts.length})
+                    </h3>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                    {t('context.conflictsDesc')}
+                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    {result.conflicts.map((c, idx) => {
+                      const itemA = allKnowledgeMap.get(c.itemIds[0]);
+                      const itemB = allKnowledgeMap.get(c.itemIds[1]);
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-lg bg-[var(--surface)] border border-amber-500/20 text-xs space-y-1 text-[var(--foreground)]"
+                        >
+                          <div className="font-semibold flex items-center gap-2 text-xs">
+                            <span className="truncate">{itemA?.title || c.itemIds[0]}</span>
+                            <span className="text-amber-600 font-mono text-[10px] shrink-0">⟷</span>
+                            <span className="truncate">{itemB?.title || c.itemIds[1]}</span>
+                          </div>
+                          {c.note && (
+                            <div className="text-[11px] text-[var(--muted)] italic">
+                              "{c.note}"
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Token Estimate Strip */}
+              <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-[var(--foreground)]">
+                      {t('context.tokenEstimateLabel')}
+                    </span>
+                    <span className="text-[11px] text-[var(--muted)] font-mono">
+                      (rule: ceil(chars / 4))
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs">
+                    <span className="font-bold text-[var(--foreground)]">
+                      {result.tokenEstimate.used.toLocaleString()}
+                    </span>
+                    <span className="text-[var(--muted)]">
+                      {' '}
+                      / {result.tokenEstimate.budget.toLocaleString()} tokens
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress meter */}
+                <div className="w-full h-1.5 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      result.tokenEstimate.used > result.tokenEstimate.budget * 0.9
+                        ? 'bg-amber-500'
+                        : 'bg-[var(--accent)]'
                     }`}
-                  >
-                    {fmt}
-                  </button>
-                ))}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (result.tokenEstimate.used / result.tokenEstimate.budget) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Metrics Metadata Ribbon */}
-            <div className="flex items-center justify-between text-[11px] text-[var(--muted)] px-3 py-2 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border)] font-mono">
-              <span>{selectedItems.length} units</span>
-              <span>&bull;</span>
-              <span>~{estimatedTokens.toLocaleString()} tokens</span>
-              <span>&bull;</span>
-              <span>{assembledPayload.length.toLocaleString()} chars</span>
-            </div>
+              {/* 4. Selected Knowledge Units List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <Bookmark className="w-4 h-4 text-[var(--accent)]" />
+                    <span>{t('context.selectedUnits')}</span>
+                    <span className="text-xs font-mono text-[var(--muted)] font-normal">
+                      ({result.selected.length})
+                    </span>
+                  </h3>
+                </div>
 
-            {/* Assembled Output Body */}
-            <div className="p-3.5 rounded-lg bg-[var(--surface-secondary)]/40 border border-[var(--border)] font-mono text-[11px] text-[var(--foreground)] max-h-[460px] overflow-y-auto leading-relaxed select-text">
-              <pre className="whitespace-pre-wrap">{assembledPayload}</pre>
-            </div>
-
-            {/* Action Group */}
-            <div className="flex items-center justify-between gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="ui-button ui-button-secondary text-xs flex-1 justify-center"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+                {result.selected.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-[var(--muted)] rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]">
+                    {t('context.noItemsSelected')}
+                  </div>
                 ) : (
-                  <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+                  <div className="space-y-3">
+                    {result.selected.map((sel, idx) => {
+                      const item = sel.item;
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 space-y-3 shadow-xs hover:border-[var(--border-hover)] transition-colors"
+                        >
+                          {/* Item Card Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                            <div className="space-y-1.5 min-w-0 flex-1">
+                              {/* Badges row */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {/* Role Badge */}
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider border ${
+                                    sel.role === 'primary'
+                                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300'
+                                      : sel.role === 'prerequisite'
+                                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-300'
+                                      : 'bg-[var(--surface-secondary)] border-[var(--border)] text-[var(--muted)]'
+                                  }`}
+                                >
+                                  {t(`context.role.${sel.role}`)}
+                                </span>
+
+                                <Badge type="knowledgeType" value={item.type} />
+                                <Badge type="evidence" value={item.evidenceLevel} />
+                                <Badge type="review" value={item.reviewStatus} />
+
+                                {/* Score badge */}
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)]">
+                                  Score: {sel.score}
+                                </span>
+                              </div>
+
+                              {/* Title */}
+                              <h4
+                                dir="auto"
+                                className="text-sm font-semibold text-[var(--foreground)] leading-snug"
+                              >
+                                {item.title}
+                              </h4>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/knowledge/${item.id}`)}
+                              className="text-[11px] font-medium text-[var(--muted)] hover:text-[var(--accent)] flex items-center gap-1 self-start shrink-0 cursor-pointer pt-0.5"
+                            >
+                              <span>Inspect</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          {/* Match Reasons */}
+                          {sel.reasons && sel.reasons.length > 0 && (
+                            <div className="flex items-start gap-2 flex-wrap text-[11px]">
+                              <span className="text-[var(--muted)] shrink-0 font-medium">
+                                {t('context.reasonsLabel')}:
+                              </span>
+                              {sel.reasons.map((r, rIdx) => (
+                                <span
+                                  key={rIdx}
+                                  className="px-2 py-0.5 rounded-md bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)] text-[10px]"
+                                >
+                                  {r}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Item Warnings (if any) */}
+                          {sel.warnings && sel.warnings.length > 0 && (
+                            <div className="flex items-start gap-2 flex-wrap text-[11px]">
+                              <span className="text-amber-600 dark:text-amber-400 shrink-0 font-medium">
+                                {t('context.warningsLabel')}:
+                              </span>
+                              {sel.warnings.map((w, wIdx) => (
+                                <span
+                                  key={wIdx}
+                                  className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[10px] font-medium"
+                                >
+                                  {w}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Summary & Applicability */}
+                          <div className="text-xs text-[var(--muted)] leading-relaxed space-y-1.5">
+                            <p dir="auto" className="text-[var(--foreground)]">
+                              {item.summary}
+                            </p>
+                            {item.applicability && (
+                              <p dir="auto" className="text-[11px]">
+                                <span className="font-semibold text-[var(--foreground)]">
+                                  Applicability:
+                                </span>{' '}
+                                {item.applicability}
+                              </p>
+                            )}
+                            {item.exclusions && (
+                              <p dir="auto" className="text-[11px] text-rose-700 dark:text-rose-300">
+                                <span className="font-semibold">Exclusions:</span> {item.exclusions}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Source Citation with Excerpt Blockquote */}
+                          {(sel.source || item.sourceExcerpt) && (
+                            <div className="pt-2 border-t border-[var(--separator)] space-y-1">
+                              <div className="text-[11px] font-semibold text-[var(--muted)] flex items-center gap-1.5">
+                                <FileText className="w-3 h-3" />
+                                <span>{t('context.sourceCitation')}:</span>
+                                <span className="text-[var(--foreground)] font-normal truncate">
+                                  {sel.source?.title || 'Referenced Document'}
+                                </span>
+                              </div>
+                              <blockquote
+                                dir="auto"
+                                className="ps-3 border-s-2 border-[var(--accent)] text-[11px] text-[var(--muted)] italic leading-relaxed line-clamp-3 bg-[var(--surface-secondary)]/30 py-1 pe-2 rounded-e"
+                              >
+                                {sel.source?.excerpt || item.sourceExcerpt}
+                              </blockquote>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-                <span>{copied ? t('common.copied') : 'Copy Package'}</span>
-              </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="ui-button ui-button-primary text-xs flex-1 justify-center"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export File</span>
-              </button>
+              {/* 5. Excluded Items Collapsible Section */}
+              {result.excluded && result.excluded.length > 0 && (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowExcluded(!showExcluded)}
+                    className="w-full p-4 flex items-center justify-between text-xs font-semibold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{t('context.excludedUnits')}</span>
+                      <span className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)]">
+                        {result.excluded.length}
+                      </span>
+                    </div>
+                    {showExcluded ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {showExcluded && (
+                    <div className="px-4 pb-4 pt-1 border-t border-[var(--separator)] divide-y divide-[var(--separator)]">
+                      {result.excluded.map((ex, idx) => {
+                        const item = allKnowledgeMap.get(ex.itemId);
+                        return (
+                          <div
+                            key={idx}
+                            className="py-2.5 flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div
+                                dir="auto"
+                                className="font-medium text-[var(--foreground)] truncate"
+                              >
+                                {item?.title || ex.itemId}
+                              </div>
+                              <div className="text-[10px] font-mono text-[var(--muted)]">
+                                ID: {ex.itemId}
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)] shrink-0">
+                              {t(`context.exclusionReasons.${ex.reason}`)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
-
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  HardDrive,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
@@ -23,21 +24,33 @@ import {
 } from '../context/ThemeContext';
 import { Collection } from '../types';
 import { ConfirmModal } from '../components/common/ConfirmModal';
+import { getLocalStorageUsage, StorageUsage } from '../lib/storage';
 
 type SettingsCategory = 'appearance' | 'general' | 'data';
 
 export const SettingsPage: React.FC = () => {
-  const { repository } = useRepository();
+  const { repository, notifyMutation } = useRepository();
   const { t, locale, setLocale } = useLocale();
   const { appearance, updateAppearance, resetAppearance } = useTheme();
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('appearance');
 
-  // Collections state (read-only view)
+  // Collections state
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
+  const [targetMoveCollectionId, setTargetMoveCollectionId] = useState<string>('');
+  const [deleteColModalOpen, setDeleteColModalOpen] = useState(false);
+  const [colActionError, setColActionError] = useState<string | null>(null);
+
+  // Reset data state
+  const [resetDataModalOpen, setResetDataModalOpen] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   // Reset appearance modal
   const [resetAppearanceModalOpen, setResetAppearanceModalOpen] = useState(false);
+
+  // Storage usage metrics
+  const [storageUsage, setStorageUsage] = useState<StorageUsage>(getLocalStorageUsage());
 
   // Custom primary color input state
   const [customHexInput, setCustomHexInput] = useState(appearance.primaryColor);
@@ -48,6 +61,7 @@ export const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     repository.listCollections().then(setCollections);
+    setStorageUsage(getLocalStorageUsage());
   }, [repository]);
 
   const handleHexChange = (val: string) => {
@@ -94,6 +108,56 @@ export const SettingsPage: React.FC = () => {
   const handleConfirmResetAppearance = () => {
     resetAppearance();
     setResetAppearanceModalOpen(false);
+  };
+
+  const handleInitiateDeleteCollection = (col: Collection) => {
+    setCollectionToDelete(col);
+    setColActionError(null);
+    const otherCols = collections.filter((c) => c.id !== col.id);
+    if (otherCols.length > 0) {
+      setTargetMoveCollectionId(otherCols[0].id);
+    } else {
+      setTargetMoveCollectionId('');
+    }
+    setDeleteColModalOpen(true);
+  };
+
+  const handleConfirmDeleteCollection = async () => {
+    if (!collectionToDelete) return;
+    try {
+      setColActionError(null);
+      const hasItems = (collectionToDelete.count ?? 0) > 0;
+      if (hasItems) {
+        if (!targetMoveCollectionId) {
+          setColActionError(t('settings.selectTargetCol'));
+          return;
+        }
+        await repository.deleteCollection(collectionToDelete.id, targetMoveCollectionId);
+      } else {
+        await repository.deleteCollection(collectionToDelete.id);
+      }
+      setDeleteColModalOpen(false);
+      setCollectionToDelete(null);
+      notifyMutation();
+      const updatedCols = await repository.listCollections();
+      setCollections(updatedCols);
+    } catch (err: any) {
+      setColActionError(err.message || 'Failed to delete collection');
+    }
+  };
+
+  const handleConfirmResetData = async () => {
+    try {
+      await repository.resetDemoStore();
+      setResetDataModalOpen(false);
+      setResetSuccess(true);
+      notifyMutation();
+      const updatedCols = await repository.listCollections();
+      setCollections(updatedCols);
+      setTimeout(() => setResetSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Primary color preset palette
@@ -191,6 +255,42 @@ export const SettingsPage: React.FC = () => {
                   Taxonomy & JSON snapshot
                 </span>
               </div>
+            </button>
+          </div>
+
+          {/* Storage Usage Widget & Export Backup Shortcut */}
+          <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span>Browser Storage</span>
+              </span>
+              <span className="font-mono text-[11px] font-medium text-[var(--foreground)]">
+                {storageUsage.percentage}%
+              </span>
+            </div>
+
+            <div className="w-full h-1.5 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  storageUsage.isNearQuota ? 'bg-amber-500' : 'bg-[var(--accent)]'
+                }`}
+                style={{ width: `${Math.max(3, storageUsage.percentage)}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-[var(--muted)] font-mono">
+              <span>{storageUsage.usedFormatted} used</span>
+              <span>{storageUsage.totalFormatted} cap</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportBackup}
+              className="w-full mt-1 ui-button ui-button-secondary text-xs py-1.5 gap-1.5 justify-center shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-[var(--muted)]" />
+              <span>Export backup</span>
             </button>
           </div>
         </div>
@@ -645,14 +745,66 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
 
-          {/* CATEGORY 3: DATA & WORKSPACE (READ-ONLY TAXONOMY & SNAPSHOT EXPORT) */}
+          {/* CATEGORY 3: DATA & WORKSPACE */}
           {activeCategory === 'data' && (
             <div className="space-y-6">
-              {/* Collections Taxonomy Overview (Read-Only) */}
+              {resetSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{t('settings.resetDataSuccess')}</span>
+                </div>
+              )}
+
+              {/* Local Storage Accounting & Direct Backup Shortcut */}
+              <div className="ui-panel p-5 sm:p-6 space-y-4 shadow-xs">
+                <div className="pb-3 border-b border-[var(--separator)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-[15px] font-semibold text-[var(--foreground)] tracking-tight flex items-center gap-2">
+                      <HardDrive className="w-4 h-4 text-[var(--accent)]" />
+                      <span>Local Storage Accounting</span>
+                    </h2>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">
+                      Monitors private browser storage usage for knowledge nodes, source reports, and cached revisions.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="ui-button ui-button-secondary text-xs shrink-0 self-start sm:self-auto"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export backup</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--foreground)] font-medium">Used Capacity</span>
+                    <span className="font-mono text-xs text-[var(--muted)]">
+                      {storageUsage.usedFormatted} of {storageUsage.totalFormatted} ({storageUsage.percentage}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        storageUsage.isNearQuota ? 'bg-amber-500' : 'bg-[var(--accent)]'
+                      }`}
+                      style={{ width: `${Math.max(2, storageUsage.percentage)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--muted)] pt-1">
+                    {storageUsage.isNearQuota
+                      ? 'Storage is approaching browser capacity limits. Export a JSON backup to prevent data eviction.'
+                      : 'Demo storage operating normally within browser quota allowances.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Collections Management Overview */}
               <div className="ui-panel p-5 sm:p-6 space-y-4 shadow-xs">
                 <div className="pb-3 border-b border-[var(--separator)]">
                   <h2 className="text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
-                    Public Research Taxonomy
+                    {t('settings.manageCollections')}
                   </h2>
                   <p className="text-xs text-[var(--muted)] mt-0.5">
                     Curated research domains organizing knowledge nodes and source documents across WikiGraph.
@@ -663,16 +815,24 @@ export const SettingsPage: React.FC = () => {
                   {collections.map((col) => (
                     <div
                       key={col.id}
-                      className="py-3 flex items-center justify-between gap-3 px-2 rounded-lg"
+                      className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2 rounded-lg"
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-semibold text-[var(--foreground)]">
                             {col.name}
                           </span>
                           {col.nameFa && col.nameFa !== col.name && (
                             <span className="text-xs text-[var(--muted)] font-normal">
                               ({col.nameFa})
+                            </span>
+                          )}
+                          <span className="text-[10px] font-mono text-[var(--muted)] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] border border-[var(--border)]">
+                            {col.id}
+                          </span>
+                          {typeof col.count === 'number' && (
+                            <span className="text-[11px] text-[var(--muted)] font-mono">
+                              ({col.count} {col.count === 1 ? 'item' : 'items'})
                             </span>
                           )}
                         </div>
@@ -682,9 +842,17 @@ export const SettingsPage: React.FC = () => {
                           </p>
                         )}
                       </div>
-                      <span className="text-[10px] font-mono text-[var(--muted)] px-2 py-0.5 rounded bg-[var(--surface-secondary)] border border-[var(--border)]">
-                        {col.id}
-                      </span>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleInitiateDeleteCollection(col)}
+                          className="ui-button ui-button-secondary text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          title={t('settings.deleteCollection')}
+                        >
+                          {t('common.delete')}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -694,7 +862,7 @@ export const SettingsPage: React.FC = () => {
               <div className="ui-panel p-5 sm:p-6 space-y-4 shadow-xs">
                 <div className="pb-3 border-b border-[var(--separator)]">
                   <h2 className="text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
-                    Public Dataset Snapshot
+                    {t('settings.exportTitle')}
                   </h2>
                   <p className="text-xs text-[var(--muted)] mt-0.5">
                     Download complete repository data (collections, source documents, knowledge units, and evaluation outcomes) in open JSON format.
@@ -717,7 +885,39 @@ export const SettingsPage: React.FC = () => {
                     className="ui-button ui-button-secondary text-xs"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download Snapshot (.json)</span>
+                    <span>{t('settings.btnExportJson')}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Hard Reset Data */}
+              <div className="ui-panel p-5 sm:p-6 space-y-4 shadow-xs border-red-200 dark:border-red-900/50">
+                <div className="pb-3 border-b border-[var(--separator)]">
+                  <h2 className="text-[15px] font-semibold text-red-700 dark:text-red-400 tracking-tight">
+                    {t('settings.resetDataTitle')}
+                  </h2>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">
+                    {t('settings.resetDataDesc')}
+                  </p>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-semibold text-[var(--foreground)] block">
+                      {t('settings.resetDataBtn')}
+                    </span>
+                    <span className="text-[11px] text-[var(--muted)]">
+                      {t('settings.resetConfirmDesc')}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setResetDataModalOpen(true)}
+                    className="ui-button text-xs bg-red-600 hover:bg-red-700 text-white font-medium"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{t('settings.resetDataBtn')}</span>
                   </button>
                 </div>
               </div>
@@ -736,6 +936,72 @@ export const SettingsPage: React.FC = () => {
         isDestructive={false}
         onConfirm={handleConfirmResetAppearance}
         onCancel={() => setResetAppearanceModalOpen(false)}
+      />
+
+      {/* Delete Collection Modal (Blocked with Move or Direct) */}
+      <ConfirmModal
+        isOpen={deleteColModalOpen && !!collectionToDelete}
+        title={
+          (collectionToDelete?.count ?? 0) > 0
+            ? t('settings.deleteCollectionBlockedTitle')
+            : t('settings.deleteCollection')
+        }
+        description={
+          (collectionToDelete?.count ?? 0) > 0
+            ? t('settings.deleteCollectionBlockedDesc')
+            : `${t('common.delete')} "${locale === 'fa' ? collectionToDelete?.nameFa || collectionToDelete?.name : collectionToDelete?.name}"?`
+        }
+        confirmLabel={
+          (collectionToDelete?.count ?? 0) > 0
+            ? t('settings.moveAndDeleteBtn')
+            : t('common.delete')
+        }
+        cancelLabel={t('common.cancel')}
+        isDestructive={true}
+        onConfirm={handleConfirmDeleteCollection}
+        onCancel={() => {
+          setDeleteColModalOpen(false);
+          setCollectionToDelete(null);
+          setColActionError(null);
+        }}
+      >
+        {(collectionToDelete?.count ?? 0) > 0 && (
+          <div className="space-y-2 pt-2 text-xs">
+            {colActionError && (
+              <div className="p-2 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs">
+                {colActionError}
+              </div>
+            )}
+            <label className="font-semibold text-[var(--foreground)] block">
+              {t('settings.moveItemsTo')}
+            </label>
+            <select
+              value={targetMoveCollectionId}
+              onChange={(e) => setTargetMoveCollectionId(e.target.value)}
+              className="ui-select w-full text-xs"
+            >
+              {collections
+                .filter((c) => c.id !== collectionToDelete?.id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {locale === 'fa' ? c.nameFa : c.name} ({c.id})
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+      </ConfirmModal>
+
+      {/* Reset Data Confirmation Modal */}
+      <ConfirmModal
+        isOpen={resetDataModalOpen}
+        title={t('settings.resetDataTitle')}
+        description={t('settings.resetDataConfirm')}
+        confirmLabel={t('settings.resetDataBtn')}
+        cancelLabel={t('common.cancel')}
+        isDestructive={true}
+        onConfirm={handleConfirmResetData}
+        onCancel={() => setResetDataModalOpen(false)}
       />
     </div>
   );
