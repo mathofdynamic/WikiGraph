@@ -1,21 +1,39 @@
-# WikiGraph — Empirical Knowledge Platform
+# WikiGraph — Knowledge Library for AI Agents
 
-**WikiGraph** is a private empirical knowledge workspace for a single owner and external AI agents. It transforms unstructured deep-research Markdown reports and machine-generated knowledge bundles into durable, reusable, and cited atomic knowledge units (procedures, findings, tips, skills, examples, failures, and lessons).
+**WikiGraph is an empirical, read-only knowledge library designed with autonomous AI agents as the primary consumer and a human publication view as a secondary reading lens.**
+
+The site reads like a documentation/publication site (~72ch reading column, typographic hierarchy, generous whitespace, zero dashboard boxes). The web UI contains NO manual create, edit, or delete workflows for library articles. Knowledge enters exclusively through structured offline pipelines, and agents communicate with the library programmatically. Token management is the **only write action** remaining in the UI.
+
+### Machine Twins & Agent View
+- **Machine Twins**: Every human-readable page has an exact machine-readable equivalent:
+  - `GET /api/v1/knowledge/:idOrSlug(.md|.json)`
+  - `GET /api/v1/sources/:idOrSlug(.md|.json)`
+  - `GET /api/v1/collections/:idOrSlug(.md|.json)`
+  - `GET /llms.txt` (standard root directory manifest following llmstxt.org)
+- **Agent View Toggle**: An "Agent view" toggle on every entry and source page displays the exact, token-efficient Markdown an agent receives, along with its live token estimate (`estimateTokens`).
+- **Human-Readable Slugs**: Stable, unique human-readable slugs (derived from titles) are used in URLs, machine twin endpoints, and citations across both English and Persian.
+
+### The Two Write Paths
+1. **Bundle Publishing by Offline Skill (`wikigraph.bundle/1`)**:
+   - An offline tool (a local AI skill) digests deep-research documents and publishes standardized packages to `POST /api/v1/import/bundle` using a `read_write` Bearer token.
+   - Bundle review status is preserved (`needs_review` or `reviewed`). Items imported as `reviewed` get `reviewedAt = import time`. Unknown top-level fields are tolerated.
+2. **Outcome Reporting by AI Agents (`report_outcome`)**:
+   - Downstream AI agents report empirical task execution results via `POST /api/v1/outcomes` using Bearer tokens with `read_write` scope.
+   - Canonical fields: `task`, `appliedKnowledgeIds`, optional `appliedRevisionIds` (recording exact versions used), `result` (`success` | `failure` | `uncertain`), `notes`, and optional `reportedBy`. Rate limited to 60 req/min.
 
 > **Important Architecture Notice**:  
-> The backend for this application **does not exist yet**. **Demo mode is enabled by default** via `MockKnowledgeRepository`, using private `localStorage` persistence and rich synthetic research fixtures. You can immediately test the full application workflow (Library, Review Queue, Interactive Network Graph, Context Assembly, Bundle Ingestion, and Outcome Logging) entirely client-side without any server dependencies.
+> The backend for this application **does not exist yet**. **Demo mode is enabled by default** via `MockKnowledgeRepository`, using private `localStorage` persistence seeded with sample content. You can immediately inspect the read-only library (Library, Document & Knowledge details with revision history and agent outcomes, Directed Network Graph, Context Builder test bench, and Token Management) entirely client-side without any server dependencies.
 >
-> For backend engineering specifications, D1 schemas, migration steps, and endpoint contracts, refer to [FRONTEND_HANDOFF.md](./FRONTEND_HANDOFF.md).
+> For backend engineering specifications, D1 schemas, and endpoint contracts, refer to [FRONTEND_HANDOFF.md](./FRONTEND_HANDOFF.md).
 
 ---
 
 ## Key Features
 
-- **Empirical Research Library**: Categorized knowledge nodes organized by curated research collections, evidence levels (`tested`, `observed`, `unverified`), and status.
-- **Review Queue**: Two-pane triage workspace for imported items (`needs_review`), with diff highlighting, excerpt grounding verification, and batch approvals.
-- **Interactive Knowledge Network Graph**: Directed SVG relationship graph (`supports`, `conflicts_with`, `prerequisite_for`, `supersedes`, `complements`, `alternative_to`) with zoom, pan, bilingual Persian/English node labels, and inspection cards.
+- **Empirical Research Library**: Read-only categorized knowledge nodes organized by curated research collections, evidence levels (`theoretical`, `observed`, `tested`, `production_proven`), and status.
+- **Interactive Knowledge Network Graph**: Directed SVG relationship graph (`supports`, `conflicts_with`, `alternative_to`, `prerequisite_for`, `derived_from`, `supersedes`, `relates_to`) with zoom, pan, bilingual Persian/English node labels, and inspection cards.
 - **Context Builder (`buildContext`)**: Shared deterministic retrieval engine that scores keyword overlap, normalizes Persian typography (ي/ک variants, ZWNJ), enforces character and token budgets, includes prerequisites, surfaces mutual conflicts, and exports AI-ready Markdown and JSON prompt packets.
-- **Bundle Ingestion (`wikigraph.bundle/1`)**: Standardized JSON bundle validation and import bench with SHA-256 integrity verification and excerpt provenance checking.
+- **Agent Connections & Token Access**: Manage machine API tokens (`read_only` / `read_write`) for external tools and agents, and inspect interactive curl / python execution snippets.
 - **Bilingual & RTL-First**: Complete native English (LTR) and Persian (RTL) localization with Vazirmatn typography, automatic script detection, and accessible direction handling.
 - **WCAG AA Compliant**: High-contrast status badges, visible keyboard focus rings across all interactive controls, and accessible focus-trapped dialogs that dismiss on Escape.
 
@@ -114,12 +132,14 @@ In `Settings` or `RepositoryContext.tsx`, `isDemoMode` dictates which repository
     │   └── ToastContext.tsx  # User feedback toast notifications
     │
     ├── lib/
+    │   ├── storage.ts        # Safe localStorage wrapper, quota alerts, & usage accounting
+    │   └── useFocusTrap.ts   # Keyboard accessibility and focus trap hook for modals
+    │
+    ├── shared/
     │   ├── bundle.ts         # wikigraph.bundle/1 validator & sample fixtures
     │   ├── bundle.test.ts    # Automated bundle ingestion test suite
     │   ├── retrieval.ts      # Deterministic retrieval engine & Persian normalizer
-    │   ├── retrieval.test.ts # Retrieval contract and token estimation test suite
-    │   ├── storage.ts        # Safe localStorage wrapper, quota alerts, & usage accounting
-    │   └── useFocusTrap.ts   # Keyboard accessibility and focus trap hook for modals
+    │   └── retrieval.test.ts # Retrieval contract and token estimation test suite
     │
     ├── locales/
     │   ├── en.ts             # English strings (LTR)

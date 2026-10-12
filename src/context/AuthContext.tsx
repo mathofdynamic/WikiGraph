@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRepository } from '../services/RepositoryContext';
 import { useToast } from './ToastContext';
+import { useLocale } from '../locales/useLocale';
 import { RepositoryError } from '../types';
 
 interface AuthContextType {
@@ -16,7 +17,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { repository, isDemoMode } = useRepository();
   const { showError, showToast } = useToast();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const { t } = useLocale();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Check initial session
@@ -53,19 +55,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAuthenticated(true);
           showToast({
             type: 'success',
-            message: 'Authenticated successfully as workspace owner.',
+            message: t('auth.loginSuccess'),
           });
           return true;
         }
         return false;
       } catch (err) {
-        showError(err, 'Authentication failed. Incorrect password.');
+        showError(err, t('auth.loginFailed'));
         return false;
       } finally {
         setIsLoading(false);
       }
     },
-    [repository, showError, showToast]
+    [repository, showError, showToast, t]
   );
 
   const logout = useCallback(async () => {
@@ -77,10 +79,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(false);
       showToast({
         type: 'info',
-        message: 'Logged out of workspace session.',
+        message: t('auth.logoutSuccess'),
       });
     }
-  }, [repository, showToast]);
+  }, [repository, showToast, t]);
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, isLoading, login, logout }}>

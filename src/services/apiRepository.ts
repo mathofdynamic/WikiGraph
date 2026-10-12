@@ -1,12 +1,9 @@
 import {
-  ApiKeyGrant,
   ApiToken,
   AuthLoginRequest,
   AuthLoginResponse,
   AuthSessionResponse,
   Collection,
-  ContextAssemblyRequest,
-  ContextAssemblyResult,
   ContextRequest,
   ContextResult,
   CreateApiTokenRequest,
@@ -16,6 +13,7 @@ import {
   KnowledgeOutcome,
   KnowledgeRelationship,
   KnowledgeRevision,
+  RelationType,
   RepositoryError,
   RepositoryErrorCode,
   SourceDocument,
@@ -24,6 +22,10 @@ import {
   WikiGraphBundle,
   ImportBundleOptions,
   ImportBundleResult,
+  PaginatedKnowledgeRequest,
+  PaginatedKnowledgeResponse,
+  SearchKnowledgeRequest,
+  SearchKnowledgeResponse,
 } from '../types';
 import { KnowledgeRepository } from './KnowledgeRepository';
 
@@ -175,12 +177,20 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
 
   // --- Sources ---
   async listSources(): Promise<SourceDocument[]> {
-    return this.requestList<SourceDocument>('/sources');
+    const rawList = await this.requestList<any>('/sources');
+    return rawList.map((s: any) => ({
+      ...s,
+      contentSha256: s.contentSha256 || s.content_sha256,
+    }));
   }
 
   async getSource(id: string): Promise<SourceDocument | null> {
     try {
-      return await this.request<SourceDocument>(`/sources/${encodeURIComponent(id)}`);
+      const s = await this.request<any>(`/sources/${encodeURIComponent(id)}`);
+      return {
+        ...s,
+        contentSha256: s.contentSha256 || s.content_sha256,
+      };
     } catch (err) {
       if (err instanceof RepositoryError && err.code === 'not_found') {
         return null;
@@ -198,10 +208,18 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
       initialRevisionSummary?: string;
     }
   ): Promise<SourceDocument> {
-    return this.request<SourceDocument>('/sources', {
+    const wirePayload: any = {
+      ...source,
+      content_sha256: source.contentSha256,
+    };
+    const s = await this.request<any>('/sources', {
       method: 'POST',
-      body: JSON.stringify(source),
+      body: JSON.stringify(wirePayload),
     });
+    return {
+      ...s,
+      contentSha256: s.contentSha256 || s.content_sha256,
+    };
   }
 
   async updateSource(
@@ -210,10 +228,18 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
     newContent?: string,
     changeSummary?: string
   ): Promise<SourceDocument> {
-    return this.request<SourceDocument>(`/sources/${encodeURIComponent(id)}`, {
+    const wireUpdates: any = { ...updates };
+    if (updates.contentSha256) {
+      wireUpdates.content_sha256 = updates.contentSha256;
+    }
+    const s = await this.request<any>(`/sources/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify({ updates, newContent, changeSummary }),
+      body: JSON.stringify({ updates: wireUpdates, newContent, changeSummary }),
     });
+    return {
+      ...s,
+      contentSha256: s.contentSha256 || s.content_sha256,
+    };
   }
 
   async deleteSource(id: string): Promise<void> {
@@ -245,6 +271,35 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
     return this.requestList<KnowledgeItem>(`/knowledge${qStr ? `?${qStr}` : ''}`);
   }
 
+  async listKnowledgePaginated(params?: PaginatedKnowledgeRequest): Promise<PaginatedKnowledgeResponse> {
+    const query = new URLSearchParams();
+    if (params?.query) query.set('q', params.query);
+    if (params?.collectionId && params.collectionId !== 'all') query.set('collectionId', params.collectionId);
+    if (params?.type && params.type !== 'all') query.set('type', params.type);
+    if (params?.language && params.language !== 'all') query.set('language', params.language);
+    if (params?.evidenceLevel && params.evidenceLevel !== 'all') query.set('evidenceLevel', params.evidenceLevel);
+    if (params?.status && params.status !== 'all') query.set('status', params.status);
+    if (params?.includeRetired) query.set('includeRetired', 'true');
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.cursor) query.set('cursor', params.cursor);
+
+    const qStr = query.toString();
+    return this.request<PaginatedKnowledgeResponse>(`/knowledge/paginated${qStr ? `?${qStr}` : ''}`);
+  }
+
+  async searchKnowledge(params: SearchKnowledgeRequest): Promise<SearchKnowledgeResponse> {
+    const query = new URLSearchParams();
+    query.set('q', params.query);
+    if (params.collectionId && params.collectionId !== 'all') query.set('collectionId', params.collectionId);
+    if (params.type && params.type !== 'all') query.set('type', params.type);
+    if (params.language && params.language !== 'all') query.set('language', params.language);
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.cursor) query.set('cursor', params.cursor);
+
+    const qStr = query.toString();
+    return this.request<SearchKnowledgeResponse>(`/search${qStr ? `?${qStr}` : ''}`);
+  }
+
   async getKnowledge(id: string): Promise<KnowledgeItem | null> {
     try {
       return await this.request<KnowledgeItem>(`/knowledge/${encodeURIComponent(id)}`);
@@ -274,12 +329,6 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
     return this.request<KnowledgeItem>(`/knowledge/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ ...updates, changeNote }),
-    });
-  }
-
-  async deleteKnowledge(id: string): Promise<void> {
-    await this.request<void>(`/knowledge/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
     });
   }
 
@@ -321,32 +370,62 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
   // --- Relationships ---
   async listRelationships(knowledgeId?: string): Promise<KnowledgeRelationship[]> {
     const q = knowledgeId ? `?knowledgeId=${encodeURIComponent(knowledgeId)}` : '';
-    return this.requestList<KnowledgeRelationship>(`/relationships${q}`);
+    const rawList = await this.requestList<any>(`/relationships${q}`);
+    return rawList.map((r: any) => ({
+      id: r.id,
+      sourceKnowledgeId: r.source_knowledge_id || r.sourceKnowledgeId,
+      targetKnowledgeId: r.target_knowledge_id || r.targetKnowledgeId,
+      type: (r.relationship_type || r.type) as RelationType,
+      notes: r.notes || undefined,
+      createdAt: r.created_at || r.createdAt || new Date().toISOString(),
+    }));
   }
 
   async createRelationship(
     rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
   ): Promise<KnowledgeRelationship> {
-    return this.request<KnowledgeRelationship>('/relationships', {
+    const wirePayload = {
+      source_knowledge_id: rel.sourceKnowledgeId,
+      target_knowledge_id: rel.targetKnowledgeId,
+      relationship_type: rel.type,
+      notes: rel.notes,
+    };
+    const r = await this.request<any>('/relationships', {
       method: 'POST',
-      body: JSON.stringify(rel),
+      body: JSON.stringify(wirePayload),
     });
-  }
-
-  async addRelationship(
-    rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
-  ): Promise<KnowledgeRelationship> {
-    return this.createRelationship(rel);
+    return {
+      id: r.id,
+      sourceKnowledgeId: r.source_knowledge_id || r.sourceKnowledgeId || rel.sourceKnowledgeId,
+      targetKnowledgeId: r.target_knowledge_id || r.targetKnowledgeId || rel.targetKnowledgeId,
+      type: (r.relationship_type || r.type || rel.type) as RelationType,
+      notes: r.notes || rel.notes,
+      createdAt: r.created_at || r.createdAt || new Date().toISOString(),
+    };
   }
 
   async updateRelationship(
     id: string,
     updates: Partial<KnowledgeRelationship>
   ): Promise<KnowledgeRelationship> {
-    return this.request<KnowledgeRelationship>(`/relationships/${encodeURIComponent(id)}`, {
+    const wirePayload: any = {};
+    if (updates.sourceKnowledgeId) wirePayload.source_knowledge_id = updates.sourceKnowledgeId;
+    if (updates.targetKnowledgeId) wirePayload.target_knowledge_id = updates.targetKnowledgeId;
+    if (updates.type) wirePayload.relationship_type = updates.type;
+    if (updates.notes !== undefined) wirePayload.notes = updates.notes;
+
+    const r = await this.request<any>(`/relationships/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(wirePayload),
     });
+    return {
+      id: r.id,
+      sourceKnowledgeId: r.source_knowledge_id || r.sourceKnowledgeId || updates.sourceKnowledgeId || '',
+      targetKnowledgeId: r.target_knowledge_id || r.targetKnowledgeId || updates.targetKnowledgeId || '',
+      type: (r.relationship_type || r.type || updates.type || 'supports') as RelationType,
+      notes: r.notes !== undefined ? r.notes : updates.notes,
+      createdAt: r.created_at || r.createdAt || new Date().toISOString(),
+    };
   }
 
   async deleteRelationship(id: string): Promise<void> {
@@ -355,23 +434,63 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
     });
   }
 
-  async removeRelationship(id: string): Promise<void> {
-    return this.deleteRelationship(id);
-  }
-
   // --- Outcomes ---
   async listOutcomes(knowledgeId?: string): Promise<KnowledgeOutcome[]> {
     const q = knowledgeId ? `?knowledgeId=${encodeURIComponent(knowledgeId)}` : '';
-    return this.requestList<KnowledgeOutcome>(`/outcomes${q}`);
+    const rawList = await this.requestList<any>(`/outcomes${q}`);
+    return rawList.map((o: any) => ({
+      id: o.id,
+      task: o.task,
+      appliedKnowledgeIds: Array.isArray(o.applied_knowledge_ids)
+        ? o.applied_knowledge_ids
+        : typeof o.applied_knowledge_ids === 'string'
+        ? JSON.parse(o.applied_knowledge_ids || '[]')
+        : (o.appliedKnowledgeIds || []),
+      appliedRevisionIds: Array.isArray(o.applied_revision_ids)
+        ? o.applied_revision_ids
+        : typeof o.applied_revision_ids === 'string'
+        ? JSON.parse(o.applied_revision_ids || '[]')
+        : (o.appliedRevisionIds || undefined),
+      result: o.result,
+      notes: o.notes || undefined,
+      recordedAt: o.recorded_at || o.recordedAt || new Date().toISOString(),
+      reportedBy: o.reported_by || o.reportedBy || undefined,
+    }));
   }
 
   async createOutcome(
     outcome: Omit<KnowledgeOutcome, 'id' | 'recordedAt'>
   ): Promise<KnowledgeOutcome> {
-    return this.request<KnowledgeOutcome>('/outcomes', {
+    const wirePayload = {
+      task: outcome.task,
+      applied_knowledge_ids: outcome.appliedKnowledgeIds,
+      applied_revision_ids: outcome.appliedRevisionIds,
+      result: outcome.result,
+      notes: outcome.notes,
+      reported_by: outcome.reportedBy,
+    };
+    const o = await this.request<any>('/outcomes', {
       method: 'POST',
-      body: JSON.stringify(outcome),
+      body: JSON.stringify(wirePayload),
     });
+    return {
+      id: o.id,
+      task: o.task || outcome.task,
+      appliedKnowledgeIds: Array.isArray(o.applied_knowledge_ids)
+        ? o.applied_knowledge_ids
+        : typeof o.applied_knowledge_ids === 'string'
+        ? JSON.parse(o.applied_knowledge_ids || '[]')
+        : (o.appliedKnowledgeIds || outcome.appliedKnowledgeIds),
+      appliedRevisionIds: Array.isArray(o.applied_revision_ids)
+        ? o.applied_revision_ids
+        : typeof o.applied_revision_ids === 'string'
+        ? JSON.parse(o.applied_revision_ids || '[]')
+        : (o.appliedRevisionIds || outcome.appliedRevisionIds),
+      result: o.result || outcome.result,
+      notes: o.notes !== undefined ? o.notes : outcome.notes,
+      recordedAt: o.recorded_at || o.recordedAt || new Date().toISOString(),
+      reportedBy: o.reported_by || o.reportedBy || outcome.reportedBy,
+    };
   }
 
   async deleteOutcome(id: string): Promise<void> {
@@ -383,6 +502,17 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
   // --- Collections ---
   async listCollections(): Promise<Collection[]> {
     return this.requestList<Collection>('/collections');
+  }
+
+  async getCollection(idOrSlug: string): Promise<Collection | null> {
+    try {
+      return await this.request<Collection>(`/collections/${encodeURIComponent(idOrSlug)}`);
+    } catch (err) {
+      if (err instanceof RepositoryError && err.code === 'not_found') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   async createCollection(col: Omit<Collection, 'id'>): Promise<Collection> {
@@ -426,62 +556,7 @@ export class ApiKnowledgeRepository implements KnowledgeRepository {
     });
   }
 
-  // --- Scoped API Keys (Legacy compatibility seam) ---
-  async listApiKeys(): Promise<ApiKeyGrant[]> {
-    const tokens = await this.listTokens();
-    return tokens.map((t) => ({
-      id: t.id,
-      label: t.name,
-      tokenPrefix: t.tokenMasked,
-      allowedCollections: t.collectionIds || ['all'],
-      grants: t.scope === 'read_only' ? ['search', 'read'] : ['search', 'read', 'compose'],
-      createdAt: t.createdAt,
-      expiresAt: new Date(Date.now() + 90 * 86400000).toISOString(),
-      lastUsedAt: t.lastUsedAt || undefined,
-      status: 'active',
-      isDemoSimulated: false,
-    }));
-  }
-
-  async createApiKey(data: {
-    label: string;
-    allowedCollections: string[];
-    grants: ('search' | 'read' | 'compose')[];
-    expiryDays: number;
-  }): Promise<{ key: ApiKeyGrant; plainTextToken: string }> {
-    const scope = data.grants.includes('compose') ? 'read_write' : 'read_only';
-    const collectionIds = data.allowedCollections.includes('all') ? null : data.allowedCollections;
-    const res = await this.createToken({
-      name: data.label,
-      scope,
-      collectionIds,
-    });
-    const key: ApiKeyGrant = {
-      id: res.token.id,
-      label: res.token.name,
-      tokenPrefix: res.token.tokenMasked,
-      allowedCollections: data.allowedCollections,
-      grants: data.grants,
-      createdAt: res.token.createdAt,
-      expiresAt: new Date(Date.now() + (data.expiryDays || 90) * 86400000).toISOString(),
-      status: 'active',
-      isDemoSimulated: false,
-    };
-    return { key, plainTextToken: res.secret };
-  }
-
-  async revokeApiKey(id: string): Promise<void> {
-    return this.deleteToken(id);
-  }
-
   // --- Context Assembly & Natural Language Retrieval ---
-  async assembleContext(req: ContextAssemblyRequest): Promise<ContextAssemblyResult> {
-    return this.request<ContextAssemblyResult>('/context/assemble', {
-      method: 'POST',
-      body: JSON.stringify(req),
-    });
-  }
-
   async buildContext(request: ContextRequest): Promise<ContextResult> {
     return this.request<ContextResult>('/query', {
       method: 'POST',

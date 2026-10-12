@@ -1,800 +1,255 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Search,
-  Layers,
-  FileText,
-  Clock,
-  ExternalLink,
-  ChevronRight,
-  X,
-  Check,
-  AlertCircle,
-  Copy,
-  Tag,
-  ShieldCheck,
-  ArrowRight,
-  FileCode,
-  Plus,
-  FileUp,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
-import {
-  Collection,
-  EvidenceLevel,
-  KnowledgeItem,
-  KnowledgeType,
-  ReviewStatus,
-  SourceDocument,
-} from '../types';
-import { Badge } from '../components/common/Badge';
-import { EmptyState } from '../components/common/EmptyState';
-import { CreateNoteModal } from '../components/common/CreateNoteModal';
+import { Collection, KnowledgeItem, KnowledgeType, AppLanguage } from '../types';
 
 export const LibraryPage: React.FC = () => {
-  const { repository, version, notifyMutation } = useRepository();
+  const { repository, version } = useRepository();
   const { t, locale } = useLocale();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Active tab: 'knowledge' | 'sources'
-  const activeTab = (searchParams.get('tab') as 'knowledge' | 'sources') || 'knowledge';
-  const selectedKnowledgeId = searchParams.get('id');
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [selectedCollection, setSelectedCollection] = useState<string>(searchParams.get('col') || 'all');
-  const [selectedType, setSelectedType] = useState<KnowledgeType | 'all'>('all');
-  const [selectedReview, setSelectedReview] = useState<ReviewStatus | 'all'>('all');
-  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceLevel | 'all'>('all');
-  const [selectedFreshness, setSelectedFreshness] = useState<'all' | 'needs_review' | 'fresh' | 'stale'>(
-    (searchParams.get('freshness') as any) || 'all'
-  );
-  const [selectedSource, setSelectedSource] = useState<string>(searchParams.get('sourceId') || 'all');
-  const [showRetired, setShowRetired] = useState<boolean>(false);
-
-  useEffect(() => {
-    const sId = searchParams.get('sourceId');
-    if (sId) setSelectedSource(sId);
-    const fresh = searchParams.get('freshness');
-    if (fresh) setSelectedFreshness(fresh as any);
-  }, [searchParams]);
-
-  // Modal state
-  const [isNewNoteModalOpen, setIsNewNoteModalOpen] = useState<boolean>(false);
-
-  // Data state
-  const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
-  const [sourcesList, setSourcesList] = useState<SourceDocument[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [items, setItems] = useState<KnowledgeItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Inspector selected item state
-  const [activeKnowledgeId, setActiveKnowledgeId] = useState<string | null>(selectedKnowledgeId);
+  // Minimal single-row filters
+  const selectedCollection = searchParams.get('collection') || 'all';
+  const selectedType = (searchParams.get('type') as KnowledgeType | 'all') || 'all';
+  const selectedLanguage = (searchParams.get('lang') as AppLanguage | 'all') || 'all';
 
-  // Quick copied feedback
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Load collections
+  useEffect(() => {
+    let mounted = true;
+    repository.listCollections().then((cols) => {
+      if (mounted) setCollections(cols);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [repository]);
 
-  // Fetch data
-  const fetchData = async () => {
-    try {
+  // Fetch initial page with filters via listKnowledgePaginated
+  useEffect(() => {
+    let mounted = true;
+    const fetchCatalog = async () => {
       setLoading(true);
-      setError(null);
+      try {
+        const res = await repository.listKnowledgePaginated({
+          collectionId: selectedCollection === 'all' ? undefined : selectedCollection,
+          type: selectedType === 'all' ? undefined : selectedType,
+          language: selectedLanguage === 'all' ? undefined : selectedLanguage,
+          limit: 20,
+        });
 
-      const [cols, allK, allS] = await Promise.all([
-        repository.listCollections(),
-        repository.listKnowledge({ includeRetired: showRetired }),
-        repository.listSources(),
-      ]);
-
-      setCollections(cols);
-      setSourcesList(allS);
-
-      // Filter knowledge items
-      let filtered = [...allK];
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        filtered = filtered.filter(
-          (k) =>
-            k.title.toLowerCase().includes(q) ||
-            k.summary.toLowerCase().includes(q) ||
-            (k.body && k.body.toLowerCase().includes(q)) ||
-            (k.applicability && k.applicability.toLowerCase().includes(q)) ||
-            (k.sourceExcerpt && k.sourceExcerpt.toLowerCase().includes(q)) ||
-            k.requirements.some((r) => r.toLowerCase().includes(q))
-        );
-      }
-
-      if (selectedCollection !== 'all') {
-        filtered = filtered.filter((k) => k.collectionId === selectedCollection);
-      }
-      if (selectedSource !== 'all') {
-        filtered = filtered.filter((k) => k.sourceId === selectedSource);
-      }
-      if (selectedType !== 'all') {
-        filtered = filtered.filter((k) => k.type === selectedType);
-      }
-      if (selectedReview !== 'all') {
-        filtered = filtered.filter((k) => k.reviewStatus === selectedReview);
-      }
-      if (selectedEvidence !== 'all') {
-        filtered = filtered.filter((k) => k.evidenceLevel === selectedEvidence);
-      }
-      if (selectedFreshness !== 'all') {
-        if (selectedFreshness === 'needs_review') {
-          filtered = filtered.filter(
-            (k) => k.sourceHasChanged || k.reviewStatus === 'draft' || k.reviewStatus === 'needs_review'
-          );
-        } else if (selectedFreshness === 'fresh') {
-          filtered = filtered.filter((k) => !k.sourceHasChanged && k.reviewStatus === 'reviewed');
-        } else if (selectedFreshness === 'stale') {
-          filtered = filtered.filter((k) => k.reviewStatus === 'deprecated' || k.sourceHasChanged);
+        if (mounted) {
+          setItems(res.items);
+          setNextCursor(res.nextCursor);
+          setTotalCount(res.total);
         }
+      } catch (err) {
+        console.error('Failed to load library items:', err);
+      } finally {
+        if (mounted) setLoading(false);
       }
+    };
 
-      setKnowledgeList(filtered);
+    fetchCatalog();
+    return () => {
+      mounted = false;
+    };
+  }, [repository, version, selectedCollection, selectedType, selectedLanguage]);
 
-      // Set default active knowledge item for inspector
-      if (filtered.length > 0) {
-        if (!activeKnowledgeId || !filtered.some((k) => k.id === activeKnowledgeId)) {
-          setActiveKnowledgeId(filtered[0].id);
-        }
-      } else {
-        setActiveKnowledgeId(null);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to load library data');
+  // Load more with cursor
+  const handleLoadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await repository.listKnowledgePaginated({
+        collectionId: selectedCollection === 'all' ? undefined : selectedCollection,
+        type: selectedType === 'all' ? undefined : selectedType,
+        language: selectedLanguage === 'all' ? undefined : selectedLanguage,
+        cursor: nextCursor,
+        limit: 20,
+      });
+
+      setItems((prev) => [...prev, ...res.items]);
+      setNextCursor(res.nextCursor);
+    } catch (err) {
+      console.error('Failed to load more library items:', err);
     } finally {
-      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const handleCreateNote = async (
-    itemData: Omit<KnowledgeItem, 'id' | 'createdAt' | 'updatedAt'>
-  ) => {
-    const created = await repository.createKnowledge(itemData, 'Initial manual note creation');
-    notifyMutation();
-    setActiveKnowledgeId(created.id);
+  const updateFilter = (key: string, value: string) => {
+    const updated = new URLSearchParams(searchParams);
+    if (value === 'all' || !value) {
+      updated.delete(key);
+    } else {
+      updated.set(key, value);
+    }
+    setSearchParams(updated);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [
-    repository,
-    version,
-    searchQuery,
-    selectedCollection,
-    selectedSource,
-    selectedType,
-    selectedReview,
-    selectedEvidence,
-    selectedFreshness,
-    showRetired,
-  ]);
-
-  const setTab = (tab: 'knowledge' | 'sources') => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('tab', tab);
-      return next;
-    });
-  };
-
-  const handleSelectKnowledge = (item: KnowledgeItem) => {
-    setActiveKnowledgeId(item.id);
-  };
-
-  const handleCopyKnowledge = (item: KnowledgeItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const textToCopy = `## ${item.title} (${item.type})\n${item.summary}\n\nApplicability: ${item.applicability || 'General'}\nRequirements: ${item.requirements.join(', ')}`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopiedId(item.id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  // Currently active knowledge item for the inspector panel
-  const activeItem = useMemo(() => {
-    if (!activeKnowledgeId) return knowledgeList[0] || null;
-    return knowledgeList.find((k) => k.id === activeKnowledgeId) || knowledgeList[0] || null;
-  }, [activeKnowledgeId, knowledgeList]);
-
-  // Find collection name for an item
-  const getCollectionName = (colId: string) => {
-    const col = collections.find((c) => c.id === colId);
-    if (!col) return colId;
-    return locale === 'fa' ? col.nameFa : col.name;
-  };
-
-  // Find source document for an item
-  const getSourceDoc = (sourceId?: string | null) => {
-    if (!sourceId) return null;
-    return sourcesList.find((s) => s.id === sourceId) || null;
-  };
+  const knowledgeTypes: KnowledgeType[] = [
+    'research_finding',
+    'tip',
+    'procedure',
+    'skill',
+    'example',
+    'failure',
+    'lesson',
+  ];
 
   return (
-    <div className="p-6 sm:p-8 space-y-6 min-h-full flex flex-col">
-      {/* Top Section: Page Title & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)]">
-            {t('library.title')}
-          </h1>
-          <p className="text-[13px] text-[var(--muted)] mt-1">
-            {t('library.subtitle')}
-          </p>
-        </div>
+    <div className="max-w-[72ch] mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-10">
+      {/* Header */}
+      <header className="space-y-3 pb-6 border-b border-[var(--separator)]">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
+          {t('library.title')}
+        </h1>
+        <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed">
+          {t('library.subtitle')}
+        </p>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/import')}
-            className="ui-button ui-button-secondary text-xs"
-          >
-            <FileUp className="w-3.5 h-3.5" />
-            <span>{t('library.importResearch')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsNewNoteModalOpen(true)}
-            className="ui-button ui-button-primary text-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{t('library.newNote')}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Unified Control Surface: Segmented Switch, Search, and Filters */}
-      <div className="ui-panel p-3.5 space-y-3 shrink-0">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Segmented Knowledge / Sources Switch */}
-          <div className="ui-segment shrink-0">
-            <button
-              type="button"
-              onClick={() => setTab('knowledge')}
-              className={`ui-segment-item ${activeTab === 'knowledge' ? 'active' : ''}`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>{t('library.tabKnowledge')}</span>
-              <span className="text-[11px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)]">
-                {knowledgeList.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('sources')}
-              className={`ui-segment-item ${activeTab === 'sources' ? 'active' : ''}`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>{t('library.tabSources')}</span>
-              <span className="text-[11px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--muted)] border border-[var(--border)]">
-                {sourcesList.length}
-              </span>
-            </button>
-          </div>
-
-          {/* Integrated Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute start-3 top-3 pointer-events-none" />
-            <input
-              type="text"
-              dir="auto"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('library.filterLibrary') || 'Filter library…'}
-              className="ui-input ps-9 pe-8"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute end-2.5 top-2.5 text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Compact Filters Bar (for Knowledge tab) */}
-        {activeTab === 'knowledge' && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--separator)]">
-            {/* Collection Filter */}
+        {/* Minimal Single Filter Row (Collection, Type, Language) - No Cluttered Toolbar */}
+        <div className="pt-4 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
+          {/* Collection Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-[var(--foreground)]">Collection:</span>
             <select
               value={selectedCollection}
-              onChange={(e) => setSelectedCollection(e.target.value)}
-              className="ui-select text-xs py-1"
+              onChange={(e) => updateFilter('collection', e.target.value)}
+              className="bg-[var(--surface-secondary)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
             >
-              <option value="all">{t('library.allCollections')}</option>
-              {collections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {locale === 'fa' ? c.nameFa : c.name}
+              <option value="all">All collections</option>
+              {collections.map((col) => (
+                <option key={col.id} value={col.id}>
+                  {locale === 'fa' && col.nameFa ? col.nameFa : col.name}
                 </option>
               ))}
             </select>
+          </div>
 
-            {/* Type Filter */}
+          <span aria-hidden="true" className="text-[var(--border)]">·</span>
+
+          {/* Type Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-[var(--foreground)]">Type:</span>
             <select
               value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value as any)}
-              className="ui-select text-xs py-1"
+              onChange={(e) => updateFilter('type', e.target.value)}
+              className="bg-[var(--surface-secondary)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
             >
-              <option value="all">{t('library.allTypes')}</option>
-              <option value="procedure">{t('types.procedure')}</option>
-              <option value="research_finding">{t('types.research_finding')}</option>
-              <option value="tip">{t('types.tip')}</option>
-              <option value="skill">{t('types.skill')}</option>
-              <option value="example">{t('types.example')}</option>
-              <option value="failure">{t('types.failure')}</option>
-              <option value="lesson">{t('types.lesson')}</option>
+              <option value="all">All types</option>
+              {knowledgeTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type.replace('_', ' ')}
+                </option>
+              ))}
             </select>
+          </div>
 
-            {/* Review Status Filter */}
+          <span aria-hidden="true" className="text-[var(--border)]">·</span>
+
+          {/* Language Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-[var(--foreground)]">Language:</span>
             <select
-              value={selectedReview}
-              onChange={(e) => setSelectedReview(e.target.value as any)}
-              className="ui-select text-xs py-1"
+              value={selectedLanguage}
+              onChange={(e) => updateFilter('lang', e.target.value)}
+              className="bg-[var(--surface-secondary)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
             >
-              <option value="all">{t('library.allReview')}</option>
-              <option value="reviewed">{t('reviewStatus.reviewed')}</option>
-              <option value="draft">{t('reviewStatus.draft')}</option>
-              <option value="deprecated">{t('reviewStatus.deprecated')}</option>
+              <option value="all">All languages</option>
+              <option value="en">English (en)</option>
+              <option value="fa">فارسی (fa)</option>
             </select>
+          </div>
 
-            {/* Evidence Level Filter */}
-            <select
-              value={selectedEvidence}
-              onChange={(e) => setSelectedEvidence(e.target.value as any)}
-              className="ui-select text-xs py-1"
+          {/* Reset Filters (if active) */}
+          {(selectedCollection !== 'all' || selectedType !== 'all' || selectedLanguage !== 'all') && (
+            <button
+              type="button"
+              onClick={() => setSearchParams(new URLSearchParams())}
+              className="ms-auto text-xs text-[var(--muted)] hover:text-[var(--foreground)] underline cursor-pointer"
             >
-              <option value="all">{t('library.allEvidence')}</option>
-              <option value="tested">{t('evidenceLevel.tested')}</option>
-              <option value="observed">{t('evidenceLevel.observed')}</option>
-              <option value="unverified">{t('evidenceLevel.unverified')}</option>
-            </select>
+              Reset
+            </button>
+          )}
+        </div>
+      </header>
 
-            {/* Freshness Filter */}
-            <select
-              value={selectedFreshness}
-              onChange={(e) => setSelectedFreshness(e.target.value as any)}
-              className="ui-select text-xs py-1"
-            >
-              <option value="all">{t('library.allFreshness')}</option>
-              <option value="fresh">{t('library.fresh')}</option>
-              <option value="needs_review">{t('library.needsReview')}</option>
-              <option value="stale">{t('library.stale')}</option>
-            </select>
-
-            {/* Show Retired Filter */}
-            <label className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] cursor-pointer select-none px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)]/50">
-              <input
-                type="checkbox"
-                checked={showRetired}
-                onChange={(e) => setShowRetired(e.target.checked)}
-                className="accent-[var(--accent)] rounded cursor-pointer"
-              />
-              <span>{t('library.showRetired')}</span>
-            </label>
-
-            {/* Active Source Filter Pill */}
-            {selectedSource !== 'all' && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30">
-                <FileText className="w-3 h-3 shrink-0" />
-                <span className="truncate max-w-[180px]">
-                  {sourcesList.find((s) => s.id === selectedSource)?.filename || selectedSource}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedSource('all');
-                    setSearchParams((prev) => {
-                      const next = new URLSearchParams(prev);
-                      next.delete('sourceId');
-                      return next;
-                    });
-                  }}
-                  className="hover:opacity-75 cursor-pointer ms-0.5"
-                  title="Remove source filter"
+      {/* Plain List of Entries */}
+      {loading ? (
+        <div className="py-16 text-center text-xs text-[var(--muted)]">
+          {t('common.loading')}
+        </div>
+      ) : items.length === 0 ? (
+        <p className="py-12 text-xs text-[var(--muted)] italic text-center">
+          {t('library.noKnowledgeFound')}
+        </p>
+      ) : (
+        <div className="space-y-6">
+          <div className="divide-y divide-[var(--separator)]">
+            {items.map((item) => (
+              <article key={item.id} className="py-4 space-y-1.5">
+                <Link
+                  to={`/knowledge/${item.id}`}
+                  className="text-base font-semibold text-[var(--foreground)] hover:text-[var(--accent)] transition-colors block"
+                  dir="auto"
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
+                  {item.title}
+                </Link>
 
-            {(searchQuery ||
-              selectedCollection !== 'all' ||
-              selectedSource !== 'all' ||
-              selectedType !== 'all' ||
-              selectedReview !== 'all' ||
-              selectedEvidence !== 'all' ||
-              selectedFreshness !== 'all' ||
-              showRetired) && (
+                {/* Quiet Text Metadata Line (type · evidence · language · updated) */}
+                <div className="text-xs text-[var(--muted)] flex items-center gap-2">
+                  <span className="capitalize">{item.type.replace('_', ' ')}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="capitalize">{item.evidenceLevel.replace('_', ' ')}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="uppercase">{item.language}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{new Date(item.updatedAt || item.createdAt).toLocaleDateString()}</span>
+                  {item.status === 'retired' && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">
+                        {t('library.retired')}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <p className="text-xs text-[var(--muted)] leading-relaxed line-clamp-2" dir="auto">
+                  {item.summary}
+                </p>
+              </article>
+            ))}
+          </div>
+
+          {/* Cursor-based Load More */}
+          {nextCursor && (
+            <div className="pt-4 text-center">
               <button
                 type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCollection('all');
-                  setSelectedSource('all');
-                  setSelectedType('all');
-                  setSelectedReview('all');
-                  setSelectedEvidence('all');
-                  setSelectedFreshness('all');
-                  setShowRetired(false);
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev);
-                    next.delete('sourceId');
-                    next.delete('freshness');
-                    return next;
-                  });
-                }}
-                className="text-xs text-[var(--accent)] hover:underline ms-auto cursor-pointer"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-4 py-2 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--foreground)] transition-colors cursor-pointer disabled:opacity-50"
               >
-                {t('library.clearFilters')}
+                {loadingMore ? 'Loading…' : t('common.loadMore') || 'Load more entries'}
               </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Main Content Workspace */}
-      <div className="flex-1 min-h-0">
-        {loading ? (
-          <div className="p-16 text-center text-xs text-[var(--muted)]">
-            <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--accent)]" />
-            <span>{t('common.loading')}</span>
-          </div>
-        ) : error ? (
-          <div className="p-8 text-center text-xs text-[var(--foreground)] ui-card">
-            <AlertCircle className="w-5 h-5 mx-auto mb-2 text-[var(--muted)]" />
-            <span>{error}</span>
-          </div>
-        ) : activeTab === 'knowledge' ? (
-          /* Master-Detail Layout (70-75% list / 25-30% inspector) */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Knowledge List (8 cols on lg ~ 67-70%, 9 cols on xl ~ 75%) */}
-            <div className="lg:col-span-8 xl:col-span-8 space-y-2">
-              {knowledgeList.length === 0 ? (
-                <EmptyState
-                  title={t('library.noKnowledgeFound')}
-                  description={t('common.emptyDesc')}
-                />
-              ) : (
-                knowledgeList.map((item) => {
-                  const isSelected = item.id === activeItem?.id;
-                  const sourceDoc = getSourceDoc(item.sourceId);
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => handleSelectKnowledge(item)}
-                      className={`p-4 rounded-xl border border-[var(--border)] transition-colors cursor-pointer relative group ${
-                        isSelected
-                          ? 'bg-[var(--surface-secondary)]'
-                          : 'bg-[var(--surface)] hover:bg-[var(--surface-secondary)]/50'
-                      }`}
-                    >
-                      {/* Left subtle 2px accent indicator line for selected item */}
-                      {isSelected && (
-                        <div className="absolute start-0 top-3 bottom-3 w-[2px] bg-[var(--accent)] rounded-e" />
-                      )}
-
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          {/* Row title (14-15px / 600) */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h2
-                              dir="auto"
-                              className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight leading-snug group-hover:text-[var(--accent)] transition-colors"
-                            >
-                              {item.title}
-                            </h2>
-                            {item.sourceHasChanged && (
-                              <span className="text-[11px] font-medium text-[var(--muted)] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] border border-[var(--border)] inline-flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3 text-[var(--muted)]" />
-                                <span>Source Updated</span>
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Short summary (13-14px) */}
-                          <p
-                            dir="auto"
-                            className="text-[13px] text-[var(--muted)] line-clamp-2 leading-relaxed"
-                          >
-                            {item.summary}
-                          </p>
-
-                          {/* Metadata row: Badges + collection + source */}
-                          <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-[var(--muted)]">
-                            <Badge type="knowledgeType" value={item.type} size="sm" />
-                            <Badge type="evidence" value={item.evidenceLevel} size="sm" />
-                            <Badge type="review" value={item.reviewStatus} size="sm" />
-                            {item.status === 'retired' && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[var(--surface-tertiary)] text-[var(--muted)] border border-[var(--border)]">
-                                {t('library.retired')}
-                              </span>
-                            )}
-
-                            <span className="text-[var(--separator)]">•</span>
-                            <span className="truncate">{getCollectionName(item.collectionId)}</span>
-
-                            {sourceDoc ? (
-                              <>
-                                <span className="text-[var(--separator)]">•</span>
-                                <span className="font-mono truncate">{sourceDoc.filename}</span>
-                              </>
-                            ) : !item.sourceId ? (
-                              <>
-                                <span className="text-[var(--separator)]">•</span>
-                                <span className="italic truncate text-[var(--muted)]">
-                                  {t('library.manualNote')}
-                                </span>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Actions aligned opposite */}
-                        <div className="flex items-center gap-1 shrink-0 pt-0.5">
-                          <button
-                            type="button"
-                            onClick={(e) => handleCopyKnowledge(item, e)}
-                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] transition-colors cursor-pointer"
-                            title="Copy Summary"
-                          >
-                            {copiedId === item.id ? (
-                              <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/knowledge/${item.id}`);
-                            }}
-                            className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-tertiary)] transition-colors cursor-pointer"
-                            title="Open Detail Page"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
             </div>
+          )}
 
-            {/* Right Inspector Panel (Holding side panel model: coherent, dense, sticky) */}
-            <div className="hidden lg:block lg:col-span-4 xl:col-span-4 sticky top-6">
-              {activeItem ? (
-                <div className="ui-panel p-5 space-y-4 shadow-sm">
-                  {/* Inspector Header: Title + open button */}
-                  <div className="space-y-2 pb-3 border-b border-[var(--separator)]">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-medium text-[var(--muted)]">
-                        {t('library.selectedItem')}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/knowledge/${activeItem.id}`)}
-                        className="ui-button ui-button-ghost text-xs p-1 text-[var(--muted)] hover:text-[var(--foreground)] inline-flex items-center gap-1"
-                      >
-                        <span>{t('common.openDetail')}</span>
-                        <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                      </button>
-                    </div>
-
-                    <h3
-                      dir="auto"
-                      className="text-[16px] font-semibold text-[var(--foreground)] leading-snug tracking-tight"
-                    >
-                      {activeItem.title}
-                    </h3>
-
-                    {/* Metadata tags */}
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                      <Badge type="knowledgeType" value={activeItem.type} size="sm" />
-                      <Badge type="evidence" value={activeItem.evidenceLevel} size="sm" />
-                      <Badge type="review" value={activeItem.reviewStatus} size="sm" />
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="space-y-1">
-                    <div className="text-[12px] font-medium text-[var(--muted)]">
-                      {t('knowledgeDetail.fieldSummary')}
-                    </div>
-                    <p
-                      dir="auto"
-                      className="text-[13px] sm:text-[14px] text-[var(--foreground)] leading-relaxed"
-                    >
-                      {activeItem.summary}
-                    </p>
-                  </div>
-
-                  {/* Applicability */}
-                  {activeItem.applicability && (
-                    <div className="space-y-1">
-                      <div className="text-[12px] font-medium text-[var(--muted)]">
-                        {t('knowledgeDetail.fieldApplicability')}
-                      </div>
-                      <p
-                        dir="auto"
-                        className="text-[13px] text-[var(--foreground)] leading-relaxed"
-                      >
-                        {activeItem.applicability}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Exclusions */}
-                  {activeItem.exclusions && (
-                    <div className="space-y-1">
-                      <div className="text-[12px] font-medium text-[var(--muted)]">
-                        {t('knowledgeDetail.fieldExclusions')}
-                      </div>
-                      <p
-                        dir="auto"
-                        className="text-[13px] text-[var(--muted)] leading-relaxed"
-                      >
-                        {activeItem.exclusions}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Requirements */}
-                  {activeItem.requirements && activeItem.requirements.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-[12px] font-medium text-[var(--muted)]">
-                        {t('knowledgeDetail.fieldRequirements')} ({activeItem.requirements.length})
-                      </div>
-                      <ul className="space-y-1 text-[13px] text-[var(--foreground)] list-disc list-inside ps-1">
-                        {activeItem.requirements.map((r, i) => (
-                          <li key={i} dir="auto" className="leading-snug">
-                            {r}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Source Citation */}
-                  {activeItem.sourceExcerpt ? (
-                    <div className="space-y-1 pt-1 border-t border-[var(--separator)]">
-                      <div className="text-[12px] font-medium text-[var(--muted)]">
-                        {t('knowledgeDetail.groundingCitationTitle')}
-                      </div>
-                      <blockquote
-                        dir="auto"
-                        className="text-[13px] text-[var(--muted)] italic ps-2.5 border-s-2 border-[var(--border)] leading-relaxed"
-                      >
-                        "{activeItem.sourceExcerpt}"
-                      </blockquote>
-                    </div>
-                  ) : !activeItem.sourceId ? (
-                    <div className="space-y-1 pt-1 border-t border-[var(--separator)] text-xs text-[var(--muted)] italic">
-                      {t('library.manualNote')}
-                    </div>
-                  ) : null}
-
-                  {/* Inspector Footer Actions */}
-                  <div className="pt-3 border-t border-[var(--separator)] flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/knowledge/${activeItem.id}`)}
-                      className="flex-1 ui-button ui-button-secondary text-xs"
-                    >
-                      <span>{t('common.openDetail')}</span>
-                      <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180 text-[var(--muted)]" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="ui-panel p-8 text-center text-xs text-[var(--muted)]">
-                  {t('outcomes.selectOutcomePrompt')}
-                </div>
-              )}
-            </div>
+          <div className="text-[11px] text-[var(--muted)] text-center font-mono">
+            Showing {items.length} of {totalCount} entries
           </div>
-        ) : (
-          /* SOURCE VIEW: Refined Transaction-Style Table */
-          <div className="ui-panel overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-start text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-[var(--separator)] bg-[var(--surface-secondary)]/40 text-[var(--muted)] text-[11px] uppercase tracking-wider font-semibold">
-                    <th className="py-3 px-4 text-start font-medium">{t('library.colTitle')}</th>
-                    <th className="py-3 px-4 text-start font-medium">{t('library.colCollection')}</th>
-                    <th className="py-3 px-4 text-start font-medium">Revisions</th>
-                    <th className="py-3 px-4 text-start font-medium">File Size</th>
-                    <th className="py-3 px-4 text-start font-medium">Imported</th>
-                    <th className="py-3 px-4 text-end font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--separator)]">
-                  {sourcesList.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-[var(--muted)]">
-                        {t('library.noSourcesFound')}
-                      </td>
-                    </tr>
-                  ) : (
-                    sourcesList.map((doc) => {
-                      const col = collections.find((c) => c.id === doc.collectionId);
-                      const colName = col ? (locale === 'fa' ? col.nameFa : col.name) : '-';
-
-                      return (
-                        <tr
-                          key={doc.id}
-                          onClick={() => navigate(`/documents/${doc.id}`)}
-                          className="hover:bg-[var(--surface-secondary)]/60 transition-colors cursor-pointer group"
-                        >
-                          <td className="py-3.5 px-4 min-w-[220px]">
-                            <div className="flex items-center gap-2.5">
-                              <FileText className="w-4 h-4 text-[var(--accent)] shrink-0" />
-                              <div className="min-w-0">
-                                <span
-                                  dir="auto"
-                                  className="text-[13px] font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors block truncate"
-                                >
-                                  {doc.title}
-                                </span>
-                                <span className="font-mono text-[11px] text-[var(--muted)] block truncate">
-                                  {doc.filename}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-[var(--foreground)] whitespace-nowrap">
-                            <span className="ui-badge text-[11px] font-normal">
-                              {colName}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-[var(--muted)] font-mono whitespace-nowrap">
-                            {doc.revisions.length} rev{doc.revisions.length > 1 ? 's' : ''}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-[var(--muted)] font-mono whitespace-nowrap">
-                            {((doc.rawSize || 0) / 1024).toFixed(1)} KiB
-                          </td>
-
-                          <td className="py-3.5 px-4 text-[var(--muted)] whitespace-nowrap">
-                            {new Date(doc.importedAt || doc.createdAt).toLocaleDateString()}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-end whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/documents/${doc.id}`);
-                              }}
-                              className="ui-button ui-button-secondary text-xs py-1 px-2.5"
-                            >
-                              <span>Inspect</span>
-                              <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

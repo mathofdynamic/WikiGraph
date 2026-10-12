@@ -96,10 +96,8 @@ export function executeRetrieval(
   // 1. Identify superseded items via 'supersedes' relationships and status
   const supersededIds = new Set<string>();
   for (const rel of relationships) {
-    const relType = rel.type || rel.relationshipType;
-    if (relType === 'supersedes') {
-      const targetId = rel.targetId || rel.targetKnowledgeId;
-      if (targetId) supersededIds.add(targetId);
+    if (rel.type === 'supersedes') {
+      if (rel.targetKnowledgeId) supersededIds.add(rel.targetKnowledgeId);
     }
   }
 
@@ -256,7 +254,7 @@ export function executeRetrieval(
     if (item.sourceHasChanged) {
       warnings.push('source has changed');
     }
-    if (item.evidenceLevel === 'unverified' || (item.evidenceLevel as string) === 'theoretical') {
+    if (item.evidenceLevel === 'theoretical') {
       warnings.push('evidence: theoretical');
     }
 
@@ -340,18 +338,11 @@ export function executeRetrieval(
       addedIds.add(primary.item.id);
     }
 
-    // Look for relationships where another item is prerequisite_for this item,
-    // or this item requires another item
+    // Look for relationships where another item is prerequisite_for this item
     for (const rel of relationships) {
-      const relType = rel.type || rel.relationshipType;
-      const sId = rel.sourceId || rel.sourceKnowledgeId;
-      const tId = rel.targetId || rel.targetKnowledgeId;
-
       let prereqId: string | null = null;
-      if (relType === 'prerequisite_for' && tId === primary.item.id && sId) {
-        prereqId = sId;
-      } else if (relType === 'requires' && sId === primary.item.id && tId) {
-        prereqId = tId;
+      if (rel.type === 'prerequisite_for' && rel.targetKnowledgeId === primary.item.id && rel.sourceKnowledgeId) {
+        prereqId = rel.sourceKnowledgeId;
       }
 
       if (prereqId && !addedIds.has(prereqId)) {
@@ -369,7 +360,7 @@ export function executeRetrieval(
           const prereqWarnings: string[] = [];
           if (prereqItem.reviewStatus === 'needs_review') prereqWarnings.push('needs review');
           if (prereqItem.sourceHasChanged) prereqWarnings.push('source has changed');
-          if (prereqItem.evidenceLevel === 'unverified' || (prereqItem.evidenceLevel as string) === 'theoretical') {
+          if (prereqItem.evidenceLevel === 'theoretical') {
             prereqWarnings.push('evidence: theoretical');
           }
 
@@ -432,17 +423,16 @@ export function executeRetrieval(
   const reportedConflictPairs = new Set<string>();
 
   for (const rel of relationships) {
-    const relType = rel.type || rel.relationshipType;
-    if (relType === 'conflicts_with') {
-      const sId = rel.sourceId || rel.sourceKnowledgeId;
-      const tId = rel.targetId || rel.targetKnowledgeId;
+    if (rel.type === 'conflicts_with') {
+      const sId = rel.sourceKnowledgeId;
+      const tId = rel.targetKnowledgeId;
       if (sId && tId && selectedIds.has(sId) && selectedIds.has(tId)) {
         const pairKey = [sId, tId].sort().join('::');
         if (!reportedConflictPairs.has(pairKey)) {
           reportedConflictPairs.add(pairKey);
           conflicts.push({
             itemIds: [sId, tId],
-            note: rel.rationale || rel.notes || 'Incompatible execution constraints or conflicting methodology.',
+            note: rel.notes || 'Incompatible execution constraints or conflicting methodology.',
           });
         }
       }

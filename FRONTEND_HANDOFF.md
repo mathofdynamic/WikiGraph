@@ -4,15 +4,42 @@ This document specifies the technical architecture of the **WikiGraph** React fr
 
 ---
 
-## 1. Executive Summary & Design System
+## 1. Executive Summary: Read-Only, Agent-First Architecture
 
-WikiGraph is a private empirical knowledge workspace for a single owner. It turns deep-research Markdown reports into durable, reusable, and cited knowledge units (procedures, findings, tips, skills, examples, failures, and lessons).
+**WikiGraph is an empirical, read-only knowledge library designed with autonomous AI agents as the primary consumer and a human publication view as a secondary reading lens.**
 
-### Design Archetype: Editorial & Restrained
-- **Typography**: Clean serif and modern sans with mathematical contrast, and `Vazirmatn` for native Persian typography.
-- **Color Palette**: Sophisticated warm neutrals (light theme: stone-50 background, white containers, stone-900 typography, deep emerald accent `#047857`; dark theme: stone-950 background, stone-900 surface, stone-100 typography).
-- **No AI Clichés**: Banned purple/blue neon gradients, glassmorphism, huge border radii, and floating cards.
-- **Bilingual & RTL**: Fully localized in English and Persian (فارسی). Switches `html[dir="rtl"]`, `html[lang="fa"]`, and adjusts alignment dynamically.
+The site presents as a documentation/publication site (~72ch content column, typographic hierarchy, generous whitespace, zero dashboard boxes). The web UI contains NO manual create, edit, or delete workflows for library articles. Knowledge enters exclusively through structured offline pipelines, and agents communicate with the library programmatically.
+
+### 1.1 Machine Twins
+Every human-readable page in WikiGraph has an exact machine-readable equivalent:
+- `GET /api/v1/knowledge/:idOrSlug.md` & `GET /api/v1/knowledge/:idOrSlug.json`
+- `GET /api/v1/sources/:idOrSlug.md` & `GET /api/v1/sources/:idOrSlug.json`
+- `GET /api/v1/collections/:idOrSlug.md` & `GET /api/v1/collections/:idOrSlug.json`
+
+The `.md` twin format is compact, token-efficient, zero-fluff, and citation-ready. Every entity is assigned a stable, human-readable slug (unique, derived from title) that is used in page URLs, citations, and API routes.
+
+### 1.2 "Agent View" Toggle
+Every entry (knowledge item) and source page features an **"Agent view"** toggle that renders the exact, unmodified Markdown payload an AI agent receives, accompanied by its estimated token count (`estimateTokens(~4 chars/token)`). In demo mode, this is rendered by the pure shared module in `src/shared/renderers.ts` (with zero React or DOM dependencies) so backend workers can reuse identical formatting.
+
+### 1.3 The Two Write Paths
+1. **Bundle Publishing by Offline Skill (`wikigraph.bundle/1`)**:
+   - An offline tool (a local AI skill) ingests raw deep-research documents, extracts structured knowledge units with exact grounding citations, and publishes bundles to `POST /api/v1/import/bundle` authenticated with a `read_write` Bearer token.
+   - Preserves review status (`needs_review` or `reviewed`). Items imported as `reviewed` receive `reviewedAt` set to import time. Unknown top-level fields are safely tolerated.
+2. **Outcome Reporting by AI Agents (`report_outcome`)**:
+   - Downstream agents executing operational tasks report empirical execution outcomes through `POST /api/v1/outcomes` using a `read_write` Bearer token.
+   - Canonical fields: `task` (string), `appliedKnowledgeIds` (string[]), `appliedRevisionIds` (optional string[]), `result` (`'success'` | `'failure'` | `'uncertain'`), `notes` (optional string), `reportedBy` (optional string).
+   - Rate limited to 60 requests per minute per token to prevent telemetry flooding.
+
+### 1.4 Response Conventions for AI Agents
+Every agent query response adheres to strict conventions:
+- **Strict Budget Ceiling**: Strictly honors `maxTokens` budget; items exceeding the remaining allowance are placed in `excluded` under reason `over_budget`.
+- **Grounded Citations**: Context packets and entry items include exact source citations: item slug, source title/filename, and literal quoted excerpt.
+- **Explicit Sufficiency**: Returns `sufficiency: 'sufficient' | 'insufficient'` in plain prose without conversational noise.
+- **Safety Filtering**: Never returns unreviewed (`reviewStatus !== 'reviewed'`) or retired (`status === 'retired'`) items unless the request explicitly enables `includeUnreviewed: true` or `includeRetired: true`.
+- **Transparent Conflicts**: When mutually conflicting units match, conflicts are stated explicitly without silent tie-breaking.
+
+### 1.5 Model Context Protocol (MCP) Server Architecture
+WikiGraph specifies a first-class Model Context Protocol (MCP) server. The MCP server is architected as a **thin layer over the exact same `/api/v1` REST contract**, ensuring that retrieval heuristics, token budgeting, Persian Unicode normalization, and citation formatting exist in only one shared codebase.
 
 ---
 
@@ -130,7 +157,12 @@ CREATE TABLE knowledge_items (
   exclusions TEXT,
   requirements TEXT NOT NULL DEFAULT '[]', -- JSON array of strings
   review_status TEXT NOT NULL DEFAULT 'needs_review', -- 'draft' | 'reviewed' | 'deprecated' | 'needs_review'
-  evidence_level TEXT NOT NULL DEFAULT 'theoretical', -- 'theoretical' | 'tested' | 'production_proven' | 'unverified' | 'observed'
+  evidence_level TEXT NOT NULL DEFAULT 'theoretical', -- 'theoretical' | 'observed' | 'tested' | 'production_proven'
+  -- Evidence level definitions:
+  --   theoretical: stated in a source, not tried
+  --   observed: seen to work informally / in one case
+  --   tested: checked with a deliberate test or comparison
+  --   production_proven: used repeatedly in real work
   language TEXT NOT NULL DEFAULT 'en', -- 'en' | 'fa'
   source_has_changed INTEGER NOT NULL DEFAULT 0, -- 0 = false, 1 = true
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -157,7 +189,7 @@ CREATE TABLE relationships (
   id TEXT PRIMARY KEY,
   source_knowledge_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
   target_knowledge_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
-  relationship_type TEXT NOT NULL, -- 'requires' | 'complements' | 'conflicts_with' | 'alternative_to' | 'supports' | 'supersedes' | 'prerequisite_for' | 'derived_from' | 'relates_to'
+  relationship_type TEXT NOT NULL, -- 'supports' | 'conflicts_with' | 'alternative_to' | 'prerequisite_for' | 'derived_from' | 'supersedes' | 'relates_to'
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -169,14 +201,11 @@ CREATE INDEX idx_rel_type ON relationships(relationship_type);
 CREATE TABLE knowledge_outcomes (
   id TEXT PRIMARY KEY,
   task TEXT NOT NULL,
-  task_context TEXT,
-  prompt TEXT,
   applied_knowledge_ids TEXT NOT NULL DEFAULT '[]', -- JSON array of Knowledge IDs
+  applied_revision_ids TEXT DEFAULT '[]', -- JSON array of Knowledge Revision IDs (same order as applied_knowledge_ids)
   result TEXT NOT NULL, -- 'success' | 'failure' | 'uncertain'
-  metrics TEXT,
   notes TEXT,
-  review_notes TEXT,
-  executed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  reported_by TEXT,
   recorded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
@@ -427,7 +456,7 @@ Ingests an external AI skill bundle (`wikigraph.bundle/1` format). Atomic: creat
         "content": "# Document Parsing Heuristics\n\nContent...",
         "content_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
       },
-      "items": [
+      "knowledge_items": [
         {
           "local_id": "item-1",
           "title": "Heuristic Row Separation",
@@ -457,9 +486,10 @@ Ingests an external AI skill bundle (`wikigraph.bundle/1` format). Atomic: creat
     "isNewRevision": false
   }
   ```
+- **Options**:
+  - `onDuplicate`: `'skip'` (default; skips duplicate content without creating new items) or `'new_revision'` (creates a new revision for an existing document).
 - **Error Cases**:
   - `400 validation_failed`: Bundle failed validation (e.g. SHA mismatch, CRLF line endings, ungrounded excerpts, invalid schema version).
-  - `409 conflict`: Source content already imported and `onDuplicate` option is `error`.
 
 #### `GET /api/v1/export`
 Exports full JSON backup containing all collections, sources, source revisions, knowledge items, knowledge revisions, relationships, and outcomes.
@@ -494,11 +524,56 @@ List & filter knowledge items.
   - `sourceId`: string
   - `type`: KnowledgeType
   - `reviewStatus`: `draft | reviewed | deprecated | needs_review`
-  - `evidenceLevel`: `theoretical | tested | production_proven`
+  - `evidenceLevel`: `theoretical | observed | tested | production_proven`
   - `status`: `active | retired`
   - `includeRetired`: boolean (`true | false`)
   - `limit`: number, `cursor`: string
 - **Response `200 OK`**: `{ "items": [ KnowledgeItem... ], "nextCursor": null }`
+
+#### `GET /api/v1/knowledge/paginated`
+Paginated knowledge query for publication catalog and library listings.
+- **Query Params**:
+  - `q`: string search term
+  - `collectionId`: string
+  - `type`: `KnowledgeType | 'all'`
+  - `language`: `'en' | 'fa' | 'all'`
+  - `evidenceLevel`: `EvidenceLevel | 'all'`
+  - `status`: `'active' | 'retired' | 'all'`
+  - `includeRetired`: boolean
+  - `limit`: number (default: 20, max: 100)
+  - `cursor`: string cursor / offset
+- **Response `200 OK`**:
+  ```json
+  {
+    "items": [ /* KnowledgeItem... */ ],
+    "nextCursor": "20",
+    "total": 48
+  }
+  ```
+
+#### `GET /api/v1/search`
+Ranked keyword search returning contextual snippets and match reasons for the publication site.
+- **Query Params**:
+  - `q`: query string (required)
+  - `collectionId`: optional filter
+  - `type`: optional filter
+  - `language`: optional filter
+  - `limit`: number (default: 20)
+  - `cursor`: optional string offset
+- **Response `200 OK`**:
+  ```json
+  {
+    "results": [
+      {
+        "item": { /* KnowledgeItem */ },
+        "snippet": "…scalar quantization (SQ8) compresses vector indices four-fold…",
+        "matchReasons": ["Title match", "Summary match"]
+      }
+    ],
+    "nextCursor": "20",
+    "total": 1
+  }
+  ```
 
 #### `POST /api/v1/knowledge`
 Creates a new knowledge item. Automatically commits initial revision snapshot.
@@ -585,7 +660,7 @@ Creates relationship between two knowledge items.
   {
     "sourceKnowledgeId": "kno-01",
     "targetKnowledgeId": "kno-02",
-    "relationshipType": "prerequisite_for",
+    "type": "prerequisite_for",
     "notes": "Text normalization must run before table parsing"
   }
   ```
@@ -593,7 +668,7 @@ Creates relationship between two knowledge items.
 
 #### `PUT /api/v1/relationships/:id`
 Updates an existing relationship's type or notes.
-- **Request Body**: `{ "relationshipType": "conflicts_with", "notes": "Updated conflict note" }`
+- **Request Body**: `{ "type": "conflicts_with", "notes": "Updated conflict note" }`
 - **Response `200 OK`**: Updated `KnowledgeRelationship`.
 
 #### `DELETE /api/v1/relationships/:id`
@@ -610,10 +685,110 @@ Deletes relationship link.
 - `POST /api/v1/collections/move-items`: Move items `{ "fromCollectionId": "col-1", "toCollectionId": "col-2" }`.
 - `DELETE /api/v1/collections/:id`: Delete collection (`?moveTo=col-2` to migrate items).
 
-#### Outcomes:
-- `GET /api/v1/outcomes`: List outcomes (`?knowledgeId=kno-01`).
-- `POST /api/v1/outcomes`: Log new execution outcome.
-- `DELETE /api/v1/outcomes/:id`: Delete outcome record.
+### 4.8 Outcomes — The Agent Write Path (`report_outcome`)
+
+Agents report empirical execution outcomes through this canonical endpoint:
+
+#### `POST /api/v1/outcomes`
+Records empirical execution results when an agent applies library knowledge.
+- **Auth**: Bearer token with `read_write` scope required.
+- **Rate Limit**: Strictly limited to 60 requests per minute per token to prevent runaway agent logging loops.
+- **Canonical Request Payload**:
+  ```json
+  {
+    "task": "Extract structured invoice table from PDF",
+    "appliedKnowledgeIds": ["kno-table-extract-01", "kno-bidi-isol-03"],
+    "appliedRevisionIds": ["rev-kno-01-c"],
+    "result": "success",
+    "notes": "Verified against test cases with 100% cell alignment.",
+    "reportedBy": "agent-worker-01"
+  }
+  ```
+  - `task` (string, required): Operational technical task or goal executed.
+  - `appliedKnowledgeIds` (string[], required): Knowledge item IDs or human-readable slugs utilized.
+  - `appliedRevisionIds` (string[], optional): Exact immutable snapshot revision IDs used.
+  - `result` (`'success' | 'failure' | 'uncertain'`, required): Empirical outcome rating.
+  - `notes` (string, optional): Observation, edge case notes, or benchmark measurements.
+  - `reportedBy` (string, optional): Client identifier (e.g. `"claude-desktop-worker"`, `"eval-harness"`).
+- **Response `201 Created`**:
+  ```json
+  {
+    "id": "out-17382910-c4e9",
+    "task": "Extract structured invoice table from PDF",
+    "appliedKnowledgeIds": ["kno-table-extract-01", "kno-bidi-isol-03"],
+    "appliedRevisionIds": ["rev-kno-01-c"],
+    "result": "success",
+    "notes": "Verified against test cases with 100% cell alignment.",
+    "recordedAt": "2026-10-11T12:00:00.000Z",
+    "reportedBy": "agent-worker-01"
+  }
+  ```
+
+#### `GET /api/v1/outcomes`
+Lists historical outcomes.
+- **Query Params**: `?knowledgeId=kno-01&limit=50&cursor=out-xyz`
+- **Response `200 OK`**: `{ "items": [ KnowledgeOutcome... ], "nextCursor": null }`
+
+---
+
+### 4.9 Machine Twins & Discovery (`/llms.txt`)
+
+Every human-facing publication entity has an exact, citation-ready machine twin:
+
+#### `GET /llms.txt`
+Root directory manifest adhering to the llmstxt.org standard.
+- **Auth**: None (Public discovery)
+- **Response `200 OK`**: Plain text Markdown manifest detailing library purpose, API endpoints, collections, and top knowledge slugs.
+
+#### `GET /api/v1/knowledge/:idOrSlug.md`
+Returns compact, token-efficient Markdown representation of the entry.
+- **Auth**: Cookie or Bearer (`read_only` / `read_write`)
+- **Response `200 OK`**: Content-Type `text/markdown; charset=utf-8`
+
+#### `GET /api/v1/knowledge/:idOrSlug.json`
+Returns full structured JSON entity.
+- **Response `200 OK`**: Content-Type `application/json`
+
+#### `GET /api/v1/sources/:idOrSlug.md`
+Returns original research report content plus index of extracted entry citations.
+- **Response `200 OK`**: Content-Type `text/markdown; charset=utf-8`
+
+#### `GET /api/v1/collections/:idOrSlug.md`
+Returns curated shelf manifest and list of member knowledge unit summaries.
+- **Response `200 OK`**: Content-Type `text/markdown; charset=utf-8`
+
+---
+
+### 4.10 Model Context Protocol (MCP) Server Architecture
+
+The WikiGraph MCP server provides tools to LLM host applications (such as Claude Desktop, Cursor, or autonomous agents) over stdio or SSE.
+
+**Architectural Rule**: The MCP server is a **thin adapter layer over the exact same `/api/v1` HTTP endpoints**. It maintains no independent database connections or duplicate retrieval logic:
+- `search_knowledge` → calls `GET /api/v1/search?q={query}`
+- `get_context` → calls `POST /api/v1/query` with `ContextRequest`
+- `get_entry` → calls `GET /api/v1/knowledge/:idOrSlug.md` (or `.json`)
+- `get_source` → calls `GET /api/v1/sources/:idOrSlug.md`
+- `list_collections` → calls `GET /api/v1/collections`
+- `report_outcome` → calls `POST /api/v1/outcomes` (requires `read_write` token)
+
+---
+
+### 4.11 System & Diagnostics
+
+#### `GET /api/v1/system/stats`
+Returns system and storage statistics for the workspace.
+- **Auth**: Cookie or Bearer (`read_only` / `read_write`)
+- **Response `200 OK`**:
+  ```json
+  {
+    "documentCount": 8,
+    "knowledgeCount": 24,
+    "relationshipCount": 16,
+    "outcomeCount": 6,
+    "estimatedBytes": 1048576,
+    "isDemoStore": false
+  }
+  ```
 
 ---
 

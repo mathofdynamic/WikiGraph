@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   GitFork,
   Search,
@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Layers,
   ArrowRight,
+  ArrowLeft,
   AlertTriangle,
   CheckCircle2,
   X,
@@ -22,9 +23,8 @@ import {
   KnowledgeItem,
   KnowledgeRelationship,
   KnowledgeType,
-  RelationshipType,
+  RelationType,
 } from '../types';
-import { Badge } from '../components/common/Badge';
 
 interface GraphNode {
   id: string;
@@ -53,22 +53,24 @@ const TYPE_COLORS: Record<KnowledgeType, string> = {
   lesson: '#4f46e5', // indigo
 };
 
-const RELATION_STYLES: Record<RelationshipType, { stroke: string; dash?: string }> = {
+const RELATION_STYLES: Record<RelationType, { stroke: string; dash?: string }> = {
   supports: { stroke: '#059669' },
   conflicts_with: { stroke: '#dc2626', dash: '4,4' },
-  prerequisite_for: { stroke: '#7c3aed' },
-  complements: { stroke: '#0284c7' },
-  supersedes: { stroke: '#ea580c', dash: '3,3' },
   alternative_to: { stroke: '#64748b', dash: '2,2' },
+  prerequisite_for: { stroke: '#7c3aed' },
   derived_from: { stroke: '#0891b2' },
+  supersedes: { stroke: '#ea580c', dash: '3,3' },
   relates_to: { stroke: '#64748b' },
-  requires: { stroke: '#7c3aed' },
 };
 
 export const GraphPage: React.FC = () => {
   const { repository, version } = useRepository();
   const { t, locale } = useLocale();
   const navigate = useNavigate();
+
+  const [searchParams] = useSearchParams();
+  const initialFocus = searchParams.get('focus');
+  const initialCollection = searchParams.get('collection');
 
   const [knowledgeList, setKnowledgeList] = useState<KnowledgeItem[]>([]);
   const [relationshipsList, setRelationshipsList] = useState<KnowledgeRelationship[]>([]);
@@ -77,7 +79,7 @@ export const GraphPage: React.FC = () => {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollection, setSelectedCollection] = useState('all');
+  const [selectedCollection, setSelectedCollection] = useState(initialCollection || 'all');
   const [selectedRelationType, setSelectedRelationType] = useState<string>('all');
   const [showRetired, setShowRetired] = useState(false);
 
@@ -144,12 +146,12 @@ export const GraphPage: React.FC = () => {
   // Filter edges
   const filteredEdges = useMemo(() => {
     return relationshipsList.filter((rel) => {
-      const src = rel.sourceKnowledgeId || rel.sourceId;
-      const tgt = rel.targetKnowledgeId || rel.targetId;
+      const src = rel.sourceKnowledgeId;
+      const tgt = rel.targetKnowledgeId;
       if (!src || !tgt) return false;
       if (!filteredNodeIds.has(src) || !filteredNodeIds.has(tgt)) return false;
 
-      const relType = rel.relationshipType || rel.type || 'supports';
+      const relType = rel.type || 'supports';
       if (selectedRelationType !== 'all' && relType !== selectedRelationType) {
         return false;
       }
@@ -192,6 +194,13 @@ export const GraphPage: React.FC = () => {
   }, [nodes]);
 
   // Handle Pan & Drag
+  useEffect(() => {
+    if (initialFocus && nodes.length > 0 && !selectedNode) {
+      const target = nodes.find((n) => n.id === initialFocus);
+      if (target) setSelectedNode(target);
+    }
+  }, [initialFocus, nodes, selectedNode]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.target === svgRef.current || (e.target as HTMLElement).tagName === 'svg') {
       setIsDragging(true);
@@ -223,6 +232,13 @@ export const GraphPage: React.FC = () => {
       {/* Top Header & Filter Toolbar */}
       <div className="p-4 sm:px-6 border-b border-[var(--separator)] bg-[var(--surface)] flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
+          <Link
+            to="/library"
+            className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
+            title="Back to library"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
           <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shrink-0">
             <GitFork className="w-4 h-4" />
           </div>
@@ -274,11 +290,13 @@ export const GraphPage: React.FC = () => {
             className="ui-select text-xs h-8 py-1"
           >
             <option value="all">{locale === 'fa' ? 'همه پیوندها' : 'All Relationships'}</option>
-            <option value="supports">supports (پشتیبانی)</option>
-            <option value="conflicts_with">conflicts_with (تناقض)</option>
-            <option value="prerequisite_for">prerequisite_for (پیش‌نیاز)</option>
-            <option value="supersedes">supersedes (جایگزین)</option>
-            <option value="complements">complements (مکمل)</option>
+            <option value="supports">supports ({t('relationships.supportedBy')})</option>
+            <option value="conflicts_with">conflicts_with ({t('relationships.conflictsWith')})</option>
+            <option value="alternative_to">alternative_to ({t('relationships.alternativeTo')})</option>
+            <option value="prerequisite_for">prerequisite_for ({t('relationships.prerequisiteFor')})</option>
+            <option value="derived_from">derived_from ({t('relationships.spawned')})</option>
+            <option value="supersedes">supersedes ({t('relationships.supersededBy')})</option>
+            <option value="relates_to">relates_to ({t('relationships.relatesTo')})</option>
           </select>
 
           {/* Zoom controls */}
@@ -359,6 +377,39 @@ export const GraphPage: React.FC = () => {
                 <path d="M 0 1 L 10 5 L 0 9 z" fill="#dc2626" />
               </marker>
               <marker
+                id="arrow-prerequisite"
+                viewBox="0 0 10 10"
+                refX="22"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#7c3aed" />
+              </marker>
+              <marker
+                id="arrow-supersedes"
+                viewBox="0 0 10 10"
+                refX="22"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#ea580c" />
+              </marker>
+              <marker
+                id="arrow-derived"
+                viewBox="0 0 10 10"
+                refX="22"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#0891b2" />
+              </marker>
+              <marker
                 id="arrow-default"
                 viewBox="0 0 10 10"
                 refX="22"
@@ -374,20 +425,26 @@ export const GraphPage: React.FC = () => {
             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
               {/* Edges */}
               {filteredEdges.map((rel) => {
-                const srcId = rel.sourceKnowledgeId || rel.sourceId;
-                const tgtId = rel.targetKnowledgeId || rel.targetId;
+                const srcId = rel.sourceKnowledgeId;
+                const tgtId = rel.targetKnowledgeId;
                 if (!srcId || !tgtId) return null;
                 const srcNode = nodeMap.get(srcId);
                 const tgtNode = nodeMap.get(tgtId);
                 if (!srcNode || !tgtNode) return null;
 
-                const relType = (rel.relationshipType || rel.type || 'supports') as RelationshipType;
+                const relType = (rel.type || 'supports') as RelationType;
                 const style = RELATION_STYLES[relType] || { stroke: '#64748b' };
                 const markerId =
                   relType === 'conflicts_with'
                     ? 'url(#arrow-conflicts)'
                     : relType === 'supports'
                     ? 'url(#arrow-supports)'
+                    : relType === 'prerequisite_for'
+                    ? 'url(#arrow-prerequisite)'
+                    : relType === 'supersedes'
+                    ? 'url(#arrow-supersedes)'
+                    : relType === 'derived_from'
+                    ? 'url(#arrow-derived)'
                     : 'url(#arrow-default)';
 
                 return (
@@ -500,10 +557,10 @@ export const GraphPage: React.FC = () => {
               top: Math.max(10, hoveredNode.screenY - 10),
             }}
           >
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge type="knowledgeType" value={hoveredNode.node.item.type} size="sm" />
-              <Badge type="evidence" value={hoveredNode.node.item.evidenceLevel} size="sm" />
-              <Badge type="review" value={hoveredNode.node.item.reviewStatus} size="sm" />
+            <div className="text-[11px] text-[var(--muted)] flex items-center gap-1.5 capitalize">
+              <span>{hoveredNode.node.item.type.replace('_', ' ')}</span>
+              <span aria-hidden="true">·</span>
+              <span>{hoveredNode.node.item.evidenceLevel.replace('_', ' ')}</span>
             </div>
             <h4
               dir="auto"
@@ -531,11 +588,11 @@ export const GraphPage: React.FC = () => {
             }}
           >
             <span className="font-semibold text-[var(--accent)]">
-              {hoveredEdge.edge.relationship.relationshipType || hoveredEdge.edge.relationship.type}
+              {hoveredEdge.edge.relationship.type}
             </span>
-            {hoveredEdge.edge.relationship.rationale && (
+            {hoveredEdge.edge.relationship.notes && (
               <p className="text-[10px] text-[var(--muted)] mt-0.5 font-sans">
-                {hoveredEdge.edge.relationship.rationale}
+                {hoveredEdge.edge.relationship.notes}
               </p>
             )}
           </div>
@@ -563,10 +620,12 @@ export const GraphPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge type="knowledgeType" value={selectedNode.item.type} size="sm" />
-              <Badge type="evidence" value={selectedNode.item.evidenceLevel} size="sm" />
-              <Badge type="review" value={selectedNode.item.reviewStatus} size="sm" />
+            <div className="text-[11px] text-[var(--muted)] flex items-center gap-1.5 capitalize">
+              <span>{selectedNode.item.type.replace('_', ' ')}</span>
+              <span aria-hidden="true">·</span>
+              <span>{selectedNode.item.evidenceLevel.replace('_', ' ')}</span>
+              <span aria-hidden="true">·</span>
+              <span>{selectedNode.item.language}</span>
             </div>
 
             <div className="text-xs space-y-2 max-h-56 overflow-y-auto pe-1">

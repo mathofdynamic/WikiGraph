@@ -1,175 +1,151 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  ExternalLink,
-  GitFork,
-  FileText,
-  ShieldCheck,
-  AlertCircle,
   Copy,
   Check,
+  FileCode,
+  FileText,
+  ExternalLink,
+  ChevronDown,
+  GitFork,
+  ArrowLeft,
+  AlertTriangle,
   History,
-  RotateCcw,
-  Archive,
-  Eye,
+  X,
+  Bot,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import {
-  Collection,
   KnowledgeItem,
+  KnowledgeOutcome,
   KnowledgeRelationship,
   KnowledgeRevision,
-  RelationshipType,
+  RelationType,
   SourceDocument,
-  KnowledgeOutcome,
 } from '../types';
-import { Badge } from '../components/common/Badge';
 import { MarkdownViewer } from '../components/common/MarkdownViewer';
-import { ConfirmModal } from '../components/common/ConfirmModal';
+import { renderKnowledgeMarkdown, estimateTokens } from '../shared/renderers';
 
 export const KnowledgeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { repository, version, notifyMutation } = useRepository();
+  const { repository } = useRepository();
   const { t, locale } = useLocale();
   const navigate = useNavigate();
 
   const [item, setItem] = useState<KnowledgeItem | null>(null);
   const [source, setSource] = useState<SourceDocument | null>(null);
-  const [collection, setCollection] = useState<Collection | null>(null);
-  const [allKnowledge, setAllKnowledge] = useState<KnowledgeItem[]>([]);
   const [relationships, setRelationships] = useState<KnowledgeRelationship[]>([]);
+  const [relatedItemsMap, setRelatedItemsMap] = useState<Record<string, KnowledgeItem>>({});
   const [outcomes, setOutcomes] = useState<KnowledgeOutcome[]>([]);
   const [revisions, setRevisions] = useState<KnowledgeRevision[]>([]);
   const [activeRevision, setActiveRevision] = useState<KnowledgeRevision | null>(null);
+
+  const [isAgentView, setIsAgentView] = useState(false);
+  const [copiedAgentMd, setCopiedAgentMd] = useState(false);
+
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Modals state
-  const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
-  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
-  const [isRestoreRevModalOpen, setIsRestoreRevModalOpen] = useState(false);
-  const [selectedRevToRestore, setSelectedRevToRestore] = useState<KnowledgeRevision | null>(null);
-  const [changeNote, setChangeNote] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  // Copied feedback states
+  const [copiedMd, setCopiedMd] = useState(false);
+  const [copiedApi, setCopiedApi] = useState(false);
 
-  // Copy feedback
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
+  // Raw preview modal
+  const [rawModalContent, setRawModalContent] = useState<{
+    title: string;
+    content: string;
+    type: 'markdown' | 'json';
+  } | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     if (!id) return;
-    let active = true;
 
-    const loadData = async () => {
+    const fetchArticleData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        const k = await repository.getKnowledge(id);
-        if (!active) return;
-        if (!k) {
-          setItem(null);
+        const kno = await repository.getKnowledge(id);
+        if (!kno) {
+          if (mounted) setError('Knowledge entry not found.');
           return;
         }
 
-        setItem(k);
+        if (mounted) setItem(kno);
 
-        const [srcDoc, cols, allK, allRels, allOutcomes, revList] = await Promise.all([
-          k.sourceId ? repository.getSource(k.sourceId) : Promise.resolve(null),
-          repository.listCollections(),
-          repository.listKnowledge({ includeRetired: true }),
-          repository.listRelationships(),
+        // Concurrently fetch source, relationships, outcomes, and revisions
+        const [srcDoc, rels, outs, revs] = await Promise.all([
+          kno.sourceId ? repository.getSource(kno.sourceId) : Promise.resolve(null),
+          repository.listRelationships(id),
           repository.listOutcomes(id),
           repository.getKnowledgeRevisions(id),
         ]);
 
-        if (!active) return;
+        if (!mounted) return;
         setSource(srcDoc);
-        setCollection(cols.find((c) => c.id === k.collectionId) || null);
-        setAllKnowledge(allK);
-        setOutcomes(allOutcomes);
-        setRevisions(revList);
+        setRelationships(rels);
+        setOutcomes(outs);
+        setRevisions(revs);
 
-        const itemRels = allRels.filter(
-          (r) => r.sourceId === id || r.sourceKnowledgeId === id
+        // Fetch targets of relationships for title lookup
+        const targetIds = Array.from(
+          new Set(
+            rels.map((r) =>
+              r.sourceKnowledgeId === id ? r.targetKnowledgeId : r.sourceKnowledgeId
+            )
+          )
         );
-        setRelationships(itemRels);
-      } catch (err) {
-        console.error(err);
+
+        if (targetIds.length > 0) {
+          const fetchedItems = await Promise.all(
+            targetIds.map((tid) => repository.getKnowledge(tid))
+          );
+          const map: Record<string, KnowledgeItem> = {};
+          fetchedItems.forEach((it) => {
+            if (it) map[it.id] = it;
+          });
+          if (mounted) setRelatedItemsMap(map);
+        }
+      } catch (err: any) {
+        if (mounted) setError(err.message || 'Failed to load article');
       } finally {
-        if (active) setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
-    loadData();
+    fetchArticleData();
     return () => {
-      active = false;
+      mounted = false;
     };
-  }, [id, repository, version]);
+  }, [id, repository]);
 
-  const handleRetire = async () => {
-    if (!item) return;
-    try {
-      setActionLoading(true);
-      const updated = await repository.retireKnowledge(item.id, changeNote.trim() || undefined);
-      setItem(updated);
-      setChangeNote('');
-      setIsRetireModalOpen(false);
-      notifyMutation();
-      const revList = await repository.getKnowledgeRevisions(item.id);
-      setRevisions(revList);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="max-w-[72ch] mx-auto px-4 py-20 text-center text-sm text-[var(--muted)]">
+        {t('common.loading')}
+      </div>
+    );
+  }
 
-  const handleRestore = async () => {
-    if (!item) return;
-    try {
-      setActionLoading(true);
-      const updated = await repository.restoreKnowledge(item.id, changeNote.trim() || undefined);
-      setItem(updated);
-      setChangeNote('');
-      setIsRestoreModalOpen(false);
-      notifyMutation();
-      const revList = await repository.getKnowledgeRevisions(item.id);
-      setRevisions(revList);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  if (error || !item) {
+    return (
+      <div className="max-w-[72ch] mx-auto px-4 py-20 text-center space-y-4">
+        <h1 className="text-xl font-semibold text-[var(--foreground)]">
+          {error || t('knowledgeDetail.notFoundDesc')}
+        </h1>
+        <Link
+          to="/library"
+          className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>{t('common.back')}</span>
+        </Link>
+      </div>
+    );
+  }
 
-  const handleRestoreRevision = async () => {
-    if (!item || !selectedRevToRestore) return;
-    try {
-      setActionLoading(true);
-      const updated = await repository.restoreKnowledgeRevision(
-        item.id,
-        selectedRevToRestore.id,
-        changeNote.trim() || undefined
-      );
-      setItem(updated);
-      setActiveRevision(null);
-      setSelectedRevToRestore(null);
-      setChangeNote('');
-      setIsRestoreRevModalOpen(false);
-      notifyMutation();
-      const revList = await repository.getKnowledgeRevisions(item.id);
-      setRevisions(revList);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Determine which fields to display (active revision snapshot vs current live item)
+  // Active content: current item or snapshot if viewing past revision
   const displayFields = activeRevision
     ? {
         title: activeRevision.snapshot.title,
@@ -177,803 +153,659 @@ export const KnowledgeDetailPage: React.FC = () => {
         body: activeRevision.snapshot.body,
         type: activeRevision.snapshot.type,
         evidenceLevel: activeRevision.snapshot.evidenceLevel,
-        reviewStatus: activeRevision.snapshot.reviewStatus,
         applicability: activeRevision.snapshot.applicability,
         exclusions: activeRevision.snapshot.exclusions,
         requirements: activeRevision.snapshot.requirements,
       }
-    : item
-    ? {
+    : {
         title: item.title,
         summary: item.summary,
         body: item.body,
         type: item.type,
         evidenceLevel: item.evidenceLevel,
-        reviewStatus: item.reviewStatus,
         applicability: item.applicability,
         exclusions: item.exclusions,
         requirements: item.requirements,
-      }
-    : null;
+      };
 
-  const handleCopyAgentPrompt = () => {
-    if (!item || !displayFields) return;
-    const promptXml = `<agent_skill id="${item.id}" type="${displayFields.type}" evidence="${displayFields.evidenceLevel}">
-<title>${displayFields.title}</title>
-<summary>${displayFields.summary}</summary>
-<applicability>${displayFields.applicability || 'General'}</applicability>
-<exclusions>${displayFields.exclusions || 'None'}</exclusions>
-<requirements>${displayFields.requirements.join(', ')}</requirements>
-<procedure>
-${displayFields.body || displayFields.summary}
-</procedure>
-<citation_grounding>
-${item.sourceExcerpt || ''}
-</citation_grounding>
-</agent_skill>`;
+  // Compile formatted Markdown representation of this knowledge unit using shared renderer
+  const agentMarkdown = item
+    ? renderKnowledgeMarkdown(item, {
+        sourceTitle: source?.title,
+        sourceFilename: source?.filename,
+      })
+    : '';
 
-    navigator.clipboard.writeText(promptXml);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
-  };
+  const agentTokens = estimateTokens(agentMarkdown);
 
-  const handleCopyMarkdown = () => {
-    if (!item || !displayFields) return;
-    const md = `# ${displayFields.title}
-
-> **${t('knowledgeDetail.fieldSummary')}:** ${displayFields.summary}
-> **${t('knowledgeDetail.fieldType')}:** ${displayFields.type} | **${t('knowledgeDetail.fieldEvidenceLevel')}:** ${displayFields.evidenceLevel} | **${t('knowledgeDetail.fieldReviewStatus')}:** ${displayFields.reviewStatus}
-
-## ${t('knowledgeDetail.fieldApplicability')}
-${displayFields.applicability || 'General'}
-
-## ${t('knowledgeDetail.fieldExclusions')}
-${displayFields.exclusions || 'None'}
-
-## ${t('knowledgeDetail.fieldRequirements')}
-${displayFields.requirements.length > 0 ? displayFields.requirements.map((r) => `- ${r}`).join('\n') : 'None'}
-
-## ${t('knowledgeDetail.fieldBody')}
-${displayFields.body || displayFields.summary}
-
-## ${t('knowledgeDetail.groundingCitationTitle')}
-> "${item.sourceExcerpt || ''}"
-— ${t('knowledgeDetail.sourceProvenance')}: ${source?.filename || item.sourceId || t('knowledgeDetail.manualNoteNotice')}
-`;
-    navigator.clipboard.writeText(md);
-    setCopiedMarkdown(true);
-    setTimeout(() => setCopiedMarkdown(false), 2000);
-  };
-
-  const getRelationshipTarget = (rel: KnowledgeRelationship) => {
-    const targetId = rel.sourceKnowledgeId === id ? rel.targetKnowledgeId : rel.sourceKnowledgeId;
-    return allKnowledge.find((k) => k.id === targetId);
-  };
-
-  const getReciprocalLabel = (type: RelationshipType): string => {
-    switch (type) {
-      case 'supports':
-        return t('relationships.supportedBy');
-      case 'conflicts_with':
-        return t('relationships.conflictsWith');
-      case 'prerequisite_for':
-        return t('relationships.requires');
-      case 'derived_from':
-        return t('relationships.spawned');
-      case 'supersedes':
-        return t('relationships.supersededBy');
-      case 'relates_to':
-        return t('relationships.relatesTo');
-      case 'requires':
-        return t('relationships.prerequisiteFor');
-      case 'complements':
-        return t('relationships.complements');
-      case 'alternative_to':
-        return t('relationships.alternativeTo');
-      default:
-        return String(type);
+  const handleCopyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(agentMarkdown);
+      setCopiedMd(true);
+      setTimeout(() => setCopiedMd(false), 2500);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="py-24 text-center text-xs text-[var(--muted)]">
-        <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-[var(--accent)]" />
-        <span>{t('common.loading')}</span>
-      </div>
-    );
-  }
+  const handleCopyAgentMd = async () => {
+    try {
+      await navigator.clipboard.writeText(agentMarkdown);
+      setCopiedAgentMd(true);
+      setTimeout(() => setCopiedAgentMd(false), 2500);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  if (!item || !displayFields) {
-    return (
-      <div className="py-24 text-center text-xs text-[var(--muted)] max-w-md mx-auto space-y-3">
-        <AlertCircle className="w-8 h-8 mx-auto text-[var(--muted)]" />
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--foreground)] mb-1">
-            {t('knowledgeDetail.notFound')}
-          </h2>
-          <p className="text-[var(--muted)]">
-            {t('knowledgeDetail.notFoundDesc')}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate('/library')}
-          className="ui-button ui-button-secondary text-xs"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
-          <span>{t('common.backToLibrary')}</span>
-        </button>
-      </div>
-    );
-  }
+  const handleCopyApiUrl = async () => {
+    try {
+      const slugOrId = item?.slug || item?.id || '';
+      const apiUrl = `${window.location.origin}/api/v1/knowledge/${slugOrId}.md`;
+      await navigator.clipboard.writeText(apiUrl);
+      setCopiedApi(true);
+      setTimeout(() => setCopiedApi(false), 2500);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleOpenRawMd = () => {
+    if (!item) return;
+    setRawModalContent({
+      title: `${item.title} (.md)`,
+      content: agentMarkdown,
+      type: 'markdown',
+    });
+  };
+
+  const handleOpenRawJson = () => {
+    if (!item) return;
+    setRawModalContent({
+      title: `${item.title} (.json)`,
+      content: JSON.stringify(item, null, 2),
+      type: 'json',
+    });
+  };
+
+  // Group relationships
+  const groupedRelationships: Record<RelationType, { rel: KnowledgeRelationship; other: KnowledgeItem }[]> = {
+    conflicts_with: [],
+    alternative_to: [],
+    prerequisite_for: [],
+    derived_from: [],
+    supersedes: [],
+    supports: [],
+    relates_to: [],
+  };
+
+  relationships.forEach((rel) => {
+    const otherId = rel.sourceKnowledgeId === item.id ? rel.targetKnowledgeId : rel.sourceKnowledgeId;
+    const otherItem = relatedItemsMap[otherId];
+    if (otherItem && groupedRelationships[rel.type]) {
+      groupedRelationships[rel.type].push({ rel, other: otherItem });
+    }
+  });
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header & Contextual Actions Bar */}
-      <div className="space-y-3 pb-4 border-b border-[var(--separator)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/library')}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer w-fit"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
-            <span>{t('common.backToLibrary')}</span>
-          </button>
-
-          {/* Contextual Top Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* If currently viewing past revision: Show restore revision action and exit button */}
-            {activeRevision ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedRevToRestore(activeRevision);
-                    setIsRestoreRevModalOpen(true);
-                  }}
-                  className="ui-button ui-button-primary text-xs"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>{t('knowledgeDetail.restoreRevision')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveRevision(null)}
-                  className="ui-button ui-button-secondary text-xs"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
-                  <span>{t('knowledgeDetail.backToCurrent')}</span>
-                </button>
-              </>
-            ) : (
-              <>
-                {/* Retire / Restore Action Button */}
-                {item.status === 'retired' ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsRestoreModalOpen(true)}
-                    className="ui-button ui-button-secondary text-xs text-[var(--accent)]"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>{t('knowledgeDetail.restore')}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsRetireModalOpen(true)}
-                    className="ui-button ui-button-secondary text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                    <span>{t('knowledgeDetail.retire')}</span>
-                  </button>
-                )}
-
-                {/* Read-Only Export Actions */}
-                <button
-                  type="button"
-                  onClick={handleCopyAgentPrompt}
-                  className="ui-button ui-button-secondary text-xs"
-                  title="Copy Context Prompt"
-                >
-                  {copiedPrompt ? (
-                    <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
-                  )}
-                  <span>{copiedPrompt ? t('common.copied') : t('knowledgeDetail.copyPromptBtn')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCopyMarkdown}
-                  className="ui-button ui-button-secondary text-xs"
-                  title="Copy Markdown"
-                >
-                  {copiedMarkdown ? (
-                    <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
-                  )}
-                  <span>{copiedMarkdown ? t('common.copied') : t('knowledgeDetail.copyMarkdownBtn')}</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Title & Metadata Summary */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap text-xs text-[var(--muted)]">
-            {collection && (
-              <span className="font-medium text-[var(--foreground)]">
-                {locale === 'fa' ? collection.nameFa : collection.name}
-              </span>
-            )}
-            {collection && <span className="text-[var(--separator)]">•</span>}
-            <span className="font-mono text-[11px]">ID: {item.id}</span>
-            {item.updatedAt && (
-              <>
-                <span className="text-[var(--separator)]">•</span>
-                <span className="text-[11px] font-mono">
-                  {new Date(item.updatedAt).toLocaleDateString()}
-                </span>
-              </>
-            )}
-            {item.origin && (
-              <>
-                <span className="text-[var(--separator)]">•</span>
-                <span className="text-[11px]">
-                  {item.origin === 'manual' ? t('library.originManual') : t('library.originBundle')}
-                </span>
-              </>
-            )}
-          </div>
-
-          <h1
-            dir="auto"
-            className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-[var(--foreground)] leading-snug"
-          >
-            {displayFields.title}
-          </h1>
-        </div>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+      {/* Back button */}
+      <div className="mb-6">
+        <Link
+          to="/library"
+          className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>{t('library.title')}</span>
+        </Link>
       </div>
 
-      {/* Retired Warning Banner */}
-      {item.status === 'retired' && (
-        <div className="p-4 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-100/80 dark:bg-stone-900/60 text-stone-800 dark:text-stone-200 flex items-start justify-between gap-3 text-xs">
-          <div className="flex items-start gap-2.5">
-            <Archive className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold text-stone-900 dark:text-stone-100">
-                {t('knowledgeDetail.retiredBanner')}
-              </div>
-              {item.retiredAt && (
-                <div className="text-stone-500 font-mono text-[11px] mt-0.5">
-                  {t('knowledgeDetail.retiredAt')}: {new Date(item.retiredAt).toLocaleString()}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-14">
+        {/* Right Panel on Desktop / Top on Mobile: "Use with an AI" */}
+        <aside className="lg:col-span-4 lg:order-last space-y-6">
+          <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs space-y-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+              {t('knowledgeDetail.useWithAI')}
+            </h2>
+
+            <div className="space-y-2 text-xs">
+              {/* Agent View Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsAgentView((prev) => !prev)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer border ${
+                  isAgentView
+                    ? 'bg-[var(--foreground)] text-[var(--surface)] border-[var(--foreground)]'
+                    : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]/80 text-[var(--foreground)] border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>{isAgentView ? t('knowledgeDetail.humanView') : t('knowledgeDetail.agentView')}</span>
                 </div>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsRestoreModalOpen(true)}
-            className="ui-button ui-button-secondary text-xs shrink-0"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{t('knowledgeDetail.restore')}</span>
-          </button>
-        </div>
-      )}
-
-      {/* Past Revision Inspection Banner */}
-      {activeRevision && (
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <Eye className="w-4 h-4 text-[var(--accent)] shrink-0" />
-            <div>
-              <span className="font-semibold">{t('knowledgeDetail.viewingRevision')}</span>
-              <span className="text-[var(--muted)] ms-2 font-mono text-[11px]">
-                ({new Date(activeRevision.createdAt).toLocaleString()})
-              </span>
-              {activeRevision.changeNote && (
-                <span className="text-[var(--foreground)] italic ms-2">
-                  — "{activeRevision.changeNote}"
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                  isAgentView
+                    ? 'bg-[var(--surface)]/20 text-[var(--surface)]'
+                    : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)]'
+                }`}>
+                  ~{agentTokens} {t('knowledgeDetail.tokensEstimate')}
                 </span>
-              )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyMarkdown}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]/80 text-[var(--foreground)] font-medium transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-[var(--muted)]" />
+                  <span>{t('knowledgeDetail.copyMarkdown')}</span>
+                </div>
+                {copiedMd ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyApiUrl}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]/80 text-[var(--foreground)] font-medium transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <ExternalLink className="w-3.5 h-3.5 text-[var(--muted)]" />
+                  <span>{t('knowledgeDetail.copyApiUrl')}</span>
+                </div>
+                {copiedApi ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-[var(--muted)]" />
+                )}
+              </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleOpenRawMd}
+                  className="px-2.5 py-1.5 rounded-md border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-[var(--muted)] hover:text-[var(--foreground)] text-[11px] font-mono text-center cursor-pointer transition-colors"
+                >
+                  {t('knowledgeDetail.openRawMd')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenRawJson}
+                  className="px-2.5 py-1.5 rounded-md border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-[var(--muted)] hover:text-[var(--foreground)] text-[11px] font-mono text-center cursor-pointer transition-colors"
+                >
+                  {t('knowledgeDetail.openRawJson')}
+                </button>
+              </div>
+            </div>
+
+            {/* Explore Graph Deep Link */}
+            <div className="pt-2 border-t border-[var(--separator)]">
+              <Link
+                to={`/graph?focus=${item.id}`}
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+              >
+                <GitFork className="w-3.5 h-3.5" />
+                <span>{t('knowledgeDetail.exploreMap')}</span>
+              </Link>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRevToRestore(activeRevision);
-                setIsRestoreRevModalOpen(true);
-              }}
-              className="ui-button ui-button-primary text-xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>{t('knowledgeDetail.restoreRevision')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveRevision(null)}
-              className="ui-button ui-button-secondary text-xs"
-            >
-              {t('knowledgeDetail.backToCurrent')}
-            </button>
-          </div>
-        </div>
-      )}
+        </aside>
 
-      {/* Source Changed Notice (Read-Only) */}
-      {item.sourceHasChanged && !activeRevision && (
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] flex items-start gap-2.5 text-xs">
-          <AlertTriangle className="w-4 h-4 text-[var(--muted)] shrink-0 mt-0.5" />
-          <div>
-            <span className="font-semibold me-1">{t('library.needsReview')}:</span>
-            <span className="text-[var(--muted)]">{t('knowledgeDetail.sourceChangedWarning')}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Composed Read Mode: 2-column layout (Main 67% / Supporting 33%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Main Column (8 cols on lg ~ 67%) */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="ui-card p-6 sm:p-8 space-y-8">
-            {/* Summary Section */}
-            <section className="space-y-2">
-              <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
-                {t('knowledgeDetail.fieldSummary')}
-              </h2>
-              <p dir="auto" className="text-[13px] sm:text-[14px] text-[var(--foreground)] leading-relaxed">
-                {displayFields.summary}
-              </p>
-            </section>
-
-            {/* Main Methodology & Technical Body */}
-            <section className="space-y-3 pt-6 border-t border-[var(--separator)]">
-              <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
-                {t('knowledgeDetail.fieldBody')}
-              </h2>
-              <div className="text-[13px] sm:text-[14px] text-[var(--foreground)] leading-relaxed">
-                {displayFields.body ? (
-                  <MarkdownViewer content={displayFields.body} />
-                ) : (
-                  <p className="italic text-[var(--muted)]">{displayFields.summary}</p>
+        {/* Main Article Reading Column (~72ch) */}
+        <article className="lg:col-span-8 max-w-[72ch] space-y-10">
+          {/* Active Revision Banner (if viewing history) */}
+          {activeRevision && (
+            <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs flex items-center justify-between gap-3 text-[var(--foreground)]">
+              <div>
+                <span className="font-semibold me-1">
+                  {t('knowledgeDetail.viewingRevision')}:
+                </span>
+                <span>
+                  {new Date(activeRevision.createdAt).toLocaleDateString()}
+                </span>
+                {activeRevision.changeNote && (
+                  <span className="text-[var(--muted)] ms-2 italic">
+                    — "{activeRevision.changeNote}"
+                  </span>
                 )}
               </div>
-            </section>
+              <button
+                type="button"
+                onClick={() => setActiveRevision(null)}
+                className="px-2.5 py-1 rounded bg-[var(--surface)] border border-[var(--border)] text-xs font-medium cursor-pointer"
+              >
+                {t('knowledgeDetail.backToCurrent')}
+              </button>
+            </div>
+          )}
 
-            {/* Operational Scope (Applicability & Exclusions) */}
-            <section className="pt-6 border-t border-[var(--separator)] space-y-4">
-              <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
-                {t('knowledgeDetail.fieldApplicability')} & {t('knowledgeDetail.fieldExclusions')}
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/50 space-y-1.5 text-xs">
-                  <div className="flex items-center gap-1.5 text-[var(--foreground)] font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-                    <span>{t('knowledgeDetail.fieldApplicability')}</span>
-                  </div>
-                  <p dir="auto" className="text-[13px] text-[var(--foreground)] leading-relaxed">
-                    {displayFields.applicability || t('common.none')}
-                  </p>
-                </div>
+          {/* Article Header */}
+          <header className="space-y-4">
+            <h1
+              className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)] leading-tight"
+              dir="auto"
+            >
+              {displayFields.title}
+            </h1>
 
-                <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/50 space-y-1.5 text-xs">
-                  <div className="flex items-center gap-1.5 text-[var(--muted)] font-medium">
-                    <AlertCircle className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
-                    <span>{t('knowledgeDetail.fieldExclusions')}</span>
-                  </div>
-                  <p dir="auto" className="text-[13px] text-[var(--muted)] leading-relaxed">
-                    {displayFields.exclusions || t('common.none')}
-                  </p>
-                </div>
-              </div>
-            </section>
+            <p
+              className="text-base sm:text-lg text-[var(--muted)] leading-relaxed"
+              dir="auto"
+            >
+              {displayFields.summary}
+            </p>
 
-            {/* Prerequisites & Requirements */}
-            {displayFields.requirements && displayFields.requirements.length > 0 && (
-              <section className="pt-6 border-t border-[var(--separator)] space-y-3">
-                <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight">
-                  {t('knowledgeDetail.fieldRequirements')} ({displayFields.requirements.length})
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {displayFields.requirements.map((req, i) => (
-                    <span
-                      key={i}
-                      dir="auto"
-                      className="px-2.5 py-1 rounded-md text-xs bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)] font-mono"
-                    >
-                      {req}
+            {/* Quiet Text Metadata Line (type · evidence · language · updated · slug) */}
+            <div className="text-xs text-[var(--muted)] flex flex-wrap items-center gap-2 pt-1 border-b border-[var(--separator)] pb-4">
+              <span className="capitalize">{displayFields.type.replace('_', ' ')}</span>
+              <span aria-hidden="true">·</span>
+              <span className="capitalize">{displayFields.evidenceLevel.replace('_', ' ')}</span>
+              <span aria-hidden="true">·</span>
+              <span className="uppercase">{item.language}</span>
+              <span aria-hidden="true">·</span>
+              <span>{new Date(item.updatedAt || item.createdAt).toLocaleDateString()}</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-mono text-[11px] text-[var(--muted)]">slug: {item.slug || item.id}</span>
+              {item.status === 'retired' && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-medium">
+                    {t('library.retired')}
+                  </span>
+                </>
+              )}
+            </div>
+          </header>
+
+          {isAgentView ? (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] font-mono">
+                      GET /api/v1/knowledge/{item.slug || item.id}.md
                     </span>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Related Knowledge (Relationships) - Read Only */}
-            <section className="pt-6 border-t border-[var(--separator)] space-y-4">
-              <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight flex items-center gap-2">
-                <GitFork className="w-4 h-4 text-[var(--muted)]" />
-                <span>{t('knowledgeDetail.relationshipsSection')}</span>
-              </h2>
-
-              {relationships.length === 0 ? (
-                <p className="text-xs text-[var(--muted)] italic">
-                  {t('knowledgeDetail.noRelationships')}
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {relationships.map((rel) => {
-                    const target = getRelationshipTarget(rel);
-                    if (!target) return null;
-                    const isOrigin = rel.sourceKnowledgeId === id;
-                    const relTypeVal = (rel.relationshipType || rel.type || 'supports') as RelationshipType;
-                    const relLabel = isOrigin
-                      ? t(`relationTypes.${relTypeVal}`)
-                      : getReciprocalLabel(relTypeVal);
-
-                    return (
-                      <div
-                        key={rel.id}
-                        onClick={() => navigate(`/knowledge/${target.id}`)}
-                        className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer flex items-center justify-between gap-2 group"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] font-medium text-[var(--foreground)] bg-[var(--surface-tertiary)] px-1.5 py-0.5 rounded border border-[var(--border)] me-1.5 inline-block">
-                            {relLabel}
-                          </span>
-                          <span className="text-xs text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors font-medium truncate block sm:inline">
-                            {target.title}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            {/* Practical Application Outcomes - Read Only */}
-            <section className="pt-6 border-t border-[var(--separator)] space-y-4">
-              <h2 className="text-[14px] sm:text-[15px] font-semibold text-[var(--foreground)] tracking-tight flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[var(--accent)]" />
-                <span>{t('knowledgeDetail.outcomesSection')}</span>
-              </h2>
-
-              {outcomes.length === 0 ? (
-                <p className="text-xs text-[var(--muted)] italic">
-                  {t('knowledgeDetail.noOutcomes')}
-                </p>
-              ) : (
-                <div className="space-y-2.5">
-                  {outcomes.map((out) => (
-                    <div
-                      key={out.id}
-                      className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/50 text-xs space-y-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge type="outcome" value={out.result} size="sm" />
-                          <span className="text-xs font-medium text-[var(--foreground)]">
-                            {out.taskContext}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[var(--muted)] font-mono shrink-0">
-                          {out.recordedAt ? new Date(out.recordedAt).toLocaleDateString() : ''}
-                        </span>
-                      </div>
-                      {out.metrics && (
-                        <div className="font-mono text-[11px] text-[var(--muted)] bg-[var(--surface-tertiary)] px-2 py-1 rounded border border-[var(--border)]">
-                          <span className="text-[var(--foreground)] font-medium me-1.5">
-                            {t('outcomes.metrics')}:
-                          </span>
-                          <span>{out.metrics}</span>
-                        </div>
-                      )}
-                      {out.notes && (
-                        <p dir="auto" className="text-[12px] text-[var(--muted)] leading-relaxed">
-                          {out.notes}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
-
-        {/* Supporting Metadata & Revision History Column (4 cols on lg ~ 33%) */}
-        <div className="lg:col-span-4 sticky top-6 space-y-4">
-          <div className="ui-panel p-5 space-y-6 shadow-xs">
-            {/* Classification & Provenance */}
-            <div className="space-y-3 pb-5 border-b border-[var(--separator)]">
-              <div className="text-[12px] font-medium text-[var(--muted)]">
-                {t('knowledgeDetail.classificationTitle')}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge type="knowledgeType" value={displayFields.type} />
-                <Badge type="evidence" value={displayFields.evidenceLevel} />
-                <Badge type="review" value={displayFields.reviewStatus} />
-                <Badge type="status" value={item.status || 'active'} />
-                <Badge type="origin" value={item.origin || 'manual'} />
-              </div>
-            </div>
-
-            {/* Grounding & Source Document */}
-            <div className="space-y-3 pb-5 border-b border-[var(--separator)]">
-              <div className="flex items-center justify-between text-[12px] font-medium text-[var(--muted)]">
-                <span>{t('knowledgeDetail.sourceEvidenceTitle')}</span>
-                {source && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/documents/${source.id}`)}
-                    className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline cursor-pointer text-xs"
-                  >
-                    <span>{t('knowledgeDetail.openDocument')}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-
-              {source ? (
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2.5 p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs">
-                    <FileText className="w-4 h-4 text-[var(--muted)] shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-[var(--foreground)] truncate">
-                        {source.filename}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted)] font-mono truncate">
-                        Rev: {item.sourceRevisionId ? item.sourceRevisionId.slice(0, 10) : (source.revisions?.[0]?.revisionId?.slice(0, 10) || 'initial')}
-                      </div>
-                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)]">
+                      ~{agentTokens} {t('knowledgeDetail.tokensEstimate')}
+                    </span>
                   </div>
-
-                  {/* Quoted Excerpt */}
-                  {item.sourceExcerpt && (
-                    <div className="space-y-1.5 pt-1">
-                      <div className="text-[11px] text-[var(--muted)] font-medium">
-                        {t('knowledgeDetail.groundingCitationTitle')}
-                      </div>
-                      <blockquote
-                        dir="auto"
-                        className="p-3 rounded-lg bg-[var(--surface-secondary)] border-s-2 border-s-[var(--accent)] border border-[var(--border)] text-xs text-[var(--foreground)] leading-relaxed font-sans italic"
-                      >
-                        "{item.sourceExcerpt}"
-                      </blockquote>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs space-y-1">
-                  <div className="font-medium text-[var(--foreground)]">
-                    {t('knowledgeDetail.manualNoteNotice')}
-                  </div>
-                  <p className="text-[11px] text-[var(--muted)]">
-                    {t('knowledgeDetail.manualNoteDesc')}
+                  <p className="text-xs text-[var(--muted)] mt-1">
+                    {t('knowledgeDetail.agentViewDesc')}
                   </p>
                 </div>
-              )}
-            </div>
-
-            {/* Workspace Metadata */}
-            <div className="space-y-2.5 text-xs pb-5 border-b border-[var(--separator)]">
-              <div className="text-[12px] font-medium text-[var(--muted)]">
-                {t('knowledgeDetail.workspacePropertiesTitle')}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyAgentMd}
+                    className="px-3 py-1.5 rounded-lg bg-[var(--foreground)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    {copiedAgentMd ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{t('common.copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>{t('knowledgeDetail.copyAgentMd')}</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAgentView(false)}
+                    className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] text-xs cursor-pointer"
+                  >
+                    {t('knowledgeDetail.exitAgentView')}
+                  </button>
+                </div>
               </div>
-              <div className="space-y-2 text-[12px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--muted)]">{t('knowledgeDetail.collectionLabel')}</span>
-                  <span className="font-medium text-[var(--foreground)]">
-                    {collection ? (locale === 'fa' ? collection.nameFa : collection.name) : t('common.none')}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--muted)]">{t('knowledgeDetail.createdLabel')}</span>
-                  <span className="font-mono text-[11px] text-[var(--foreground)]">
-                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--muted)]">{t('knowledgeDetail.sourceSyncLabel')}</span>
-                  <span className="font-medium text-[var(--foreground)]">
-                    {item.sourceHasChanged
-                      ? t('knowledgeDetail.pendingReview')
-                      : t('knowledgeDetail.synchronized')}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--muted)]">{t('knowledgeDetail.revisionsCount')}</span>
-                  <span className="font-mono text-[11px] text-[var(--foreground)]">
-                    {revisions.length}
-                  </span>
-                </div>
+
+              <div className="p-4 sm:p-6 rounded-xl bg-[var(--surface-secondary)]/80 border border-[var(--border)] font-mono text-xs text-[var(--foreground)] overflow-x-auto leading-relaxed select-text" dir="ltr">
+                <pre className="whitespace-pre-wrap">{agentMarkdown}</pre>
               </div>
             </div>
+          ) : (
+            <>
+          {/* Section: When to use */}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+              {t('knowledgeDetail.whenToUse')}
+            </h2>
+            <div className="text-sm text-[var(--foreground)] leading-relaxed" dir="auto">
+              {displayFields.applicability || t('knowledgeDetail.noExclusions')}
+            </div>
+          </section>
 
-            {/* Revision History Panel */}
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-medium text-[var(--foreground)]">
-                  <History className="w-3.5 h-3.5 text-[var(--accent)]" />
-                  <span>{t('knowledgeDetail.historySection')}</span>
-                </div>
-                <span className="text-[11px] font-mono text-[var(--muted)]">
-                  {revisions.length} {t('knowledgeDetail.version')}
-                </span>
-              </div>
-              <p className="text-[11px] text-[var(--muted)] leading-relaxed">
-                {t('knowledgeDetail.historyDesc')}
+          {/* Section: When not to */}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+              {t('knowledgeDetail.whenNotTo')}
+            </h2>
+            <div className="text-sm text-[var(--foreground)] leading-relaxed" dir="auto">
+              {displayFields.exclusions || t('knowledgeDetail.noExclusions')}
+            </div>
+          </section>
+
+          {/* Section: Requirements */}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+              {t('knowledgeDetail.requirements')}
+            </h2>
+            {displayFields.requirements.length > 0 ? (
+              <ul className="list-disc list-inside text-sm text-[var(--foreground)] space-y-1">
+                {displayFields.requirements.map((req, i) => (
+                  <li key={i} dir="auto">
+                    {req}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                {t('knowledgeDetail.noRequirements')}
               </p>
+            )}
+          </section>
 
-              {revisions.length === 0 ? (
-                <p className="text-[11px] text-[var(--muted)] italic">
-                  {t('knowledgeDetail.noRevisions')}
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto pe-1">
-                  {revisions.map((rev, idx) => {
-                    const isSelected = activeRevision?.id === rev.id;
-                    const revNum = revisions.length - idx;
+          {/* Section: Details (Markdown Body) */}
+          <section className="space-y-2 pt-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+              {t('knowledgeDetail.details')}
+            </h2>
+            <div className="prose prose-stone dark:prose-invert max-w-none text-sm leading-relaxed" dir="auto">
+              <MarkdownViewer content={displayFields.body} />
+            </div>
+          </section>
 
-                    return (
-                      <div
-                        key={rev.id}
-                        className={`p-2.5 rounded-lg border text-xs transition-colors space-y-1.5 ${
-                          isSelected
-                            ? 'bg-[var(--surface-secondary)] border-[var(--accent)]'
-                            : 'bg-[var(--surface-secondary)]/50 border-[var(--border)] hover:bg-[var(--surface-secondary)]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-mono text-[11px] font-semibold text-[var(--foreground)]">
-                            v{revNum} • {new Date(rev.createdAt).toLocaleDateString()}
-                          </span>
-                          <span className="text-[10px] text-[var(--muted)] font-mono">
-                            {new Date(rev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
+          {/* Section: Source (Excerpt Blockquote) */}
+          {item.sourceExcerpt && (
+            <section className="space-y-2 pt-4 border-t border-[var(--separator)]">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+                {t('knowledgeDetail.source')}
+              </h2>
+              <blockquote className="ps-4 border-s-2 border-[var(--foreground)] text-xs text-[var(--muted)] italic space-y-1">
+                <p dir="auto">"{item.sourceExcerpt}"</p>
+                {source && (
+                  <cite className="not-italic block pt-1 text-[11px] font-mono">
+                    <Link
+                      to={`/documents/${source.id}`}
+                      className="text-[var(--foreground)] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>{source.filename}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </cite>
+                )}
+              </blockquote>
+            </section>
+          )}
 
-                        {rev.changeNote && (
-                          <p dir="auto" className="text-[11px] text-[var(--foreground)] leading-snug">
-                            {rev.changeNote}
-                          </p>
+          {/* Section: Related (Grouped by relationship type) */}
+          <section className="space-y-4 pt-4 border-t border-[var(--separator)]">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+                {t('knowledgeDetail.related')}
+              </h2>
+              <Link
+                to={`/graph?focus=${item.id}`}
+                className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] inline-flex items-center gap-1"
+              >
+                <span>{t('knowledgeDetail.exploreMap')}</span>
+                <GitFork className="w-3 h-3" />
+              </Link>
+            </div>
+
+            {relationships.length === 0 ? (
+              <p className="text-xs text-[var(--muted)]">
+                {t('knowledgeDetail.noRelated')}
+              </p>
+            ) : (
+              <div className="space-y-4 text-xs">
+                {/* 1. Conflicts */}
+                {groupedRelationships.conflicts_with.length > 0 && (
+                  <div className="space-y-1.5 p-3 rounded-lg border border-amber-300 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+                    <div className="font-semibold text-amber-900 dark:text-amber-200">
+                      {t('relationships.conflictsWith')}:
+                    </div>
+                    {groupedRelationships.conflicts_with.map(({ rel, other }) => (
+                      <div key={rel.id} className="space-y-0.5">
+                        <Link
+                          to={`/knowledge/${other.id}`}
+                          className="font-medium hover:underline text-[var(--foreground)]"
+                          dir="auto"
+                        >
+                          {other.title}
+                        </Link>
+                        {rel.notes && (
+                          <p className="text-[11px] text-[var(--muted)]">{rel.notes}</p>
                         )}
-
-                        <div className="flex items-center justify-end gap-1 pt-1 border-t border-[var(--separator)]">
-                          {isSelected ? (
-                            <button
-                              type="button"
-                              onClick={() => setActiveRevision(null)}
-                              className="text-[11px] text-[var(--accent)] font-medium hover:underline cursor-pointer"
-                            >
-                              {t('knowledgeDetail.backToCurrent')}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setActiveRevision(rev)}
-                              className="text-[11px] text-[var(--muted)] hover:text-[var(--foreground)] font-medium cursor-pointer"
-                            >
-                              {t('knowledgeDetail.viewRevision')}
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRevToRestore(rev);
-                              setIsRestoreRevModalOpen(true);
-                            }}
-                            className="text-[11px] text-[var(--accent)] hover:underline font-medium ms-2 cursor-pointer inline-flex items-center gap-1"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>{t('knowledgeDetail.restore')}</span>
-                          </button>
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+
+                {/* 2. Alternatives */}
+                {groupedRelationships.alternative_to.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-[var(--foreground)]">
+                      {t('relationships.alternativeTo')}:
+                    </div>
+                    {groupedRelationships.alternative_to.map(({ rel, other }) => (
+                      <div key={rel.id} className="ps-2 border-s border-[var(--border)]">
+                        <Link
+                          to={`/knowledge/${other.id}`}
+                          className="hover:underline text-[var(--foreground)]"
+                          dir="auto"
+                        >
+                          {other.title}
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 3. Supersedes / Superseded */}
+                {groupedRelationships.supersedes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-[var(--foreground)]">
+                      {t('relationships.supersededBy')}:
+                    </div>
+                    {groupedRelationships.supersedes.map(({ rel, other }) => (
+                      <div key={rel.id} className="ps-2 border-s border-[var(--border)]">
+                        <Link
+                          to={`/knowledge/${other.id}`}
+                          className="hover:underline text-[var(--foreground)]"
+                          dir="auto"
+                        >
+                          {other.title}
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 4. Prerequisites */}
+                {groupedRelationships.prerequisite_for.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-[var(--foreground)]">
+                      {t('relationships.prerequisiteFor')}:
+                    </div>
+                    {groupedRelationships.prerequisite_for.map(({ rel, other }) => (
+                      <div key={rel.id} className="ps-2 border-s border-[var(--border)]">
+                        <Link
+                          to={`/knowledge/${other.id}`}
+                          className="hover:underline text-[var(--foreground)]"
+                          dir="auto"
+                        >
+                          {other.title}
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 5. Derived from */}
+                {groupedRelationships.derived_from.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-[var(--foreground)]">
+                      {t('relationships.spawned')}:
+                    </div>
+                    {groupedRelationships.derived_from.map(({ rel, other }) => (
+                      <div key={rel.id} className="ps-2 border-s border-[var(--border)]">
+                        <Link
+                          to={`/knowledge/${other.id}`}
+                          className="hover:underline text-[var(--foreground)]"
+                          dir="auto"
+                        >
+                          {other.title}
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 6. Supports */}
+                {groupedRelationships.supports.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-[var(--foreground)]">
+                      {t('relationships.supportedBy')}:
+                    </div>
+                    {groupedRelationships.supports.map(({ rel, other }) => (
+                      <div key={rel.id} className="ps-2 border-s border-[var(--border)]">
+                        <Link
+                          to={`/knowledge/${other.id}`}
+                          className="hover:underline text-[var(--foreground)]"
+                          dir="auto"
+                        >
+                          {other.title}
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Section: Reported Outcomes (Read-Only) */}
+          <section className="space-y-3 pt-4 border-t border-[var(--separator)]">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)]">
+              {t('knowledgeDetail.outcomesSection')}
+            </h2>
+            {outcomes.length === 0 ? (
+              <p className="text-xs text-[var(--muted)]">
+                {t('knowledgeDetail.noOutcomes')}
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {outcomes.map((out) => (
+                  <div
+                    key={out.id}
+                    className="p-3 rounded-lg bg-[var(--surface-secondary)]/50 text-xs space-y-1"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium text-[var(--foreground)]" dir="auto">
+                        {out.task}
+                      </span>
+                      <span className="text-[11px] font-mono text-[var(--muted)]">
+                        {out.result} · {new Date(out.recordedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {out.reportedBy && (
+                      <div className="text-[11px] text-[var(--muted)] font-mono">
+                        {t('knowledgeDetail.reportedByAgent')}: {out.reportedBy}
+                      </div>
+                    )}
+                    {out.notes && (
+                      <p className="text-[11px] text-[var(--muted)] leading-relaxed" dir="auto">
+                        {out.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Section: Collapsed History (<details>) */}
+          <section className="pt-4 border-t border-[var(--separator)]">
+            <details className="group">
+              <summary className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--foreground)] transition-colors flex items-center gap-2 list-none">
+                <ChevronDown className="w-3.5 h-3.5 group-open:rotate-180 transition-transform" />
+                <span>{t('knowledgeDetail.history')}</span>
+                <span className="text-xs font-normal normal-case font-mono">
+                  ({revisions.length})
+                </span>
+              </summary>
+
+              <div className="mt-4 space-y-2 divide-y divide-[var(--separator)] text-xs">
+                {revisions.map((rev, idx) => (
+                  <div key={rev.id} className="pt-2.5 first:pt-0 space-y-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium font-mono text-[11px]">
+                        rev-{revisions.length - idx} · {new Date(rev.createdAt).toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveRevision(rev)}
+                        className="text-[11px] text-[var(--muted)] hover:text-[var(--foreground)] underline cursor-pointer"
+                      >
+                        {t('knowledgeDetail.viewRevision')}
+                      </button>
+                    </div>
+                    {rev.changeNote && (
+                      <p className="text-[11px] text-[var(--muted)] italic" dir="auto">
+                        "{rev.changeNote}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          </section>
+          </>
+        )}
+        </article>
+      </div>
+
+      {/* Raw Markdown / JSON Modal */}
+      {rawModalContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <h3 className="text-sm font-mono font-medium truncate">
+                {rawModalContent.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRawModalContent(null)}
+                className="p-1 rounded text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <pre className="p-4 overflow-auto flex-1 font-mono text-xs bg-[var(--surface-secondary)]/50 text-[var(--foreground)] whitespace-pre-wrap leading-relaxed select-all">
+              {rawModalContent.content}
+            </pre>
+            <div className="p-3 border-t border-[var(--border)] flex justify-end">
+              <button
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(rawModalContent.content);
+                  setRawModalContent(null);
+                }}
+                className="px-3 py-1.5 rounded bg-[var(--foreground)] text-[var(--surface)] text-xs font-medium cursor-pointer"
+              >
+                {t('common.copy')}
+              </button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Retire Knowledge Modal */}
-      <ConfirmModal
-        isOpen={isRetireModalOpen}
-        title={t('knowledgeDetail.retireTitle')}
-        description={t('knowledgeDetail.retireConfirm')}
-        confirmLabel={t('knowledgeDetail.retire')}
-        cancelLabel={t('common.cancel')}
-        isDestructive={true}
-        onConfirm={handleRetire}
-        onCancel={() => {
-          setIsRetireModalOpen(false);
-          setChangeNote('');
-        }}
-      >
-        <div className="space-y-1 text-xs">
-          <label className="font-medium text-[var(--foreground)]">
-            {t('knowledgeDetail.changeNote')}
-          </label>
-          <input
-            type="text"
-            dir="auto"
-            value={changeNote}
-            onChange={(e) => setChangeNote(e.target.value)}
-            placeholder={t('knowledgeDetail.changeNotePlaceholder')}
-            className="ui-input w-full text-xs"
-          />
-        </div>
-      </ConfirmModal>
-
-      {/* Restore Knowledge Modal */}
-      <ConfirmModal
-        isOpen={isRestoreModalOpen}
-        title={t('knowledgeDetail.restoreTitle')}
-        description={t('knowledgeDetail.restoreConfirm')}
-        confirmLabel={t('knowledgeDetail.restore')}
-        cancelLabel={t('common.cancel')}
-        isDestructive={false}
-        onConfirm={handleRestore}
-        onCancel={() => {
-          setIsRestoreModalOpen(false);
-          setChangeNote('');
-        }}
-      >
-        <div className="space-y-1 text-xs">
-          <label className="font-medium text-[var(--foreground)]">
-            {t('knowledgeDetail.changeNote')}
-          </label>
-          <input
-            type="text"
-            dir="auto"
-            value={changeNote}
-            onChange={(e) => setChangeNote(e.target.value)}
-            placeholder={t('knowledgeDetail.changeNotePlaceholder')}
-            className="ui-input w-full text-xs"
-          />
-        </div>
-      </ConfirmModal>
-
-      {/* Restore Specific Past Revision Modal */}
-      <ConfirmModal
-        isOpen={isRestoreRevModalOpen}
-        title={t('knowledgeDetail.restoreRevision')}
-        description={t('knowledgeDetail.restoreRevisionConfirm')}
-        confirmLabel={t('knowledgeDetail.restore')}
-        cancelLabel={t('common.cancel')}
-        isDestructive={false}
-        onConfirm={handleRestoreRevision}
-        onCancel={() => {
-          setIsRestoreRevModalOpen(false);
-          setSelectedRevToRestore(null);
-          setChangeNote('');
-        }}
-      >
-        <div className="space-y-1 text-xs">
-          <label className="font-medium text-[var(--foreground)]">
-            {t('knowledgeDetail.changeNote')}
-          </label>
-          <input
-            type="text"
-            dir="auto"
-            value={changeNote}
-            onChange={(e) => setChangeNote(e.target.value)}
-            placeholder={t('knowledgeDetail.changeNotePlaceholder')}
-            className="ui-input w-full text-xs"
-          />
-        </div>
-      </ConfirmModal>
+      )}
     </div>
   );
 };

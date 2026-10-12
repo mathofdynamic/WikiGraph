@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Layers,
-  Cpu,
-  CheckCircle2,
-  KeyRound,
-  Settings,
   Search,
   Languages,
   Sun,
   Moon,
   Menu,
   X,
-  FileUp,
-  ClipboardCheck,
   LogOut,
-  GitFork,
   AlertTriangle,
   Download,
 } from 'lucide-react';
@@ -23,26 +15,27 @@ import { useLocale } from '../../locales/useLocale';
 import { useTheme } from '../../context/ThemeContext';
 import { useRepository } from '../../services/RepositoryContext';
 import { useAuth } from '../../context/AuthContext';
-import { SearchModal } from '../common/SearchModal';
 import { QUOTA_ERROR_EVENT } from '../../lib/storage';
 
 export const AppLayout: React.FC = () => {
   const { t, locale, setLocale } = useLocale();
   const { isDark, toggleTheme } = useTheme();
-  const { repository, version } = useRepository();
-  const { logout } = useAuth();
+  const { repository, isDemoMode } = useRepository();
+  const { isAuthenticated, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [needsReviewCount, setNeedsReviewCount] = useState<number>(0);
+  const [navSearchQuery, setNavSearchQuery] = useState('');
   const [quotaError, setQuotaError] = useState<string | null>(null);
 
   // Storage quota event listener
   useEffect(() => {
     const handleQuota = (e: Event) => {
       const custom = e as CustomEvent<{ message: string }>;
-      setQuotaError(custom.detail?.message || 'Browser storage is full. Export a backup and clear space.');
+      setQuotaError(
+        custom.detail?.message || 'Browser storage is full. Export a backup and clear space.'
+      );
     };
     window.addEventListener(QUOTA_ERROR_EVENT, handleQuota);
     return () => window.removeEventListener(QUOTA_ERROR_EVENT, handleQuota);
@@ -77,264 +70,245 @@ export const AppLayout: React.FC = () => {
     }
   };
 
-  // Load items needing review count for sidebar badge
-  useEffect(() => {
-    let active = true;
-    repository
-      .listKnowledge({ reviewStatus: 'needs_review' })
-      .then((items) => {
-        if (active) setNeedsReviewCount(items.length);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [repository, version]);
-
-  // Close mobile drawer on route change
+  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Global keyboard shortcut for search (Cmd+K / Ctrl+K)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setSearchOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = navSearchQuery.trim();
+    if (q) {
+      navigate(`/search?q=${encodeURIComponent(q)}`);
+    } else {
+      navigate('/search');
+    }
+  };
 
-  const navItems = [
-    { to: '/library', label: t('nav.library'), icon: Layers },
-    { to: '/review', label: t('nav.review'), icon: ClipboardCheck, badge: needsReviewCount },
-    { to: '/graph', label: t('nav.graph') || (locale === 'fa' ? 'گراف دانش' : 'Knowledge Graph'), icon: GitFork },
-    { to: '/import', label: t('nav.import'), icon: FileUp },
-    { to: '/context', label: t('nav.context'), icon: Cpu },
-    { to: '/outcomes', label: t('nav.outcomes'), icon: CheckCircle2 },
-    { to: '/connections', label: 'API & Agent Access', icon: KeyRound },
+  const navLinks = [
+    { to: '/collections', label: t('nav.collections') },
+    { to: '/for-agents', label: t('nav.forAgents') },
   ];
 
-  const sidebarContent = (
-    <div className="flex flex-col h-full bg-[var(--surface)] select-none">
-      {/* Workspace Brand Identity */}
-      <div className="h-14 flex items-center px-4 gap-2.5 border-b border-[var(--separator)] shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shrink-0">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="5" cy="6" r="2.5" />
-            <circle cx="19" cy="8" r="2.5" />
-            <circle cx="12" cy="18" r="2.5" />
-            <line x1="7.2" y1="6.8" x2="16.8" y2="7.6" />
-            <line x1="6.6" y1="8.2" x2="10.8" y2="15.8" />
-            <line x1="17.6" y1="10.2" x2="13.2" y2="15.8" />
-          </svg>
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-[var(--foreground)] tracking-tight leading-none truncate">
-            WikiGraph
-          </div>
-          <div className="text-[11px] text-[var(--muted)] font-mono leading-none mt-1 truncate">
-            Public Knowledge Platform
-          </div>
-        </div>
-      </div>
-
-      {/* Main Navigation Items */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex items-center justify-between px-3 py-2 text-[13px] font-medium rounded-[10px] transition-colors cursor-pointer ${
-                  isActive
-                    ? 'bg-[var(--surface-secondary)] text-[var(--foreground)] font-semibold'
-                    : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)]/50'
-                }`
-              }
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Icon className="w-[17px] h-[17px] shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </div>
-              {item.badge !== undefined && item.badge > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25 shrink-0">
-                  {item.badge}
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
-      </nav>
-
-      {/* Bottom Section: Settings */}
-      <div className="p-3 border-t border-[var(--separator)] shrink-0">
-        <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-[10px] transition-colors cursor-pointer ${
-              isActive
-                ? 'bg-[var(--surface-secondary)] text-[var(--foreground)] font-semibold'
-                : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)]/50'
-            }`
-          }
-        >
-          <Settings className="w-[17px] h-[17px] shrink-0" />
-          <span className="truncate">{t('nav.settings')}</span>
-        </NavLink>
-
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-[10px] text-[var(--muted)] hover:text-rose-500 hover:bg-[var(--surface-secondary)]/50 transition-colors cursor-pointer mt-0.5"
-          aria-label={locale === 'fa' ? 'خروج از حساب' : 'Sign Out'}
-        >
-          <LogOut className="w-[17px] h-[17px] shrink-0" />
-          <span className="truncate">{locale === 'fa' ? 'خروج از حساب' : 'Sign Out'}</span>
-        </button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
-      {/* Desktop Persistent Left Sidebar (230px) */}
-      <aside className="hidden lg:flex flex-col w-[230px] shrink-0 border-e border-[var(--border)] h-full z-20">
-        {sidebarContent}
-      </aside>
+    <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--foreground)] font-sans antialiased selection:bg-[var(--accent)] selection:text-white">
+      {/* Slim Top Navigation Bar */}
+      <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-13 flex items-center justify-between gap-4">
+          {/* Brand Wordmark & Search */}
+          <div className="flex items-center gap-6 min-w-0">
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 text-[var(--foreground)] hover:opacity-90 transition-opacity font-semibold tracking-tight text-base shrink-0"
+            >
+              <span className="w-5 h-5 rounded bg-[var(--foreground)] text-[var(--surface)] flex items-center justify-center font-bold text-[11px] leading-none">
+                W
+              </span>
+              <span>WikiGraph</span>
+            </Link>
 
-      {/* Mobile Drawer Backdrop and Sidebar */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <div className="relative flex flex-col w-[240px] max-w-[80vw] h-full shadow-2xl z-10 animate-in slide-in-from-left duration-200">
-            <div className="absolute top-3 end-3 z-20">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)]"
-                aria-label={t('common.close')}
+            {/* Desktop Inline Search Field */}
+            <form onSubmit={handleSearchSubmit} className="relative hidden md:block w-48 lg:w-60">
+              <Search className="w-3.5 h-3.5 absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+              <input
+                type="search"
+                value={navSearchQuery}
+                onChange={(e) => setNavSearchQuery(e.target.value)}
+                placeholder={t('common.searchWorkspace')}
+                className="w-full ps-8 pe-3 py-1.5 text-xs rounded-md bg-[var(--surface-secondary)] border border-transparent focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none text-[var(--foreground)] placeholder:text-[var(--muted)] transition-colors"
+              />
+            </form>
+          </div>
+
+          {/* Desktop Nav Links (Clean Typography, Zero-Pills) */}
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `text-[13px] font-medium transition-colors hover:text-[var(--foreground)] ${
+                    isActive
+                      ? 'text-[var(--foreground)] font-semibold border-b-2 border-[var(--foreground)] -mb-[1px] pb-3.5 pt-4'
+                      : 'text-[var(--muted)]'
+                  }`
+                }
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {sidebarContent}
-          </div>
-        </div>
-      )}
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
 
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
-        {/* Top Workspace Header (56px) */}
-        <header className="h-14 px-4 sm:px-6 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between gap-4 shrink-0 z-10">
-          {/* Left: Mobile hamburger & Global Search Button */}
-          <div className="flex items-center gap-3 min-w-0">
+          {/* Right Controls: Language, Theme, Auth, Mobile Toggle */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Mobile Search Icon Trigger */}
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-1.5 -ms-1.5 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] cursor-pointer"
-              aria-label={locale === 'fa' ? 'تغییر وضعیت منو' : 'Toggle navigation'}
+              onClick={() => navigate('/search')}
+              className="md:hidden p-2 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
+              aria-label={t('nav.search')}
             >
-              <Menu className="w-5 h-5" />
+              <Search className="w-4 h-4" />
             </button>
 
-            {/* Compact Search Trigger with Cmd+K */}
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--field-background)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--accent)] transition-all cursor-pointer w-48 sm:w-64"
-              aria-label={t('common.searchWorkspace')}
-            >
-              <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate flex-1 text-start">{t('common.searchWorkspace')}</span>
-              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--muted)]">
-                ⌘K
-              </kbd>
-            </button>
-          </div>
-
-          {/* Right: Controls & Profile */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Language Switch */}
+            {/* Language Toggle */}
             <button
               type="button"
               onClick={() => setLocale(locale === 'en' ? 'fa' : 'en')}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] border border-transparent hover:border-[var(--border)] transition-colors cursor-pointer flex items-center gap-1.5"
-              title="Toggle Language"
-              aria-label={locale === 'fa' ? 'تغییر زبان به انگلیسی' : 'Switch language to Persian'}
+              className="px-2 py-1 rounded text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors flex items-center gap-1"
+              title="Toggle language (English / فارسی)"
             >
               <Languages className="w-3.5 h-3.5" />
               <span className="font-mono uppercase">{locale === 'en' ? 'FA' : 'EN'}</span>
             </button>
 
-            {/* Theme Switch */}
+            {/* Theme Toggle */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] border border-transparent hover:border-[var(--border)] transition-colors cursor-pointer"
-              title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-              aria-label={isDark ? (locale === 'fa' ? 'تغییر به پوسته روشن' : 'Switch to Light Theme') : (locale === 'fa' ? 'تغییر به پوسته تاریک' : 'Switch to Dark Theme')}
+              className="p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
+              title={isDark ? 'Light mode' : 'Dark mode'}
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Public status badge */}
-            <div className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--separator)]">
-              <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-              <span className="text-xs font-medium text-[var(--foreground)]">
-                Public Platform
-              </span>
-            </div>
-          </div>
-        </header>
+            {/* Logout (if authenticated and not running in headless demo mode) */}
+            {isAuthenticated && !isDemoMode && (
+              <button
+                type="button"
+                onClick={logout}
+                className="p-1.5 rounded text-[var(--muted)] hover:text-rose-600 hover:bg-[var(--surface-secondary)] transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
 
-        {/* Storage Quota Warning Banner */}
-        {quotaError && (
-          <div
-            role="alert"
-            className="bg-amber-500/15 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-2.5 text-xs flex items-center justify-between gap-3 shrink-0"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="font-medium truncate">{quotaError}</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleExportBackup}
-                className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+            {/* Mobile Hamburger Menu Toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="md:hidden p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 space-y-3">
+            <form onSubmit={handleSearchSubmit} className="relative w-full">
+              <Search className="w-3.5 h-3.5 absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+              <input
+                type="search"
+                value={navSearchQuery}
+                onChange={(e) => setNavSearchQuery(e.target.value)}
+                placeholder={t('common.searchWorkspace')}
+                className="w-full ps-8 pe-3 py-1.5 text-xs rounded-md bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--foreground)]"
+              />
+            </form>
+
+            <nav className="flex flex-col space-y-1 pt-1">
+              <Link
+                to="/"
+                className="px-2.5 py-1.5 rounded text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)]"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export backup</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuotaError(null)}
-                className="p-1 rounded text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 cursor-pointer"
-                aria-label={t('common.close')}
+                {t('nav.home')}
+              </Link>
+              <Link
+                to="/library"
+                className="px-2.5 py-1.5 rounded text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+                {t('nav.library')}
+              </Link>
+              {navLinks.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={({ isActive }) =>
+                    `px-2.5 py-1.5 rounded text-sm font-medium ${
+                      isActive
+                        ? 'bg-[var(--surface-secondary)] text-[var(--foreground)] font-semibold'
+                        : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+                    }`
+                  }
+                >
+                  {link.label}
+                </NavLink>
+              ))}
+              <Link
+                to="/graph"
+                className="px-2.5 py-1.5 rounded text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                {t('home.exploreMap')}
+              </Link>
+            </nav>
           </div>
         )}
+      </header>
 
-        {/* Main Application Workspace Canvas (Full width with 24-32px gutters) */}
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
-      </div>
+      {/* Storage Quota Warning Banner */}
+      {quotaError && (
+        <div
+          role="alert"
+          className="bg-amber-500/10 border-b border-amber-500/25 text-amber-900 dark:text-amber-200 px-4 py-2 text-xs flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="truncate">{quotaError}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleExportBackup}
+              className="px-2 py-0.5 rounded bg-amber-600 text-white font-medium text-[11px] flex items-center gap-1 cursor-pointer"
+            >
+              <Download className="w-3 h-3" />
+              <span>Export backup</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuotaError(null)}
+              className="p-0.5 rounded hover:bg-amber-500/20 text-amber-800 dark:text-amber-300"
+              aria-label={t('common.close')}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Global Cmd+K Search Modal */}
-      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+      {/* Main Content Area */}
+      <main className="flex-1 w-full">
+        <Outlet />
+      </main>
+
+      {/* Quiet Publication Footer */}
+      <footer className="border-t border-[var(--separator)] bg-[var(--surface)]/50 mt-20 py-10 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-[var(--muted)]">
+          <div>
+            <span className="font-semibold text-[var(--foreground)]">WikiGraph</span>
+            <span className="mx-2">·</span>
+            <span>Knowledge library for AI agents with a human reading view</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link to="/library" className="hover:text-[var(--foreground)] transition-colors">
+              {t('nav.library')}
+            </Link>
+            <Link to="/collections" className="hover:text-[var(--foreground)] transition-colors">
+              {t('nav.collections')}
+            </Link>
+            <Link to="/for-agents" className="hover:text-[var(--foreground)] transition-colors">
+              {t('nav.forAgents')}
+            </Link>
+            <Link to="/graph" className="hover:text-[var(--foreground)] transition-colors">
+              {t('home.exploreMap')}
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

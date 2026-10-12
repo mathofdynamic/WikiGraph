@@ -1,12 +1,9 @@
 import {
-  ApiKeyGrant,
   ApiToken,
   AuthLoginRequest,
   AuthLoginResponse,
   AuthSessionResponse,
   Collection,
-  ContextAssemblyRequest,
-  ContextAssemblyResult,
   CreateApiTokenRequest,
   CreateApiTokenResponse,
   KnowledgeFilter,
@@ -22,6 +19,10 @@ import {
   ImportBundleResult,
   ContextRequest,
   ContextResult,
+  PaginatedKnowledgeRequest,
+  PaginatedKnowledgeResponse,
+  SearchKnowledgeRequest,
+  SearchKnowledgeResponse,
 } from '../types';
 
 export interface KnowledgeRepository {
@@ -49,6 +50,8 @@ export interface KnowledgeRepository {
 
   // Knowledge Items
   listKnowledge(filters?: KnowledgeFilter): Promise<KnowledgeItem[]>;
+  listKnowledgePaginated(params?: PaginatedKnowledgeRequest): Promise<PaginatedKnowledgeResponse>;
+  searchKnowledge(params: SearchKnowledgeRequest): Promise<SearchKnowledgeResponse>;
   getKnowledge(id: string): Promise<KnowledgeItem | null>;
   createKnowledge(
     item: Omit<KnowledgeItem, 'id' | 'createdAt' | 'updatedAt'>,
@@ -59,7 +62,6 @@ export interface KnowledgeRepository {
     updates: Partial<KnowledgeItem>,
     changeNote?: string
   ): Promise<KnowledgeItem>;
-  deleteKnowledge(id: string): Promise<void>;
   retireKnowledge(id: string, changeNote?: string): Promise<KnowledgeItem>;
   restoreKnowledge(id: string, changeNote?: string): Promise<KnowledgeItem>;
 
@@ -76,15 +78,11 @@ export interface KnowledgeRepository {
   createRelationship(
     rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
   ): Promise<KnowledgeRelationship>;
-  addRelationship(
-    rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
-  ): Promise<KnowledgeRelationship>;
   updateRelationship(
     id: string,
     updates: Partial<KnowledgeRelationship>
   ): Promise<KnowledgeRelationship>;
   deleteRelationship(id: string): Promise<void>;
-  removeRelationship(id: string): Promise<void>;
 
   // Outcomes
   listOutcomes(knowledgeId?: string): Promise<KnowledgeOutcome[]>;
@@ -95,6 +93,7 @@ export interface KnowledgeRepository {
 
   // Collections
   listCollections(): Promise<Collection[]>;
+  getCollection(idOrSlug: string): Promise<Collection | null>;
   createCollection(col: Omit<Collection, 'id'>): Promise<Collection>;
   deleteCollection(id: string, targetCollectionIdForMove?: string): Promise<void>;
   moveCollectionItems(fromCollectionId: string, toCollectionId: string): Promise<void>;
@@ -104,18 +103,7 @@ export interface KnowledgeRepository {
   createToken(data: CreateApiTokenRequest): Promise<CreateApiTokenResponse>;
   deleteToken(id: string): Promise<void>;
 
-  // Scoped API Keys (Machine Connections - Legacy Compatibility)
-  listApiKeys(): Promise<ApiKeyGrant[]>;
-  createApiKey(data: {
-    label: string;
-    allowedCollections: string[];
-    grants: ('search' | 'read' | 'compose')[];
-    expiryDays: number;
-  }): Promise<{ key: ApiKeyGrant; plainTextToken: string }>;
-  revokeApiKey(id: string): Promise<void>;
-
-  // Context Assembly
-  assembleContext(req: ContextAssemblyRequest): Promise<ContextAssemblyResult>;
+  // Retrieval Contract
   buildContext(request: ContextRequest): Promise<ContextResult>;
 
   // Demo store management / Backup

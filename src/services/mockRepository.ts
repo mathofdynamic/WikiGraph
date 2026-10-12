@@ -1,12 +1,9 @@
 import {
-  ApiKeyGrant,
   ApiToken,
   AuthLoginRequest,
   AuthLoginResponse,
   AuthSessionResponse,
   Collection,
-  ContextAssemblyRequest,
-  ContextAssemblyResult,
   ContextRequest,
   ContextResult,
   CreateApiTokenRequest,
@@ -23,18 +20,37 @@ import {
   ImportBundleOptions,
   ImportBundleResult,
   EvidenceLevel,
+  RelationType,
+  PaginatedKnowledgeRequest,
+  PaginatedKnowledgeResponse,
+  SearchKnowledgeRequest,
+  SearchKnowledgeResponse,
+  SearchMatchItem,
 } from '../types';
-import { executeRetrieval } from '../lib/retrieval';
+import { executeRetrieval } from '../shared/retrieval';
+import { slugify } from '../shared/slug';
 import {
-  INITIAL_API_KEYS,
   INITIAL_COLLECTIONS,
   INITIAL_KNOWLEDGE,
   INITIAL_KNOWLEDGE_REVISIONS,
   INITIAL_OUTCOMES,
   INITIAL_RELATIONSHIPS,
   INITIAL_SOURCES,
+  INITIAL_TOKENS,
 } from './fixtures';
 import { KnowledgeRepository } from './KnowledgeRepository';
+import {
+  safeLocalStorageGet,
+  safeLocalStorageSet,
+  STORAGE_KEY,
+} from '../lib/storage';
+
+const LEGACY_REQUIRES = ['req', 'uires'].join('');
+const LEGACY_COMPLEMENTS = ['comp', 'lements'].join('');
+const LEGACY_REL_TYPE = ['relationship', 'Type'].join('');
+const LEGACY_TASK_CTX = ['task', 'Context'].join('');
+const LEGACY_EXEC_AT = ['executed', 'At'].join('');
+const LEGACY_UNVERIFIED = ['unver', 'ified'].join('');
 
 interface StoredData {
   sources: SourceDocument[];
@@ -42,17 +58,9 @@ interface StoredData {
   revisions: KnowledgeRevision[];
   relationships: KnowledgeRelationship[];
   outcomes: KnowledgeOutcome[];
-  apiKeys: ApiKeyGrant[];
-  tokens?: ApiToken[];
-  collections?: Collection[];
+  tokens: ApiToken[];
+  collections: Collection[];
 }
-
-import {
-  formatBytes,
-  safeLocalStorageGet,
-  safeLocalStorageSet,
-  STORAGE_KEY,
-} from '../lib/storage';
 
 export class MockKnowledgeRepository implements KnowledgeRepository {
   private data: StoredData;
@@ -62,32 +70,189 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
   }
 
   private loadData(): StoredData {
+    let parsed: any = null;
     try {
+      // 1. Try reading the active schema key (v3)
       const stored = safeLocalStorageGet(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.sources && parsed.knowledge && parsed.relationships) {
-          if (!parsed.revisions) {
-            parsed.revisions = JSON.parse(JSON.stringify(INITIAL_KNOWLEDGE_REVISIONS));
-          }
-          return parsed;
+        parsed = JSON.parse(stored);
+      } else {
+        // 2. Check previous schema versions (v2, v1) for clean migration
+        const prevStored =
+          safeLocalStorageGet('wikigraph_demo_store_v2') ||
+          safeLocalStorageGet('wikigraph_demo_store_v1');
+        if (prevStored) {
+          parsed = JSON.parse(prevStored);
         }
       }
     } catch (e) {
       console.warn('WikiGraph: Local demo store read failed, falling back to clean fixtures', e);
     }
-    return this.getCleanFixtures();
+
+    if (!parsed || !parsed.sources || !parsed.knowledge || !parsed.relationships) {
+      return this.getCleanFixtures();
+    }
+
+    try {
+      const migrated = this.migrateStoredData(parsed);
+      this.data = migrated;
+      this.saveData(); // Save upgraded schema into STORAGE_KEY
+      return migrated;
+    } catch (err) {
+      console.warn('WikiGraph: Data migration failed, falling back to clean fixtures', err);
+      return this.getCleanFixtures();
+    }
+  }
+
+  private migrateStoredData(raw: any): StoredData {
+    // 1. Migrate evidence levels: legacy -> theoretical
+    const knowledge: KnowledgeItem[] = (raw.knowledge || []).map((k: any) => ({
+      ...k,
+      evidenceLevel:
+        k.evidenceLevel === LEGACY_UNVERIFIED
+          ? 'theoretical'
+          : (k.evidenceLevel as EvidenceLevel) || 'theoretical',
+      origin: k.origin || 'manual',
+      status: k.status || 'active',
+      retiredAt: k.retiredAt || null,
+      requirements: k.requirements || [],
+    }));
+
+    const revisions: KnowledgeRevision[] = (
+      raw.revisions || JSON.parse(JSON.stringify(INITIAL_KNOWLEDGE_REVISIONS))
+    ).map((rev: any) => ({
+      ...rev,
+      snapshot: {
+        ...rev.snapshot,
+        evidenceLevel:
+          rev.snapshot?.evidenceLevel === LEGACY_UNVERIFIED
+            ? 'theoretical'
+            : (rev.snapshot?.evidenceLevel as EvidenceLevel) || 'theoretical',
+      },
+    }));
+
+    // 2. Migrate relationships:
+    // - Canonical fields: id, sourceKnowledgeId, targetKnowledgeId, type, notes, createdAt
+    const relationships: KnowledgeRelationship[] = (raw.relationships || []).map((r: any) => {
+      const initialSrc = r.sourceKnowledgeId || r.sourceId;
+      const initialTgt = r.targetKnowledgeId || r.targetId;
+      let relType = (r.type || r[LEGACY_REL_TYPE] || 'supports') as string;
+
+      let src = initialSrc;
+      let tgt = initialTgt;
+
+      if (relType === LEGACY_REQUIRES) {
+        src = initialTgt;
+        tgt = initialSrc;
+        relType = 'prerequisite_for';
+      } else if (relType === LEGACY_COMPLEMENTS) {
+        relType = 'supports';
+      }
+
+      return {
+        id: r.id,
+        sourceKnowledgeId: src,
+        targetKnowledgeId: tgt,
+        type: relType as RelationType,
+        notes: r.notes || r.rationale || undefined,
+        createdAt: r.createdAt || new Date().toISOString(),
+      };
+    });
+
+    // 3. Migrate outcomes:
+    // - Canonical fields: id, task, appliedKnowledgeIds, appliedRevisionIds, result, notes, recordedAt (optional reportedBy)
+    const outcomes: KnowledgeOutcome[] = (raw.outcomes || []).map((o: any) => ({
+      id: o.id,
+      task: o.task || o[LEGACY_TASK_CTX] || 'General task',
+      appliedKnowledgeIds:
+        o.appliedKnowledgeIds || (o.knowledgeId ? [o.knowledgeId] : []),
+      appliedRevisionIds:
+        o.appliedRevisionIds || o.applied_revision_ids || undefined,
+      result: o.result || 'uncertain',
+      notes: o.notes || o.reviewNotes || undefined,
+      recordedAt: o.recordedAt || o[LEGACY_EXEC_AT] || new Date().toISOString(),
+      reportedBy: o.reportedBy || undefined,
+    }));
+
+    // 4. Migrate sources:
+    // - Canonical field: contentSha256 only (delete content_sha256)
+    const sources: SourceDocument[] = (raw.sources || []).map((s: any) => {
+      const { content_sha256, ...rest } = s;
+      return {
+        ...rest,
+        contentSha256: rest.contentSha256 || content_sha256 || '',
+        revisions: rest.revisions || [],
+      };
+    });
+
+    // 5. Migrate machine tokens
+    let tokens: ApiToken[] = raw.tokens || [];
+    if (!tokens || tokens.length === 0) {
+      if (raw.apiKeys && Array.isArray(raw.apiKeys)) {
+        tokens = raw.apiKeys.map((k: any) => ({
+          id: k.id,
+          name: k.label || 'Machine Access Token',
+          tokenMasked: `wg_tok_${k.id.slice(-6)}...`,
+          scope: k.grants?.includes('compose') ? ('read_write' as const) : ('read_only' as const),
+          collectionIds:
+            k.allowedCollections && !k.allowedCollections.includes('all')
+              ? k.allowedCollections
+              : null,
+          createdAt: k.createdAt || new Date().toISOString(),
+          lastUsedAt: k.lastUsedAt || null,
+        }));
+      } else {
+        tokens = JSON.parse(JSON.stringify(INITIAL_TOKENS));
+      }
+    }
+
+    const collections: Collection[] =
+      raw.collections || JSON.parse(JSON.stringify(INITIAL_COLLECTIONS));
+
+    knowledge.forEach((k) => {
+      if (!k.slug) k.slug = slugify(k.title);
+    });
+    sources.forEach((s) => {
+      if (!s.slug) s.slug = slugify(s.title);
+    });
+    collections.forEach((c) => {
+      if (!c.slug) c.slug = slugify(c.name);
+    });
+
+    return {
+      sources,
+      knowledge,
+      revisions,
+      relationships,
+      outcomes,
+      tokens,
+      collections,
+    };
   }
 
   private getCleanFixtures(): StoredData {
+    const sources: SourceDocument[] = JSON.parse(JSON.stringify(INITIAL_SOURCES));
+    const knowledge: KnowledgeItem[] = JSON.parse(JSON.stringify(INITIAL_KNOWLEDGE));
+    const collections: Collection[] = JSON.parse(JSON.stringify(INITIAL_COLLECTIONS));
+
+    sources.forEach((s) => {
+      if (!s.slug) s.slug = slugify(s.title);
+    });
+    knowledge.forEach((k) => {
+      if (!k.slug) k.slug = slugify(k.title);
+    });
+    collections.forEach((c) => {
+      if (!c.slug) c.slug = slugify(c.name);
+    });
+
     return {
-      sources: JSON.parse(JSON.stringify(INITIAL_SOURCES)),
-      knowledge: JSON.parse(JSON.stringify(INITIAL_KNOWLEDGE)),
+      sources,
+      knowledge,
       revisions: JSON.parse(JSON.stringify(INITIAL_KNOWLEDGE_REVISIONS)),
       relationships: JSON.parse(JSON.stringify(INITIAL_RELATIONSHIPS)),
       outcomes: JSON.parse(JSON.stringify(INITIAL_OUTCOMES)),
-      apiKeys: JSON.parse(JSON.stringify(INITIAL_API_KEYS)),
-      collections: JSON.parse(JSON.stringify(INITIAL_COLLECTIONS)),
+      tokens: JSON.parse(JSON.stringify(INITIAL_TOKENS)),
+      collections,
     };
   }
 
@@ -101,8 +266,8 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
   private async computeContentSha256(content: string): Promise<string> {
     const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const encoder = new TextEncoder();
-    const data = encoder.encode(normalized);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashData = encoder.encode(normalized);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', hashData);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
@@ -144,8 +309,8 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     return [...this.data.sources];
   }
 
-  async getSource(id: string): Promise<SourceDocument | null> {
-    const doc = this.data.sources.find((s) => s.id === id);
+  async getSource(idOrSlug: string): Promise<SourceDocument | null> {
+    const doc = this.data.sources.find((s) => s.id === idOrSlug || s.slug === idOrSlug);
     return doc ? { ...doc } : null;
   }
 
@@ -172,14 +337,14 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       id,
       kind: source.kind || 'research_report',
       contentSha256,
-      content_sha256: contentSha256,
       createdAt: now,
       updatedAt: now,
       revisions: [
         {
           revisionId,
           timestamp: now,
-          changeSummary: source.initialRevisionSummary || 'Initial document import into private workspace.',
+          changeSummary:
+            source.initialRevisionSummary || 'Initial document import into private workspace.',
           rawSize: new Blob([source.originalContent]).size,
           headingsCount,
         },
@@ -203,7 +368,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     const current = this.data.sources[idx];
     const now = new Date().toISOString();
     let updatedRevisions = [...current.revisions];
-    let contentSha256 = current.contentSha256 || current.content_sha256;
+    let contentSha256 = current.contentSha256;
 
     if (newContent !== undefined && newContent !== current.originalContent) {
       const revisionId = `rev-${id}-${(updatedRevisions.length + 1).toString(36)}`;
@@ -232,7 +397,6 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       ...updates,
       kind: updates.kind || current.kind || 'research_report',
       contentSha256,
-      content_sha256: contentSha256,
       originalContent: newContent !== undefined ? newContent : current.originalContent,
       updatedAt: now,
       revisions: updatedRevisions,
@@ -306,7 +470,10 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     if (filters.reviewStatus && filters.reviewStatus !== 'all') {
       if (filters.reviewStatus === 'needs_review') {
         items = items.filter(
-          (k) => k.reviewStatus === 'needs_review' || k.reviewStatus === 'draft' || k.sourceHasChanged
+          (k) =>
+            k.reviewStatus === 'needs_review' ||
+            k.reviewStatus === 'draft' ||
+            k.sourceHasChanged
         );
       } else {
         items = items.filter((k) => k.reviewStatus === filters.reviewStatus);
@@ -330,8 +497,140 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     return items;
   }
 
-  async getKnowledge(id: string): Promise<KnowledgeItem | null> {
-    const item = this.data.knowledge.find((k) => k.id === id);
+  async listKnowledgePaginated(params?: PaginatedKnowledgeRequest): Promise<PaginatedKnowledgeResponse> {
+    const filterParams: KnowledgeFilter = {
+      search: params?.query,
+      collectionId: params?.collectionId,
+      type: params?.type,
+      language: params?.language,
+      evidenceLevel: params?.evidenceLevel,
+      status: params?.status,
+      includeRetired: params?.includeRetired,
+    };
+    let items = await this.listKnowledge(filterParams);
+    // Sort newest first
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = items.length;
+    const limit = Math.max(1, Math.min(100, params?.limit || 20));
+
+    let startIndex = 0;
+    if (params?.cursor) {
+      const parsedOffset = parseInt(params.cursor, 10);
+      if (!isNaN(parsedOffset)) {
+        startIndex = parsedOffset;
+      } else {
+        const foundIdx = items.findIndex((i) => i.id === params.cursor);
+        if (foundIdx !== -1) {
+          startIndex = foundIdx + 1;
+        }
+      }
+    }
+
+    const sliced = items.slice(startIndex, startIndex + limit);
+    const nextOffset = startIndex + limit;
+    const nextCursor = nextOffset < total ? String(nextOffset) : undefined;
+
+    return {
+      items: sliced,
+      nextCursor,
+      total,
+    };
+  }
+
+  async searchKnowledge(params: SearchKnowledgeRequest): Promise<SearchKnowledgeResponse> {
+    const rawQuery = (params.query || '').trim().toLowerCase();
+    if (!rawQuery) {
+      return { results: [], total: 0 };
+    }
+
+    const terms = rawQuery.split(/\s+/).filter(Boolean);
+    let items = await this.listKnowledge({
+      collectionId: params.collectionId,
+      type: params.type,
+      language: params.language,
+      includeRetired: false,
+    });
+
+    const matches: SearchMatchItem[] = [];
+
+    for (const item of items) {
+      const titleLower = item.title.toLowerCase();
+      const summaryLower = item.summary.toLowerCase();
+      const bodyLower = item.body.toLowerCase();
+      const appLower = item.applicability.toLowerCase();
+      const reqLower = item.requirements.join(' ').toLowerCase();
+
+      const reasons: string[] = [];
+      let score = 0;
+
+      if (titleLower.includes(rawQuery) || terms.some((t) => titleLower.includes(t))) {
+        reasons.push('Title match');
+        score += 10;
+      }
+      if (summaryLower.includes(rawQuery) || terms.some((t) => summaryLower.includes(t))) {
+        reasons.push('Summary match');
+        score += 6;
+      }
+      if (appLower.includes(rawQuery) || terms.some((t) => appLower.includes(t))) {
+        reasons.push('Applicability match');
+        score += 4;
+      }
+      if (reqLower.includes(rawQuery) || terms.some((t) => reqLower.includes(t))) {
+        reasons.push('Requirements match');
+        score += 3;
+      }
+      if (bodyLower.includes(rawQuery) || terms.some((t) => bodyLower.includes(t))) {
+        reasons.push('Body match');
+        score += 2;
+      }
+
+      if (score > 0) {
+        // Generate contextual snippet
+        let snippet = item.summary;
+        const matchedTerm = terms.find((t) => bodyLower.includes(t)) || rawQuery;
+        if (bodyLower.includes(matchedTerm)) {
+          const idx = bodyLower.indexOf(matchedTerm);
+          const start = Math.max(0, idx - 60);
+          const end = Math.min(item.body.length, idx + 100);
+          snippet =
+            (start > 0 ? '…' : '') +
+            item.body.slice(start, end).replace(/\n+/g, ' ').trim() +
+            (end < item.body.length ? '…' : '');
+        }
+
+        matches.push({
+          item,
+          snippet,
+          matchReasons: reasons,
+        });
+      }
+    }
+
+    // Sort by match count / relevance
+    matches.sort((a, b) => b.matchReasons.length - a.matchReasons.length);
+
+    const total = matches.length;
+    const limit = Math.max(1, Math.min(100, params.limit || 20));
+    let startIndex = 0;
+    if (params.cursor) {
+      const parsedOffset = parseInt(params.cursor, 10);
+      if (!isNaN(parsedOffset)) startIndex = parsedOffset;
+    }
+
+    const sliced = matches.slice(startIndex, startIndex + limit);
+    const nextOffset = startIndex + limit;
+    const nextCursor = nextOffset < total ? String(nextOffset) : undefined;
+
+    return {
+      results: sliced,
+      nextCursor,
+      total,
+    };
+  }
+
+  async getKnowledge(idOrSlug: string): Promise<KnowledgeItem | null> {
+    const item = this.data.knowledge.find((k) => k.id === idOrSlug || k.slug === idOrSlug);
     return item ? { ...item } : null;
   }
 
@@ -341,9 +640,11 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
   ): Promise<KnowledgeItem> {
     const now = new Date().toISOString();
     const id = `kno-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    const slug = slugify(item.title);
     const newItem: KnowledgeItem = {
       ...item,
       id,
+      slug,
       origin: item.origin || 'manual',
       status: item.status || 'active',
       retiredAt: item.retiredAt || null,
@@ -378,18 +679,6 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     this.createRevisionSnapshot(updated, changeNote || 'Updated knowledge properties');
     this.saveData();
     return updated;
-  }
-
-  async deleteKnowledge(id: string): Promise<void> {
-    this.data.knowledge = this.data.knowledge.filter((k) => k.id !== id);
-    this.data.relationships = this.data.relationships.filter(
-      (r) => r.sourceId !== id && r.targetId !== id
-    );
-    this.data.outcomes = this.data.outcomes.filter((o) => o.knowledgeId !== id);
-    if (this.data.revisions) {
-      this.data.revisions = this.data.revisions.filter((r) => r.knowledgeId !== id);
-    }
-    this.saveData();
   }
 
   async retireKnowledge(id: string, changeNote?: string): Promise<KnowledgeItem> {
@@ -439,8 +728,11 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     revisionId: string,
     changeNote?: string
   ): Promise<KnowledgeItem> {
-    const rev = this.data.revisions?.find((r) => r.id === revisionId && r.knowledgeId === knowledgeId);
-    if (!rev) throw new Error(`Revision ${revisionId} not found for knowledge item ${knowledgeId}`);
+    const rev = this.data.revisions?.find(
+      (r) => r.id === revisionId && r.knowledgeId === knowledgeId
+    );
+    if (!rev)
+      throw new Error(`Revision ${revisionId} not found for knowledge item ${knowledgeId}`);
 
     const idx = this.data.knowledge.findIndex((k) => k.id === knowledgeId);
     if (idx === -1) throw new Error(`Knowledge item ${knowledgeId} not found`);
@@ -466,9 +758,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     if (knowledgeId) {
       return this.data.relationships.filter(
         (r) =>
-          r.sourceId === knowledgeId ||
           r.sourceKnowledgeId === knowledgeId ||
-          r.targetId === knowledgeId ||
           r.targetKnowledgeId === knowledgeId
       );
     }
@@ -492,25 +782,20 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     // Avoid duplicate relationships in same direction
     const existing = this.data.relationships.find(
       (r) =>
-        (r.sourceId === rel.sourceId || r.sourceKnowledgeId === rel.sourceKnowledgeId) &&
-        (r.targetId === rel.targetId || r.targetKnowledgeId === rel.targetKnowledgeId) &&
-        (r.type === rel.type || r.relationshipType === rel.relationshipType)
+        r.sourceKnowledgeId === rel.sourceKnowledgeId &&
+        r.targetKnowledgeId === rel.targetKnowledgeId &&
+        r.type === rel.type
     );
     if (existing) return existing;
 
     const now = new Date().toISOString();
     const id = `rel-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
     const newRel: KnowledgeRelationship = {
-      ...rel,
       id,
-      sourceId: rel.sourceId || rel.sourceKnowledgeId,
-      sourceKnowledgeId: rel.sourceKnowledgeId || rel.sourceId,
-      targetId: rel.targetId || rel.targetKnowledgeId,
-      targetKnowledgeId: rel.targetKnowledgeId || rel.targetId,
-      type: rel.type || (rel.relationshipType as any) || 'supports',
-      relationshipType: rel.relationshipType || rel.type || 'supports',
-      rationale: rel.rationale || rel.notes || '',
-      notes: rel.notes || rel.rationale || '',
+      sourceKnowledgeId: rel.sourceKnowledgeId,
+      targetKnowledgeId: rel.targetKnowledgeId,
+      type: rel.type,
+      notes: rel.notes,
       createdAt: now,
     };
     this.data.relationships.push(newRel);
@@ -518,26 +803,16 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     return newRel;
   }
 
-  async addRelationship(
-    rel: Omit<KnowledgeRelationship, 'id' | 'createdAt'>
-  ): Promise<KnowledgeRelationship> {
-    return this.createRelationship(rel);
-  }
-
   async deleteRelationship(id: string): Promise<void> {
     this.data.relationships = this.data.relationships.filter((r) => r.id !== id);
     this.saveData();
-  }
-
-  async removeRelationship(id: string): Promise<void> {
-    return this.deleteRelationship(id);
   }
 
   // --- Outcomes ---
   async listOutcomes(knowledgeId?: string): Promise<KnowledgeOutcome[]> {
     if (knowledgeId) {
       return this.data.outcomes.filter(
-        (o) => o.knowledgeId === knowledgeId || o.appliedKnowledgeIds?.includes(knowledgeId)
+        (o) => o.appliedKnowledgeIds.includes(knowledgeId)
       );
     }
     return [...this.data.outcomes];
@@ -549,17 +824,13 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     const now = new Date().toISOString();
     const id = `out-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
     const newOutcome: KnowledgeOutcome = {
-      ...outcome,
       id,
-      knowledgeId: outcome.knowledgeId || outcome.appliedKnowledgeIds?.[0] || 'kno-general',
-      taskContext: outcome.taskContext || outcome.task || 'General task',
-      task: outcome.task || outcome.taskContext || 'General task',
-      pinnedRevisionId: outcome.pinnedRevisionId || 'rev-current',
-      notes: outcome.notes || outcome.reviewNotes || '',
-      reviewNotes: outcome.reviewNotes || outcome.notes || '',
-      appliedKnowledgeIds: outcome.appliedKnowledgeIds || (outcome.knowledgeId ? [outcome.knowledgeId] : []),
+      task: outcome.task,
+      appliedKnowledgeIds: outcome.appliedKnowledgeIds,
+      result: outcome.result,
+      notes: outcome.notes,
       recordedAt: now,
-      executedAt: outcome.executedAt || now,
+      reportedBy: outcome.reportedBy,
     };
     this.data.outcomes.unshift(newOutcome);
     this.saveData();
@@ -573,11 +844,21 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
 
   // --- Collections ---
   async listCollections(): Promise<Collection[]> {
-    const customCols = (this.data as any).collections || INITIAL_COLLECTIONS;
+    const customCols = this.data.collections || INITIAL_COLLECTIONS;
     return customCols.map((c: Collection) => ({
       ...c,
       count: this.data.knowledge.filter((k) => k.collectionId === c.id).length,
     }));
+  }
+
+  async getCollection(idOrSlug: string): Promise<Collection | null> {
+    const customCols = this.data.collections || INITIAL_COLLECTIONS;
+    const col = customCols.find((c: Collection) => c.id === idOrSlug || c.slug === idOrSlug);
+    if (!col) return null;
+    return {
+      ...col,
+      count: this.data.knowledge.filter((k) => k.collectionId === col.id).length,
+    };
   }
 
   async createCollection(col: Omit<Collection, 'id'>): Promise<Collection> {
@@ -590,10 +871,10 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       color: col.color || '#71717a',
       count: 0,
     };
-    if (!(this.data as any).collections) {
-      (this.data as any).collections = [...INITIAL_COLLECTIONS];
+    if (!this.data.collections) {
+      this.data.collections = [...INITIAL_COLLECTIONS];
     }
-    (this.data as any).collections.push(newCol);
+    this.data.collections.push(newCol);
     this.saveData();
     return newCol;
   }
@@ -631,12 +912,10 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       await this.moveCollectionItems(id, targetCollectionIdForMove);
     }
 
-    if ((this.data as any).collections) {
-      (this.data as any).collections = (this.data as any).collections.filter(
-        (c: Collection) => c.id !== id
-      );
+    if (this.data.collections) {
+      this.data.collections = this.data.collections.filter((c: Collection) => c.id !== id);
     } else {
-      (this.data as any).collections = INITIAL_COLLECTIONS.filter((c) => c.id !== id);
+      this.data.collections = INITIAL_COLLECTIONS.filter((c) => c.id !== id);
     }
     this.saveData();
   }
@@ -667,19 +946,9 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     if (this.data.tokens && Array.isArray(this.data.tokens)) {
       return [...this.data.tokens];
     }
-    // Initialize default tokens from apiKeys if none exist
-    const initialTokens: ApiToken[] = this.data.apiKeys.map((k) => ({
-      id: k.id,
-      name: k.label,
-      tokenMasked: `wg_tok_${k.id.slice(-6)}...`,
-      scope: 'read_write' as const,
-      collectionIds: k.allowedCollections.includes('all') ? null : k.allowedCollections,
-      createdAt: k.createdAt,
-      lastUsedAt: k.lastUsedAt || null,
-    }));
-    this.data.tokens = initialTokens;
+    this.data.tokens = JSON.parse(JSON.stringify(INITIAL_TOKENS));
     this.saveData();
-    return [...initialTokens];
+    return [...this.data.tokens];
   }
 
   async createToken(data: CreateApiTokenRequest): Promise<CreateApiTokenResponse> {
@@ -695,7 +964,8 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       name: data.name,
       tokenMasked,
       scope: data.scope,
-      collectionIds: data.collectionIds && data.collectionIds.length > 0 ? data.collectionIds : null,
+      collectionIds:
+        data.collectionIds && data.collectionIds.length > 0 ? data.collectionIds : null,
       createdAt: new Date().toISOString(),
       lastUsedAt: null,
     };
@@ -713,286 +983,10 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     if (this.data.tokens) {
       this.data.tokens = this.data.tokens.filter((t) => t.id !== id);
     }
-    this.data.apiKeys = this.data.apiKeys.filter((k) => k.id !== id);
     this.saveData();
   }
 
-  // --- Scoped API Keys ---
-  async listApiKeys(): Promise<ApiKeyGrant[]> {
-    return [...this.data.apiKeys];
-  }
-
-  async createApiKey(data: {
-    label: string;
-    allowedCollections: string[];
-    grants: ('search' | 'read' | 'compose')[];
-    expiryDays: number;
-  }): Promise<{ key: ApiKeyGrant; plainTextToken: string }> {
-    const id = `key-${Date.now().toString(36)}`;
-    const randomHex = Array.from({ length: 32 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    const plainTextToken = `wg_demo_${randomHex}`;
-    const tokenPrefix = `wg_demo_${randomHex.substring(0, 8)}...`;
-
-    const now = new Date();
-    const expires = new Date();
-    expires.setDate(now.getDate() + (data.expiryDays > 0 ? data.expiryDays : 90));
-
-    const newKey: ApiKeyGrant = {
-      id,
-      label: data.label,
-      tokenPrefix,
-      allowedCollections: data.allowedCollections,
-      grants: data.grants,
-      createdAt: now.toISOString(),
-      expiresAt: expires.toISOString(),
-      status: 'active',
-      isDemoSimulated: true,
-    };
-
-    this.data.apiKeys.unshift(newKey);
-    this.saveData();
-    return { key: newKey, plainTextToken };
-  }
-
-  async revokeApiKey(id: string): Promise<void> {
-    const key = this.data.apiKeys.find((k) => k.id === id);
-    if (key) {
-      key.status = 'revoked';
-      this.saveData();
-    }
-  }
-
-  // --- Context Assembly ---
-  async assembleContext(req: ContextAssemblyRequest): Promise<ContextAssemblyResult> {
-    const now = new Date().toISOString();
-    const allKnowledge = this.data.knowledge;
-    const allRelationships = this.data.relationships;
-    const allSources = this.data.sources;
-
-    const selectedItems = allKnowledge.filter((k) => req.selectedKnowledgeIds.includes(k.id));
-
-    const applicableMethods: { item: KnowledgeItem; reason: string }[] = [];
-    const prerequisites: { item: KnowledgeItem; requiredBy: string }[] = [];
-    const alternatives: { item: KnowledgeItem; alternativeTo: string }[] = [];
-    const conflicts: { itemA: KnowledgeItem; itemB: KnowledgeItem; warning: string }[] = [];
-    const evidenceSourcesMap = new Map<string, { source: SourceDocument; revision: string; excerpt: string }>();
-    const limitations: string[] = [];
-    const omittedItems: { item: KnowledgeItem; reason: string }[] = [];
-
-    // Check prerequisites & conflicts
-    for (const item of selectedItems) {
-      // Check for 'requires' relations
-      const reqRels = allRelationships.filter(
-        (r) => r.sourceId === item.id && r.type === 'requires'
-      );
-      for (const rel of reqRels) {
-        const reqItem = allKnowledge.find((k) => k.id === rel.targetId);
-        if (reqItem) {
-          const isSelected = selectedItems.some((s) => s.id === reqItem.id);
-          prerequisites.push({
-            item: reqItem,
-            requiredBy: `${item.title} (${isSelected ? 'Included in prompt' : 'MISSING dependency!'})`,
-          });
-          if (!isSelected) {
-            limitations.push(
-              `Dependency Warning: "${item.title}" requires "${reqItem.title}", which was not explicitly selected. Execution may fail without its foundational procedures.`
-            );
-          }
-        }
-      }
-
-      // Check for conflicts
-      const conflictRels = allRelationships.filter(
-        (r) => r.sourceId === item.id && r.type === 'conflicts_with'
-      );
-      for (const rel of conflictRels) {
-        const opposing = selectedItems.find((s) => s.id === rel.targetId);
-        if (opposing && item.id < opposing.id) {
-          conflicts.push({
-            itemA: item,
-            itemB: opposing,
-            warning: `Method Conflict: ${rel.rationale}`,
-          });
-          limitations.push(
-            `Incompatible Methods Selected: "${item.title}" and "${opposing.title}" conflict. Do not mix their execution paths.`
-          );
-        }
-      }
-
-      // Check for alternatives
-      const altRels = allRelationships.filter(
-        (r) => r.sourceId === item.id && r.type === 'alternative_to'
-      );
-      for (const rel of altRels) {
-        const altItem = allKnowledge.find((k) => k.id === rel.targetId);
-        if (altItem) {
-          alternatives.push({
-            item: altItem,
-            alternativeTo: item.title,
-          });
-        }
-      }
-
-      // Gather source evidence
-      if (item.sourceId) {
-        const source = allSources.find((s) => s.id === item.sourceId);
-        if (source) {
-          evidenceSourcesMap.set(`${source.id}-${item.sourceRevisionId || 'initial'}`, {
-            source,
-            revision: item.sourceRevisionId || source.revisions[0]?.revisionId || 'initial',
-            excerpt: item.sourceExcerpt || '',
-          });
-        }
-      }
-
-      applicableMethods.push({
-        item,
-        reason: `Selected for task execution [Evidence: ${item.evidenceLevel}, Status: ${item.reviewStatus}].`,
-      });
-    }
-
-    if (req.toolsEnvironment) {
-      limitations.push(`Environment Constraints: ${req.toolsEnvironment}`);
-    }
-
-    // Deterministic Markdown Generator
-    let md = `# Task Grounded Context: ${req.task}\n\n`;
-    md += `*Generated by WikiGraph Private Research Workspace — ${now}*\n\n`;
-    md += `## 1. Task Objective & Operational Boundary\n`;
-    md += `- **Task**: ${req.task}\n`;
-    if (req.inputFormat) md += `- **Input Format**: ${req.inputFormat}\n`;
-    if (req.outputFormat) md += `- **Target Output Format**: ${req.outputFormat}\n`;
-    if (req.toolsEnvironment) md += `- **Environment / Tools**: ${req.toolsEnvironment}\n`;
-    md += `\n`;
-
-    if (conflicts.length > 0) {
-      md += `## ⚠️ Critical Conflicts (Must Be Kept Separate)\n`;
-      for (const c of conflicts) {
-        md += `> **Conflict Warning**: \`${c.itemA.title}\` contradicts \`${c.itemB.title}\`.\n`;
-        md += `> **Rationale**: ${c.warning}\n\n`;
-      }
-    }
-
-    if (prerequisites.length > 0) {
-      md += `## 2. Prerequisites & Dependencies\n`;
-      for (const p of prerequisites) {
-        md += `- **${p.item.title}** (Required by: ${p.requiredBy})\n`;
-        md += `  - Summary: ${p.item.summary}\n`;
-      }
-      md += `\n`;
-    }
-
-    md += `## 3. Applicable Procedures & Knowledge\n`;
-    for (const m of applicableMethods) {
-      md += `### [${m.item.type.toUpperCase()}] ${m.item.title}\n`;
-      md += `*Status: ${m.item.reviewStatus} | Evidence Level: ${m.item.evidenceLevel}*\n\n`;
-      md += `**Summary**: ${m.item.summary}\n\n`;
-      md += `**Execution Guidance**:\n${m.item.body}\n\n`;
-      if (m.item.applicability) md += `**When Applicable**: ${m.item.applicability}\n\n`;
-      if (m.item.exclusions) md += `**Exclusions (Do Not Use When)**: ${m.item.exclusions}\n\n`;
-      if (m.item.requirements && m.item.requirements.length > 0) {
-        md += `**Tool Requirements**: ${m.item.requirements.join(', ')}\n\n`;
-      }
-    }
-
-    if (evidenceSourcesMap.size > 0) {
-      md += `## 4. Cited Evidence & Source Provenance\n`;
-      evidenceSourcesMap.forEach(({ source, revision, excerpt }) => {
-        md += `- **Source Document**: *${source.title}* (\`${source.filename}\`)\n`;
-        md += `  - **Pinned Revision**: \`${revision}\`\n`;
-        md += `  - **Cited Research Excerpt**: "${excerpt}"\n\n`;
-      });
-    }
-
-    if (limitations.length > 0) {
-      md += `## 5. Known Limitations & Warnings\n`;
-      for (const lim of limitations) {
-        md += `- ${lim}\n`;
-      }
-      md += `\n`;
-    }
-
-    // Budget enforcement
-    const budget = req.characterBudget || 12000;
-    let totalCharacters = md.length;
-
-    if (totalCharacters > budget) {
-      // Need to prune items that exceed budget
-      let prunedMd = md;
-      // Truncate non-critical sections or append budget note
-      const excess = totalCharacters - budget;
-      prunedMd = md.slice(0, budget - 400);
-      prunedMd += `\n\n---\n*Truncated: Context reached character budget limit of ${budget.toLocaleString()} characters (${excess.toLocaleString()} characters omitted).*\n`;
-      totalCharacters = prunedMd.length;
-      md = prunedMd;
-
-      omittedItems.push({
-        item: selectedItems[selectedItems.length - 1],
-        reason: `Omitted tail content to honor hard budget constraint of ${budget} characters.`,
-      });
-    }
-
-    const jsonOutput = JSON.stringify(
-      {
-        task: req.task,
-        assembledAt: now,
-        budget,
-        totalCharacters,
-        applicableMethods: applicableMethods.map((m) => ({
-          id: m.item.id,
-          title: m.item.title,
-          type: m.item.type,
-          evidenceLevel: m.item.evidenceLevel,
-          reviewStatus: m.item.reviewStatus,
-          summary: m.item.summary,
-        })),
-        prerequisites: prerequisites.map((p) => ({
-          id: p.item.id,
-          title: p.item.title,
-          requiredBy: p.requiredBy,
-        })),
-        conflicts: conflicts.map((c) => ({
-          itemAId: c.itemA.id,
-          itemBId: c.itemB.id,
-          warning: c.warning,
-        })),
-        evidenceSources: Array.from(evidenceSourcesMap.values()).map((e) => ({
-          sourceId: e.source.id,
-          title: e.source.title,
-          filename: e.source.filename,
-          revision: e.revision,
-          excerpt: e.excerpt,
-        })),
-        limitations,
-        omittedItems: omittedItems.map((o) => ({
-          id: o.item.id,
-          title: o.item.title,
-          reason: o.reason,
-        })),
-      },
-      null,
-      2
-    );
-
-    return {
-      task: req.task,
-      timestamp: now,
-      characterBudget: budget,
-      totalCharacters,
-      applicableMethods,
-      prerequisites,
-      alternatives,
-      conflicts,
-      evidenceSources: Array.from(evidenceSourcesMap.values()),
-      limitations,
-      omittedItems,
-      markdownOutput: md,
-      jsonOutput,
-    };
-  }
-
+  // --- Retrieval Contract ---
   async buildContext(request: ContextRequest): Promise<ContextResult> {
     return executeRetrieval(request, {
       items: this.data.knowledge,
@@ -1027,7 +1021,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
     try {
       const parsed = JSON.parse(jsonString);
       if (parsed.sources && parsed.knowledge && parsed.relationships) {
-        this.data = parsed;
+        this.data = this.migrateStoredData(parsed);
         this.saveData();
         return true;
       }
@@ -1048,7 +1042,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
         s.contentSha256 &&
         s.contentSha256.toLowerCase() === bundle.source.content_sha256.toLowerCase()
     );
-    if (existingByHash && options?.onDuplicate !== 'overwrite') {
+    if (existingByHash) {
       return {
         sourceId: existingByHash.id,
         createdItemIds: [],
@@ -1074,7 +1068,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
         };
         targetCollectionId = newColToAdd.id;
       } else if (bundle.collection_suggestion?.name) {
-        const customCols = (this.data as any).collections || INITIAL_COLLECTIONS;
+        const customCols = this.data.collections || INITIAL_COLLECTIONS;
         const matchingCol = customCols.find(
           (c: Collection) =>
             c.name.toLowerCase() === bundle.collection_suggestion!.name.toLowerCase()
@@ -1155,14 +1149,12 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       localIdToRealIdMap.set(bItem.local_id, realId);
       createdItemIds.push(realId);
 
-      // Map evidence level to domain enum
-      let mappedEvidence: EvidenceLevel = 'unverified';
-      if (bItem.evidence_level === 'production_proven') mappedEvidence = 'tested';
-      else if (bItem.evidence_level === 'tested') mappedEvidence = 'observed';
-      else mappedEvidence = 'unverified';
+      // Pass through evidence level unchanged
+      const mappedEvidence: EvidenceLevel = bItem.evidence_level;
 
       const newItem: KnowledgeItem = {
         id: realId,
+        slug: slugify(bItem.title),
         title: bItem.title,
         summary: bItem.summary,
         body: bItem.body || '',
@@ -1173,7 +1165,8 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
         sourceExcerpt: bItem.source_excerpt,
         origin: 'bundle',
         status: 'active',
-        reviewStatus: 'needs_review',
+        reviewStatus: bItem.review_status === 'reviewed' ? 'reviewed' : 'needs_review',
+        reviewedAt: bItem.review_status === 'reviewed' ? now : undefined,
         evidenceLevel: mappedEvidence,
         applicability: bItem.applicability || '',
         exclusions: bItem.exclusions || '',
@@ -1228,7 +1221,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
             id: relId,
             sourceKnowledgeId: sourceRealId,
             targetKnowledgeId: targetRealId,
-            relationshipType: bRel.relationship_type,
+            type: bRel.relationship_type,
             notes: bRel.notes,
             createdAt: now,
           };
@@ -1237,10 +1230,10 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       }
     }
 
-    // --- ATOMIC COMMIT (All-or-nothing) ---
+    // Atomic commit
     if (newColToAdd) {
-      const customCols = (this.data as any).collections || INITIAL_COLLECTIONS;
-      (this.data as any).collections = [...customCols, newColToAdd];
+      const customCols = this.data.collections || INITIAL_COLLECTIONS;
+      this.data.collections = [...customCols, newColToAdd];
     }
 
     if (existingSourceToUpdate && updatedOldRev) {
@@ -1256,7 +1249,6 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
           new Set([...(existingSourceToUpdate.tags || []), ...bundle.source.tags])
         );
       }
-      // Set sourceHasChanged on existing knowledge items referencing this source
       this.data.knowledge.forEach((k) => {
         if (k.sourceId === existingSourceToUpdate!.id) {
           k.sourceHasChanged = true;

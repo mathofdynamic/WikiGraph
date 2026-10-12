@@ -2,7 +2,7 @@
  * Safe local storage utility with quota-error interception and storage accounting.
  */
 
-export const STORAGE_KEY = 'wikigraph_demo_store_v2';
+export const STORAGE_KEY = 'wikigraph_demo_store_v3';
 export const QUOTA_ERROR_EVENT = 'wikigraph:quota-error';
 export const QUOTA_MESSAGE = 'Browser storage is full. Export a backup and clear space.';
 

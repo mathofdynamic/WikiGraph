@@ -67,10 +67,16 @@ const VALID_TYPES = [
   'failure',
   'lesson',
 ] as const;
-const VALID_EVIDENCE = ['theoretical', 'tested', 'production_proven'] as const;
+const VALID_EVIDENCE = [
+  'theoretical',
+  'observed',
+  'tested',
+  'production_proven',
+] as const;
 const VALID_RELATIONSHIPS = [
   'supports',
   'conflicts_with',
+  'alternative_to',
   'prerequisite_for',
   'derived_from',
   'supersedes',
@@ -261,10 +267,10 @@ export async function validateBundle(raw: unknown): Promise<BundleValidationResu
         );
       }
 
-      // Review Status check
-      if (item.review_status !== 'needs_review') {
+      // Review Status check ('needs_review' | 'reviewed')
+      if (item.review_status !== 'needs_review' && item.review_status !== 'reviewed') {
         errors.push(
-          `${itemPrefix} ('${item.local_id || index}'): review_status must be 'needs_review', found '${item.review_status}'.`
+          `${itemPrefix} ('${item.local_id || index}'): review_status must be 'needs_review' or 'reviewed', found '${item.review_status}'.`
         );
       }
 
@@ -459,7 +465,7 @@ export const SAMPLE_BUNDLE: WikiGraphBundle = {
       exclusions: 'Small collections (<100,000 vectors) where unquantized FP32 easily fits into host memory.',
       requirements: ['AVX-512 or NEON SIMD vector instruction support'],
       evidence_level: 'theoretical',
-      review_status: 'needs_review',
+      review_status: 'reviewed',
       source_excerpt:
         'Scalar quantization (SQ8) maps continuous 32-bit floating point vectors into discrete 8-bit integers using uniform histogram calibration.\nThis reduces vector storage memory by exactly 75% while maintaining over 98.4% top-10 retrieval recall across MTEB benchmarks.',
     },

@@ -9,20 +9,16 @@ export type KnowledgeType =
 
 export type ReviewStatus = 'draft' | 'reviewed' | 'deprecated' | 'needs_review';
 
-export type EvidenceLevel = 'unverified' | 'observed' | 'tested';
+export type EvidenceLevel = 'theoretical' | 'observed' | 'tested' | 'production_proven';
 
 export type RelationType =
-  | 'requires'
-  | 'complements'
+  | 'supports'
   | 'conflicts_with'
   | 'alternative_to'
-  | 'supports'
-  | 'supersedes'
   | 'prerequisite_for'
   | 'derived_from'
+  | 'supersedes'
   | 'relates_to';
-
-export type RelationshipType = RelationType;
 
 export type OutcomeResult = 'success' | 'failure' | 'uncertain';
 
@@ -30,6 +26,7 @@ export type AppLanguage = 'en' | 'fa';
 
 export interface Collection {
   id: string;
+  slug?: string;
   name: string;
   nameFa: string;
   description?: string;
@@ -52,6 +49,7 @@ export interface SourceRevision {
 
 export interface SourceDocument {
   id: string;
+  slug?: string;
   title: string;
   filename: string;
   originalContent: string;
@@ -61,7 +59,6 @@ export interface SourceDocument {
   kind?: SourceDocumentKind;
   tags?: string[];
   contentSha256?: string;
-  content_sha256?: string;
   createdAt: string;
   updatedAt: string;
   url?: string;
@@ -102,6 +99,7 @@ export interface KnowledgeRevision {
 
 export interface KnowledgeItem {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   body: string;
@@ -129,31 +127,22 @@ export interface KnowledgeItem {
 
 export interface KnowledgeRelationship {
   id: string;
-  sourceId?: string; // from knowledge item
-  sourceKnowledgeId?: string;
-  targetId?: string; // to knowledge item
-  targetKnowledgeId?: string;
-  type?: RelationType;
-  relationshipType?: RelationType | string;
-  rationale?: string;
+  sourceKnowledgeId: string;
+  targetKnowledgeId: string;
+  type: RelationType;
   notes?: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
 export interface KnowledgeOutcome {
   id: string;
-  knowledgeId?: string;
-  taskContext?: string;
-  task?: string;
-  prompt?: string;
-  appliedKnowledgeIds?: string[];
-  pinnedRevisionId?: string;
+  task: string;
+  appliedKnowledgeIds: string[];
+  appliedRevisionIds?: string[];
   result: OutcomeResult;
-  metrics?: string;
   notes?: string;
-  reviewNotes?: string;
-  recordedAt?: string;
-  executedAt?: string;
+  recordedAt: string;
+  reportedBy?: string;
 }
 
 export interface ApiToken {
@@ -241,19 +230,6 @@ export interface ContextRecipe {
   createdAt: string;
 }
 
-export interface ApiKeyGrant {
-  id: string;
-  label: string;
-  tokenPrefix: string;
-  allowedCollections: string[]; // collection IDs or 'all'
-  grants: ('search' | 'read' | 'compose')[];
-  createdAt: string;
-  expiresAt: string;
-  lastUsedAt?: string;
-  status: 'active' | 'revoked';
-  isDemoSimulated: boolean;
-}
-
 export interface KnowledgeFilter {
   search?: string;
   sourceId?: string;
@@ -266,6 +242,45 @@ export interface KnowledgeFilter {
   status?: 'all' | 'active' | 'retired';
   includeRetired?: boolean;
   origin?: 'all' | 'bundle' | 'manual';
+}
+
+export interface PaginatedKnowledgeRequest {
+  query?: string;
+  collectionId?: string;
+  type?: KnowledgeType | 'all';
+  language?: AppLanguage | 'all';
+  evidenceLevel?: EvidenceLevel | 'all';
+  status?: 'all' | 'active' | 'retired';
+  includeRetired?: boolean;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface PaginatedKnowledgeResponse {
+  items: KnowledgeItem[];
+  nextCursor?: string;
+  total: number;
+}
+
+export interface SearchKnowledgeRequest {
+  query: string;
+  collectionId?: string;
+  type?: KnowledgeType | 'all';
+  language?: AppLanguage | 'all';
+  limit?: number;
+  cursor?: string;
+}
+
+export interface SearchMatchItem {
+  item: KnowledgeItem;
+  snippet: string;
+  matchReasons: string[];
+}
+
+export interface SearchKnowledgeResponse {
+  results: SearchMatchItem[];
+  nextCursor?: string;
+  total: number;
 }
 
 export interface ContextRequest {
@@ -312,33 +327,6 @@ export interface ContextResult {
   };
 }
 
-export interface ContextAssemblyRequest {
-  task: string;
-  collectionId?: string;
-  language: AppLanguage | 'any';
-  inputFormat: string;
-  outputFormat: string;
-  toolsEnvironment: string;
-  characterBudget: number;
-  selectedKnowledgeIds: string[];
-}
-
-export interface ContextAssemblyResult {
-  task: string;
-  timestamp: string;
-  characterBudget: number;
-  totalCharacters: number;
-  applicableMethods: { item: KnowledgeItem; reason: string }[];
-  prerequisites: { item: KnowledgeItem; requiredBy: string }[];
-  alternatives: { item: KnowledgeItem; alternativeTo: string }[];
-  conflicts: { itemA: KnowledgeItem; itemB: KnowledgeItem; warning: string }[];
-  evidenceSources: { source: SourceDocument; revision: string; excerpt: string }[];
-  limitations: string[];
-  omittedItems: { item: KnowledgeItem; reason: string }[];
-  markdownOutput: string;
-  jsonOutput: string;
-}
-
 export interface StorageStats {
   documentCount: number;
   knowledgeCount: number;
@@ -368,14 +356,14 @@ export interface BundleKnowledgeItem {
   applicability?: string;
   exclusions?: string;
   requirements?: string[];
-  evidence_level: 'theoretical' | 'tested' | 'production_proven';
-  review_status: 'needs_review';
+  evidence_level: EvidenceLevel;
+  review_status: 'needs_review' | 'reviewed';
   source_excerpt: string;
 }
 
 export interface BundleRelationship {
   source_local_id: string;
-  relationship_type: RelationshipType;
+  relationship_type: RelationType;
   target_local_id: string;
   notes?: string;
 }
@@ -394,6 +382,7 @@ export interface WikiGraphBundle {
   };
   knowledge_items: BundleKnowledgeItem[];
   relationships?: BundleRelationship[];
+  [key: string]: unknown;
 }
 
 export interface BundleValidationResult {
@@ -408,7 +397,7 @@ export interface ImportBundleOptions {
     name: string;
     name_fa?: string;
   };
-  onDuplicate?: 'skip' | 'new_revision' | 'overwrite';
+  onDuplicate?: 'skip' | 'new_revision';
 }
 
 export interface ImportBundleResult {

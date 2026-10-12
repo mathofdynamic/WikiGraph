@@ -182,16 +182,31 @@ async function runTests() {
     assert(!resDup.valid, 'Duplicate local_id fails validation');
     assert(resDup.errors.some(e => e.includes('duplicate local_id')), 'Error reported for duplicate local_id');
 
-    // review_status not 'needs_review'
+    // review_status invalid
     const wrongStatusBundle: any = {
       ...SAMPLE_BUNDLE,
       knowledge_items: [
-        { ...SAMPLE_BUNDLE.knowledge_items[0], review_status: 'reviewed' },
+        { ...SAMPLE_BUNDLE.knowledge_items[0], review_status: 'invalid_status' },
       ],
     };
     const resStatus = await validateBundle(wrongStatusBundle);
-    assert(!resStatus.valid, 'review_status != needs_review fails validation');
-    assert(resStatus.errors.some(e => e.includes("review_status must be 'needs_review'")), 'Error reported for review_status');
+    assert(!resStatus.valid, 'invalid review_status fails validation');
+    assert(resStatus.errors.some(e => e.includes('review_status must be \'needs_review\' or \'reviewed\'')), 'Error reported for invalid review_status');
+
+    // Bundle with both 'reviewed' and 'needs_review' items + unknown top-level fields
+    const mixedBundle: WikiGraphBundle = {
+      ...SAMPLE_BUNDLE,
+      generated_at: '2026-10-10T08:00:00Z',
+      generator: { tool: 'custom-ai-tool', version: '2.0.0' },
+      unknown_meta_field: 'ignored value',
+      knowledge_items: [
+        { ...SAMPLE_BUNDLE.knowledge_items[0], review_status: 'reviewed' },
+        { ...SAMPLE_BUNDLE.knowledge_items[1], review_status: 'needs_review' },
+      ],
+    };
+    const resMixed = await validateBundle(mixedBundle);
+    assert(resMixed.valid, 'Bundle with both reviewed and needs_review items and unknown fields is valid');
+    assert(resMixed.errors.length === 0, 'No errors for mixed review_status and unknown top-level fields');
 
     // Self-link relationship
     const selfLinkBundle: WikiGraphBundle = {
@@ -277,11 +292,15 @@ async function runTests() {
     assert(importRes.createdItemIds.length === SAMPLE_BUNDLE.knowledge_items.length, 'All knowledge items created');
     assert(importRes.createdRelationshipIds.length === (SAMPLE_BUNDLE.relationships?.length || 0), 'All relationships created');
 
-    // Verify imported items have origin='bundle', reviewStatus='needs_review'
-    const importedItem = await repo.getKnowledge(importRes.createdItemIds[0]);
-    assert(importedItem !== null, 'Imported item retrieved from repo');
-    assert(importedItem?.origin === 'bundle', 'Imported item has origin === "bundle"');
-    assert(importedItem?.reviewStatus === 'needs_review', 'Imported item has reviewStatus === "needs_review"');
+    // Verify imported items preserve review_status and origin='bundle'
+    const importedItem0 = await repo.getKnowledge(importRes.createdItemIds[0]);
+    assert(importedItem0 !== null, 'Imported item retrieved from repo');
+    assert(importedItem0?.origin === 'bundle', 'Imported item has origin === "bundle"');
+    assert(importedItem0?.reviewStatus === 'reviewed', 'Imported item 0 has reviewStatus === "reviewed"');
+    assert(typeof importedItem0?.reviewedAt === 'string', 'Imported item 0 has reviewedAt timestamp');
+
+    const importedItem1 = await repo.getKnowledge(importRes.createdItemIds[1]);
+    assert(importedItem1?.reviewStatus === 'needs_review', 'Imported item 1 has reviewStatus === "needs_review"');
 
     // 2. Duplicate by hash -> skipped
     const dupRes = await repo.importBundle(SAMPLE_BUNDLE);

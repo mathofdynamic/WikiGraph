@@ -1,6 +1,6 @@
 {
   "name": "WikiGraph",
-  "description": "Public research knowledge platform for exploring deep-research reports, reusable insights, relationship graphs, and assembling task-specific cited context.",
+  "description": "WikiGraph - knowledge library for AI agents",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
