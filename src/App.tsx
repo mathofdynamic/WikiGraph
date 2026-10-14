@@ -29,9 +29,7 @@ const ConnectionsPage = lazy(() =>
 );
 
 const PageLoader: React.FC = () => (
-  <div className="min-h-[50vh] flex items-center justify-center">
-    <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-  </div>
+  <div className="min-h-[50vh] w-full bg-[var(--background)]" aria-busy="true" />
 );
 
 /**

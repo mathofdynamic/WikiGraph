@@ -169,6 +169,40 @@ export async function validateBundle(raw: unknown): Promise<BundleValidationResu
         }
       }
     }
+
+    // Optional source.origin validation (url must be http/https, other known fields must be strings, unknown fields ignored)
+    if (src.origin !== undefined && src.origin !== null) {
+      if (typeof src.origin !== 'object' || Array.isArray(src.origin)) {
+        errors.push("Field 'source.origin' must be an object if provided.");
+      } else {
+        const origin = src.origin as Record<string, unknown>;
+        const stringFields = [
+          'url',
+          'repository',
+          'path',
+          'author',
+          'license',
+          'version',
+          'retrievedAt',
+          'note',
+        ] as const;
+
+        for (const field of stringFields) {
+          if (origin[field] !== undefined && typeof origin[field] !== 'string') {
+            errors.push(`Field 'source.origin.${field}' must be a string if provided.`);
+          }
+        }
+
+        if (origin.url !== undefined && typeof origin.url === 'string') {
+          const trimmedUrl = origin.url.trim();
+          if (!/^https?:\/\//i.test(trimmedUrl)) {
+            errors.push(
+              `Invalid 'source.origin.url': must be an absolute HTTP or HTTPS URL (found '${origin.url}').`
+            );
+          }
+        }
+      }
+    }
   }
 
   // 3. Knowledge Items Validation

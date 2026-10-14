@@ -47,6 +47,17 @@ export interface SourceRevision {
   headingsCount?: number;
 }
 
+export interface SourceOrigin {
+  url?: string;
+  repository?: string;
+  path?: string;
+  author?: string;
+  license?: string;
+  version?: string;
+  retrievedAt?: string;
+  note?: string;
+}
+
 export interface SourceDocument {
   id: string;
   slug?: string;
@@ -63,6 +74,7 @@ export interface SourceDocument {
   updatedAt: string;
   url?: string;
   sourceUrl?: string;
+  origin?: SourceOrigin;
   importedAt?: string;
   revisions: SourceRevision[];
 }
@@ -344,6 +356,7 @@ export interface BundleSource {
   tags: string[];
   content: string;
   content_sha256: string;
+  origin?: SourceOrigin;
 }
 
 export interface BundleKnowledgeItem {

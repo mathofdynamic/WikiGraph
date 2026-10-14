@@ -239,6 +239,78 @@ async function runTests() {
     assert(resUnknownRel.errors.some(e => e.includes('does not match any local_id')), 'Error reported for unknown relationship local_id');
   }
 
+  console.log('\n--- Test Suite: Source Origin Validation ---');
+  {
+    // Valid origin
+    const validOriginBundle: WikiGraphBundle = {
+      ...SAMPLE_BUNDLE,
+      source: {
+        ...SAMPLE_BUNDLE.source,
+        origin: {
+          url: 'https://github.com/anthropics/anthropic-cookbook',
+          repository: 'anthropics/anthropic-cookbook',
+          path: 'skills/research/table_extraction.md',
+          author: 'Anthropic Research',
+          license: 'Apache-2.0',
+          version: '1.2.0',
+          retrievedAt: '2026-09-15T12:00:00Z',
+          note: 'Imported from public cookbook',
+        },
+      },
+    };
+    const resValid = await validateBundle(validOriginBundle);
+    assert(resValid.valid, 'Bundle with valid source.origin passes validation');
+
+    // Non-http/https URL rejected
+    const badUrlBundle: WikiGraphBundle = {
+      ...SAMPLE_BUNDLE,
+      source: {
+        ...SAMPLE_BUNDLE.source,
+        origin: {
+          url: 'ftp://files.example.com/skill.md',
+        },
+      },
+    };
+    const resBadUrl = await validateBundle(badUrlBundle);
+    assert(!resBadUrl.valid, 'Non-http/https origin URL is rejected');
+    assert(
+      resBadUrl.errors.some((e) => e.includes('absolute HTTP or HTTPS URL')),
+      'Error reported for invalid URL protocol'
+    );
+
+    // Wrong type for origin field rejected
+    const wrongTypeBundle: any = {
+      ...SAMPLE_BUNDLE,
+      source: {
+        ...SAMPLE_BUNDLE.source,
+        origin: {
+          repository: 12345, // should be string
+        },
+      },
+    };
+    const resWrongType = await validateBundle(wrongTypeBundle);
+    assert(!resWrongType.valid, 'Non-string origin field is rejected');
+    assert(
+      resWrongType.errors.some((e) => e.includes("Field 'source.origin.repository' must be a string")),
+      'Error reported for non-string origin field'
+    );
+
+    // Non-object origin rejected
+    const nonObjBundle: any = {
+      ...SAMPLE_BUNDLE,
+      source: {
+        ...SAMPLE_BUNDLE.source,
+        origin: 'https://example.com',
+      },
+    };
+    const resNonObj = await validateBundle(nonObjBundle);
+    assert(!resNonObj.valid, 'Non-object origin is rejected');
+    assert(
+      resNonObj.errors.some((e) => e.includes("Field 'source.origin' must be an object")),
+      'Error reported for non-object origin'
+    );
+  }
+
   console.log('\n--- Test Suite: Warnings (Evidence level, Language, Applicability) ---');
   {
     // Item language differs from source language

@@ -1125,6 +1125,7 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
         contentSha256: bundle.source.content_sha256,
         kind: bundle.source.kind,
         language: bundle.source.language,
+        origin: bundle.source.origin ? { ...bundle.source.origin } : undefined,
         revisions: [
           {
             revisionId: sourceRevId,
@@ -1243,6 +1244,9 @@ export class MockKnowledgeRepository implements KnowledgeRepository {
       ];
       existingSourceToUpdate.originalContent = bundle.source.content;
       existingSourceToUpdate.contentSha256 = bundle.source.content_sha256;
+      if (bundle.source.origin) {
+        existingSourceToUpdate.origin = { ...bundle.source.origin };
+      }
       existingSourceToUpdate.updatedAt = new Date().toISOString();
       if (bundle.source.tags) {
         existingSourceToUpdate.tags = Array.from(

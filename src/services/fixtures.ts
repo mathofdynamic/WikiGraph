@@ -52,6 +52,16 @@ export const INITIAL_SOURCES: SourceDocument[] = [
     createdAt: '2026-06-12T09:15:00Z',
     updatedAt: '2026-08-10T14:30:00Z',
     url: 'https://internal.research.archive/notes/pdf_table_heuristics_v2',
+    origin: {
+      url: 'https://github.com/wikigraph-demo/document-heuristics',
+      repository: 'wikigraph-demo/document-heuristics',
+      path: 'reports/pdf_table_heuristics.md',
+      author: 'WikiGraph Synthetic Research Team (Demo Data)',
+      license: 'CC-BY-4.0',
+      version: '2.1.0',
+      retrievedAt: '2026-08-10T14:00:00Z',
+      note: 'Fictional demo provenance for test workspace verification.',
+    },
     revisions: [
       {
         revisionId: 'rev-src-01-a',
@@ -68,7 +78,16 @@ export const INITIAL_SOURCES: SourceDocument[] = [
         headingsCount: 8,
       },
     ],
-    originalContent: `# Deep Dive: Structured Table Extraction from Messy PDFs
+    originalContent: `---
+name: pdf-table-heuristics
+description: Empirical heuristics and KDE column boundary clustering for borderless PDF tables.
+author: WikiGraph Synthetic Research Team
+license: CC-BY-4.0
+version: 2.1.0
+review_status: reviewed
+---
+
+# Deep Dive: Structured Table Extraction from Messy PDFs
 
 *Note: Fictional synthetic research case for WikiGraph private knowledge workspace.*
 
@@ -98,6 +117,16 @@ Headers often span 2 to 4 data sub-columns. Detecting these demands measuring ho
     rawSize: 22100,
     createdAt: '2026-05-18T11:00:00Z',
     updatedAt: '2026-07-22T16:45:00Z',
+    origin: {
+      url: 'https://github.com/wikigraph-demo/synthesis-methodology',
+      repository: 'wikigraph-demo/synthesis-methodology',
+      path: 'methods/technical_synthesis.md',
+      author: 'Knowledge Architecture Lab (Demo Data)',
+      license: 'MIT',
+      version: '1.4.0',
+      retrievedAt: '2026-07-22T16:00:00Z',
+      note: 'Fictional demo provenance for synthesis report testing.',
+    },
     revisions: [
       {
         revisionId: 'rev-src-02-a',
@@ -107,7 +136,16 @@ Headers often span 2 to 4 data sub-columns. Detecting these demands measuring ho
         headingsCount: 7,
       },
     ],
-    originalContent: `# Comparative Synthesis of Long-form Technical Evidence
+    originalContent: `---
+name: comparative-technical-synthesis
+description: Methodology for distilling 200+ page technical research archives into atomic proposition networks.
+author: Knowledge Architecture Lab
+license: MIT
+version: 1.4.0
+review_status: reviewed
+---
+
+# Comparative Synthesis of Long-form Technical Evidence
 
 *Fictional research methodology digest.*
 
@@ -208,6 +246,16 @@ Multiplying total addressable market percentages before demonstrating problem-so
     rawSize: 14300,
     createdAt: '2026-06-25T15:10:00Z',
     updatedAt: '2026-07-15T18:00:00Z',
+    origin: {
+      url: 'https://github.com/wikigraph-demo/agent-skills-archive',
+      repository: 'wikigraph-demo/agent-skills-archive',
+      path: 'skills/executive-briefings/SKILL.md',
+      author: 'Executive Communication Collective (Demo Data)',
+      license: 'Apache-2.0',
+      version: '1.0.0',
+      retrievedAt: '2026-07-15T17:30:00Z',
+      note: 'Fictional demo skill provenance for agent skill reader evaluation.',
+    },
     revisions: [
       {
         revisionId: 'rev-src-05-a',
@@ -217,7 +265,16 @@ Multiplying total addressable market percentages before demonstrating problem-so
         headingsCount: 5,
       },
     ],
-    originalContent: `# Executive Technical Briefing Architecture and Signal Density
+    originalContent: `---
+name: executive-technical-briefings
+description: Guidelines and signal-density heuristics for presenting deep-technical architectures to executive stakeholders without loss of nuance.
+author: Executive Communication Collective
+license: Apache-2.0
+version: 1.0.0
+review_status: reviewed
+---
+
+# Executive Technical Briefing Architecture and Signal Density
 
 *Fictional briefing design standard.*
 
@@ -229,6 +286,9 @@ Executive audiences require high signal-to-noise:
 
 ## 2. Redundancy Pitfall
 Repeating executive summaries across multiple slide transitions causes audience disengagement. Summaries must act as anchors, not repetitive filler.
+
+## 3. Decision-Matrix Anchoring
+Structure recommendations around the three core axes: implementation velocity, architectural reversibility, and estimated maintenance burden.
 `,
   },
   {

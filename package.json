@@ -9,14 +9,13 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/shared/bundle.test.ts && tsx src/shared/retrieval.test.ts && tsx src/services/migration.test.ts"
+    "test": "tsx src/shared/bundle.test.ts && tsx src/shared/retrieval.test.ts && tsx src/services/migration.test.ts && tsx src/shared/layout.test.ts && tsx src/shared/fonts.test.ts && tsx src/shared/appearance.test.ts && tsx src/shared/agentSkill.test.ts && tsx src/shared/frontmatter.test.ts && tsx src/shared/motion.test.ts"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
-    "@fontsource/vazirmatn": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "lucide-react": "^0.546.0",

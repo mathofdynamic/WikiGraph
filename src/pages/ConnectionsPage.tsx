@@ -20,10 +20,18 @@ import {
   Sparkles,
   ChevronDown,
   Info,
+  Download,
 } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
 import { useToast } from '../context/ToastContext';
+import {
+  AGENT_SKILL_NAME,
+  AGENT_SKILL_VERSION,
+  renderAgentSkill,
+  renderAgentPrompt,
+  sha256Hex,
+} from '../shared/agentSkill';
 import {
   ApiToken,
   Collection,
@@ -33,8 +41,11 @@ import {
   KnowledgeItem,
 } from '../types';
 import { ConfirmModal } from '../components/common/ConfirmModal';
+import { useTransientSurface } from '../lib/useTransientSurface';
 import { renderLlmsTxt } from '../shared/renderers';
 import { formatContextMarkdown } from '../shared/retrieval';
+import { Container } from '../components/layout/Container';
+import { PageGrid } from '../components/layout/PageGrid';
 
 interface McpToolDoc {
   name: string;
@@ -183,6 +194,18 @@ export const ConnectionsPage: React.FC = () => {
   const [createdSecretData, setCreatedSecretData] = useState<CreateApiTokenResponse | null>(null);
   const [copiedSecret, setCopiedSecret] = useState<boolean>(false);
 
+  const {
+    isRendered: isCreateModalRendered,
+    isClosing: isCreateModalClosing,
+    requestClose: requestCloseCreateModal,
+  } = useTransientSurface(isCreateModalOpen, () => setIsCreateModalOpen(false));
+
+  const {
+    isRendered: isSecretModalRendered,
+    isClosing: isSecretModalClosing,
+    requestClose: requestCloseSecretModal,
+  } = useTransientSurface(Boolean(createdSecretData), () => setCreatedSecretData(null));
+
   // Revoke confirm modal
   const [tokenToDelete, setTokenToDelete] = useState<ApiToken | null>(null);
 
@@ -233,7 +256,66 @@ export const ConnectionsPage: React.FC = () => {
     };
   }, [repository, version, showError]);
 
-  const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : 'https://api.wikigraph.internal/api/v1';
+  // In-memory editable Base URL for testing local or custom backend origins (not stored)
+  const [customBaseOrigin, setCustomBaseOrigin] = useState(() =>
+    typeof window !== 'undefined' ? window.location.origin : 'https://api.wikigraph.internal'
+  );
+  const [skillTab, setSkillTab] = useState<'claude' | 'codex' | 'other'>('claude');
+  const [renderedSkill, setRenderedSkill] = useState('');
+  const [skillSha, setSkillSha] = useState('');
+  const [copiedInstallPrompt, setCopiedInstallPrompt] = useState(false);
+  const [copiedSkillMarkdown, setCopiedSkillMarkdown] = useState(false);
+
+  // Compute live rendered skill text and SHA-256 integrity hash
+  useEffect(() => {
+    const text = renderAgentSkill(customBaseOrigin);
+    setRenderedSkill(text);
+    sha256Hex(text)
+      .then(setSkillSha)
+      .catch(() => setSkillSha(''));
+  }, [customBaseOrigin]);
+
+  const baseUrl = `${customBaseOrigin.replace(/\/+$/, '')}/api/v1`;
+
+  const handleCopyInstallPrompt = async () => {
+    try {
+      const prompt = renderAgentPrompt(customBaseOrigin, 'install');
+      await navigator.clipboard.writeText(prompt);
+      setCopiedInstallPrompt(true);
+      showToast({ type: 'success', message: t('agentPrompt.promptCopied') });
+      setTimeout(() => setCopiedInstallPrompt(false), 2000);
+    } catch {
+      showToast({ type: 'error', message: 'Failed to copy to clipboard' });
+    }
+  };
+
+  const handleCopySkillMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(renderedSkill);
+      setCopiedSkillMarkdown(true);
+      showToast({ type: 'success', message: t('agentPrompt.skillCopied') });
+      setTimeout(() => setCopiedSkillMarkdown(false), 2000);
+    } catch {
+      showToast({ type: 'error', message: 'Failed to copy to clipboard' });
+    }
+  };
+
+  const handleDownloadSkill = () => {
+    try {
+      const blob = new Blob([renderedSkill], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'SKILL.md';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast({ type: 'success', message: t('agentPrompt.downloaded') });
+    } catch {
+      showToast({ type: 'error', message: 'Failed to download skill file' });
+    }
+  };
 
   // Generate /llms.txt manifest preview
   const llmsTxtContent = useMemo(() => {
@@ -393,9 +475,11 @@ print(data["contextPacket"])`;
   const activeTool = MCP_TOOLS.find((t) => t.name === selectedMcpTool) || MCP_TOOLS[0];
 
   return (
-    <div className="max-w-[76ch] mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-16">
-      {/* 1. Page Header & What This Library Is */}
-      <header className="space-y-4">
+    <>
+      <Container className="py-12 sm:py-16">
+      <PageGrid className="gap-y-16">
+        {/* 1. Page Header & What This Library Is: Columns 1-8 */}
+        <header className="col-span-12 lg:col-span-8 space-y-4 bg-transparent">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
             {t('forAgents.title')}
@@ -416,8 +500,277 @@ print(data["contextPacket"])`;
         </div>
       </header>
 
-      {/* 2. Base URL & Authentication */}
-      <section className="space-y-4">
+      {/* 2. FIRST SECTION: Install the Skill */}
+      <section className="col-span-12 lg:col-span-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[var(--accent)]/15 text-[var(--accent)] uppercase">
+                Agent Skill
+              </span>
+              <span className="text-[11px] font-mono text-[var(--muted)]">
+                v{AGENT_SKILL_VERSION}
+              </span>
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)] mt-1.5">
+              {t('agentPrompt.installSkill')}
+            </h2>
+            <p className="mt-1 text-xs text-[var(--muted)] leading-relaxed">
+              {t('agentPrompt.skillSubtitle')}
+            </p>
+          </div>
+
+          {/* Quick button "Copy agent prompt" on For agents page */}
+          <button
+            type="button"
+            onClick={handleCopyInstallPrompt}
+            className="px-3.5 py-2 rounded-lg bg-[var(--foreground)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 shrink-0 shadow-xs"
+          >
+            {copiedInstallPrompt ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span>{t('common.copied')}</span>
+              </>
+            ) : (
+              <>
+                <Bot className="w-3.5 h-3.5" />
+                <span>{t('agentPrompt.copyPrompt')}</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Clearly visible note */}
+        <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-xs">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div className="font-medium">
+            {t('agentPrompt.demoNotice')}
+          </div>
+        </div>
+
+        {/* Base URL: Editable in React state only (not stored) */}
+        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label htmlFor="agent-base-url-input" className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-[var(--accent)]" />
+              <span>{t('agentPrompt.baseUrl')}</span>
+            </label>
+            <span className="text-[11px] text-[var(--muted)]">
+              {t('agentPrompt.baseUrlHelp')}
+            </span>
+          </div>
+          <input
+            id="agent-base-url-input"
+            type="url"
+            value={customBaseOrigin}
+            onChange={(e) => setCustomBaseOrigin(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] font-mono text-xs focus:outline-none focus:border-[var(--accent)] focus:bg-[var(--surface)] transition-colors"
+            placeholder="https://wikigraph.example.com"
+          />
+        </div>
+
+        {/* Tabs: Claude Code / Codex / Other agent */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          {/* Tab navigation */}
+          <div className="flex items-center border-b border-[var(--border)] bg-[var(--surface-secondary)]/50 px-2 pt-2 gap-1">
+            <button
+              type="button"
+              onClick={() => setSkillTab('claude')}
+              className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors cursor-pointer border-b-2 -mb-[1px] ${
+                skillTab === 'claude'
+                  ? 'border-[var(--accent)] text-[var(--foreground)] bg-[var(--surface)] font-semibold'
+                  : 'border-transparent text-[var(--muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              {t('agentPrompt.claudeCode')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSkillTab('codex')}
+              className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors cursor-pointer border-b-2 -mb-[1px] ${
+                skillTab === 'codex'
+                  ? 'border-[var(--accent)] text-[var(--foreground)] bg-[var(--surface)] font-semibold'
+                  : 'border-transparent text-[var(--muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              {t('agentPrompt.codex')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSkillTab('other')}
+              className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors cursor-pointer border-b-2 -mb-[1px] ${
+                skillTab === 'other'
+                  ? 'border-[var(--accent)] text-[var(--foreground)] bg-[var(--surface)] font-semibold'
+                  : 'border-transparent text-[var(--muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              {t('agentPrompt.otherAgent')}
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-5 space-y-4 text-xs">
+            {skillTab === 'claude' && (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-[11px] font-mono text-[var(--muted)] block mb-1">
+                    {t('agentPrompt.installPath')}:
+                  </span>
+                  <code className="block p-2 rounded-md bg-[var(--surface-secondary)] text-[var(--foreground)] font-mono text-xs select-all">
+                    ~/.claude/skills/wikigraph-library/SKILL.md
+                  </code>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <span className="font-semibold text-[var(--foreground)]">
+                    {t('agentPrompt.installSteps')}:
+                  </span>
+                  <ol className="list-decimal list-inside space-y-1 text-[var(--muted)] leading-relaxed">
+                    <li>Download or copy the rendered <code className="text-[var(--foreground)]">SKILL.md</code> below to <code className="text-[var(--foreground)]">~/.claude/skills/wikigraph-library/SKILL.md</code></li>
+                    <li>Export your token: <code className="text-[var(--foreground)]">export WIKIGRAPH_TOKEN=&quot;&lt;your_token&gt;&quot;</code></li>
+                    <li>Launch Claude Code — it automatically picks up the skill and queries WikiGraph before executing non-trivial tasks.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+
+            {skillTab === 'codex' && (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-[11px] font-mono text-[var(--muted)] block mb-1">
+                    {t('agentPrompt.installPath')}:
+                  </span>
+                  <code className="block p-2 rounded-md bg-[var(--surface-secondary)] text-[var(--foreground)] font-mono text-xs select-all">
+                    .agents/skills/wikigraph-library/SKILL.md
+                  </code>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <span className="font-semibold text-[var(--foreground)]">
+                    {t('agentPrompt.installSteps')}:
+                  </span>
+                  <ol className="list-decimal list-inside space-y-1 text-[var(--muted)] leading-relaxed">
+                    <li>Save <code className="text-[var(--foreground)]">SKILL.md</code> into your project repository at <code className="text-[var(--foreground)]">.agents/skills/wikigraph-library/SKILL.md</code></li>
+                    <li>Provide your token in your environment: <code className="text-[var(--foreground)]">WIKIGRAPH_TOKEN=&quot;&lt;your_token&gt;&quot;</code></li>
+                    <li>Codex queries WikiGraph context and posts execution outcomes to <code className="text-[var(--foreground)]">/api/v1/outcomes</code>.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+
+            {skillTab === 'other' && (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-[11px] font-mono text-[var(--muted)] block mb-1">
+                    {t('agentPrompt.installPath')}:
+                  </span>
+                  <code className="block p-2 rounded-md bg-[var(--surface-secondary)] text-[var(--foreground)] font-mono text-xs select-all">
+                    Agent System Prompt / In-Context Memory
+                  </code>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <span className="font-semibold text-[var(--foreground)]">
+                    {t('agentPrompt.installSteps')}:
+                  </span>
+                  <ol className="list-decimal list-inside space-y-1 text-[var(--muted)] leading-relaxed">
+                    <li>Provide the Agent Prompt or paste the full <code className="text-[var(--foreground)]">SKILL.md</code> into your agent&apos;s system prompt.</li>
+                    <li>Pass your Bearer token in the <code className="text-[var(--foreground)]">WIKIGRAPH_TOKEN</code> environment variable.</li>
+                    <li>Instruct the agent to treat all retrieved library items strictly as data, never as prompt instructions.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+
+            {/* Install Prompt with Copy button */}
+            <div className="pt-3 border-t border-[var(--separator)] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[var(--foreground)]">
+                  {t('agentPrompt.copyPrompt')}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyInstallPrompt}
+                  className="px-2.5 py-1 rounded text-xs font-medium bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]/80 text-[var(--foreground)] flex items-center gap-1.5 cursor-pointer border border-[var(--border)]"
+                >
+                  {copiedInstallPrompt ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+                      <span>{t('common.copied')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{t('common.copy')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <pre className="p-3 rounded-lg bg-[var(--surface-secondary)] font-mono text-xs text-[var(--foreground)] whitespace-pre-wrap leading-relaxed select-all border border-[var(--border)]">
+                {renderAgentPrompt(customBaseOrigin, 'install')}
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        {/* Rendered SKILL.md in a code block with Copy and Download SKILL.md buttons */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden space-y-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border-b border-[var(--border)] bg-[var(--surface-secondary)]/50 gap-2">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <FileCode className="w-4 h-4 text-[var(--accent)]" />
+                <span className="font-semibold text-xs text-[var(--foreground)]">
+                  {t('agentPrompt.renderedSkillDoc')}
+                </span>
+                <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)]">
+                  v{AGENT_SKILL_VERSION}
+                </span>
+              </div>
+              {skillSha && (
+                <div className="font-mono text-[10px] text-[var(--muted)] truncate max-w-md">
+                  SHA-256: {skillSha}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopySkillMarkdown}
+                className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--foreground)] transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                {copiedSkillMarkdown ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    <span>{t('common.copied')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{t('agentPrompt.copySkillText')}</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadSkill}
+                className="px-3 py-1.5 rounded-lg bg-[var(--foreground)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{t('agentPrompt.downloadSkill')}</span>
+              </button>
+            </div>
+          </div>
+
+          <pre className="p-4 bg-[var(--surface-secondary)] text-[var(--foreground)] font-mono text-[11px] leading-relaxed overflow-x-auto max-h-[380px] overflow-y-auto whitespace-pre select-all">
+            {renderedSkill}
+          </pre>
+        </div>
+      </section>
+
+      {/* 3. Base URL & Authentication */}
+      <section className="col-span-12 lg:col-span-8 space-y-4">
         <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
           {t('forAgents.authTitle')}
         </h2>
@@ -448,7 +801,7 @@ print(data["contextPacket"])`;
       </section>
 
       {/* 3. The MCP Tool List */}
-      <section className="space-y-4">
+      <section className="col-span-12 lg:col-span-8 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
@@ -546,7 +899,7 @@ print(data["contextPacket"])`;
       </section>
 
       {/* 4. /llms.txt Directory Manifest Preview */}
-      <section className="space-y-4">
+      <section className="col-span-12 lg:col-span-8 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
@@ -563,7 +916,7 @@ print(data["contextPacket"])`;
           >
             {copiedLlmsTxt ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>{t('common.copied')}</span>
               </>
             ) : (
@@ -581,7 +934,7 @@ print(data["contextPacket"])`;
       </section>
 
       {/* 5. Integration Code Snippets (cURL, Python, Outcomes) */}
-      <section className="space-y-4">
+      <section className="col-span-12 lg:col-span-8 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
           <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
             {t('forAgents.codeExamplesTitle')}
@@ -640,7 +993,7 @@ print(data["contextPacket"])`;
           >
             {copiedSnippet ? (
               <>
-                <Check className="w-3 h-3 text-emerald-500" />
+                <Check className="w-3 h-3 text-[var(--accent)]" />
                 <span>{t('common.copied')}</span>
               </>
             ) : (
@@ -654,7 +1007,7 @@ print(data["contextPacket"])`;
       </section>
 
       {/* 6. "Try it" Panel (Live Context Retrieval Simulator) */}
-      <section className="space-y-4">
+      <section className="col-span-12 lg:col-span-8 space-y-4">
         <div>
           <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
             {t('forAgents.tryItTitle')}
@@ -775,7 +1128,7 @@ print(data["contextPacket"])`;
       </section>
 
       {/* 7. Token Management (The ONLY write action in the UI) */}
-      <section className="space-y-4">
+      <section className="col-span-12 lg:col-span-8 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
@@ -870,18 +1223,33 @@ print(data["contextPacket"])`;
           )}
         </div>
       </section>
+      </PageGrid>
+    </Container>
 
-      {/* Modal 1: Generate New Token */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+      {/* Modal 1: Generate New Token (Transient Surface) */}
+      {isCreateModalRendered && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs motion-transient-overlay ${
+            isCreateModalClosing ? 'closing' : ''
+          }`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) requestCloseCreateModal();
+          }}
+        >
+          <div
+            className={`w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] motion-transient-card ${
+              isCreateModalClosing ? 'closing' : 'entering'
+            }`}
+          >
             <div className="px-5 py-4 border-b border-[var(--separator)] flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--foreground)]">
                 {t('forAgents.generateToken')}
               </h2>
               <button
                 type="button"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={requestCloseCreateModal}
                 className="text-[var(--muted)] hover:text-[var(--foreground)] p-1 rounded-lg hover:bg-[var(--surface-secondary)] cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1000,7 +1368,7 @@ print(data["contextPacket"])`;
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-[var(--separator)]">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={requestCloseCreateModal}
                   className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-secondary)] cursor-pointer"
                 >
                   Cancel
@@ -1018,12 +1386,25 @@ print(data["contextPacket"])`;
         </div>
       )}
 
-      {/* Modal 2: One-time Secret Display */}
-      {createdSecretData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4">
+      {/* Modal 2: One-time Secret Display (Transient Surface) */}
+      {isSecretModalRendered && createdSecretData && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs motion-transient-overlay ${
+            isSecretModalClosing ? 'closing' : ''
+          }`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) requestCloseSecretModal();
+          }}
+        >
+          <div
+            className={`w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4 motion-transient-card ${
+              isSecretModalClosing ? 'closing' : 'entering'
+            }`}
+          >
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+              <div className="p-2 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] shrink-0">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
@@ -1054,7 +1435,7 @@ print(data["contextPacket"])`;
                 >
                   {copiedSecret ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
                       <span>{t('common.copied')}</span>
                     </>
                   ) : (
@@ -1070,7 +1451,7 @@ print(data["contextPacket"])`;
             <div className="pt-2 flex justify-end">
               <button
                 type="button"
-                onClick={() => setCreatedSecretData(null)}
+                onClick={requestCloseSecretModal}
                 className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--surface-secondary)] text-[var(--foreground)] hover:bg-[var(--surface-secondary)]/80 transition-colors cursor-pointer border border-[var(--border)]"
               >
                 Done
@@ -1090,7 +1471,7 @@ print(data["contextPacket"])`;
         onConfirm={handleDeleteToken}
         onCancel={() => setTokenToDelete(null)}
       />
-    </div>
+    </>
   );
 };
 

@@ -453,6 +453,16 @@ Ingests an external AI skill bundle (`wikigraph.bundle/1` format). Atomic: creat
         "kind": "research_report",
         "language": "en",
         "tags": ["parsing", "pdf"],
+        "origin": {
+          "url": "https://github.com/example-org/pdf-heuristics",
+          "repository": "example-org/pdf-heuristics",
+          "path": "skills/parsing.md",
+          "author": "Data Research Group",
+          "license": "MIT",
+          "version": "1.0.0",
+          "retrievedAt": "2026-10-01T12:00:00Z",
+          "note": "Imported from upstream repository"
+        },
         "content": "# Document Parsing Heuristics\n\nContent...",
         "content_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
       },
@@ -608,10 +618,6 @@ Returns list of all revision snapshots for an item, ordered newest to oldest.
 Replaces item's current content with snapshot from historical revision. Commits a new revision note noting the restoration.
 - **Response `200 OK`**: Restored `KnowledgeItem`.
 
-#### `DELETE /api/v1/knowledge/:id`
-Hard deletion. Restricted to administrative resets.
-- **Response `204 No Content`**
-
 ---
 
 ### 4.6 Sources & Source Revisions
@@ -738,7 +744,27 @@ Every human-facing publication entity has an exact, citation-ready machine twin:
 #### `GET /llms.txt`
 Root directory manifest adhering to the llmstxt.org standard.
 - **Auth**: None (Public discovery)
-- **Response `200 OK`**: Plain text Markdown manifest detailing library purpose, API endpoints, collections, and top knowledge slugs.
+- **Response `200 OK`**: Plain text Markdown manifest detailing library purpose, API endpoints, agent skill definition, collections, and top knowledge slugs.
+
+#### `GET /skill/wikigraph-library/SKILL.md`
+Returns the public Agent Skill definition rendered with the server's own origin in place of `{{BASE_URL}}`.
+- **Auth**: None (Public discovery)
+- **Response `200 OK`**: Content-Type `text/markdown; charset=utf-8`
+- **Behavior**: Interpolates `{{BASE_URL}}` with the runtime origin (e.g. `https://wikigraph.example.com`).
+
+#### `GET /api/v1/skill`
+Returns JSON metadata and SHA-256 integrity hash of the active agent skill.
+- **Auth**: None (Public discovery)
+- **Response `200 OK`**: Content-Type `application/json`
+- **Schema**:
+  ```json
+  {
+    "name": "wikigraph-library",
+    "version": "0.1.0",
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "url": "https://wikigraph.example.com/skill/wikigraph-library/SKILL.md"
+  }
+  ```
 
 #### `GET /api/v1/knowledge/:idOrSlug.md`
 Returns compact, token-efficient Markdown representation of the entry.

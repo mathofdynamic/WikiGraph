@@ -25,6 +25,8 @@ import {
   KnowledgeType,
   RelationType,
 } from '../types';
+import { Container } from '../components/layout/Container';
+import { PageGrid } from '../components/layout/PageGrid';
 
 interface GraphNode {
   id: string;
@@ -230,32 +232,35 @@ export const GraphPage: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-[var(--background)] select-none overflow-hidden">
       {/* Top Header & Filter Toolbar */}
-      <div className="p-4 sm:px-6 border-b border-[var(--separator)] bg-[var(--surface)] flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/library"
-            className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
-            title="Back to library"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shrink-0">
-            <GitFork className="w-4 h-4" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-semibold text-[var(--foreground)] tracking-tight">
-              {locale === 'fa' ? 'گراف شبکه دانش' : 'Knowledge Network Graph'}
-            </h1>
-            <p className="text-xs text-[var(--muted)]">
-              {locale === 'fa'
-                ? `${nodes.length} گره دانشی فعال و ${filteredEdges.length} پیوند ساختاریافته`
-                : `${nodes.length} knowledge nodes & ${filteredEdges.length} verified connections`}
-            </p>
-          </div>
-        </div>
+      <div className="border-b border-[var(--separator)] bg-[var(--surface)] py-3 shrink-0">
+        <Container>
+          <PageGrid className="items-center">
+            {/* Title / Back button: Columns 1-6 */}
+            <div className="col-span-12 md:col-span-6 flex items-center gap-3">
+              <Link
+                to="/library"
+                className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
+                title="Back to library"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+              <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] shrink-0">
+                <GitFork className="w-4 h-4" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold text-[var(--foreground)] tracking-tight">
+                  {locale === 'fa' ? 'گراف شبکه دانش' : 'Knowledge Network Graph'}
+                </h1>
+                <p className="text-xs text-[var(--muted)]">
+                  {locale === 'fa'
+                    ? `${nodes.length} گره دانشی فعال و ${filteredEdges.length} پیوند ساختاریافته`
+                    : `${nodes.length} knowledge nodes & ${filteredEdges.length} verified connections`}
+                </p>
+              </div>
+            </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
+            {/* Filters & Zoom controls: Columns 7-12 */}
+            <div className="col-span-12 md:col-span-6 flex flex-wrap items-center md:justify-end gap-2">
           {/* Search */}
           <div className="relative min-w-[160px] sm:min-w-[200px]">
             <Search className="w-3.5 h-3.5 absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
@@ -330,7 +335,9 @@ export const GraphPage: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+      </PageGrid>
+    </Container>
+  </div>
 
       {/* Main Graph Visualization Workspace */}
       <div className="relative flex-1 overflow-hidden bg-[var(--field-background)]">
@@ -533,7 +540,7 @@ export const GraphPage: React.FC = () => {
                       direction={isPersian ? 'rtl' : 'ltr'}
                       className="fill-[var(--foreground)] text-[11px] font-medium pointer-events-none select-none transition-all"
                       style={{
-                        fontFamily: isPersian ? 'Vazirmatn, var(--font-sans)' : 'var(--font-sans)',
+                        fontFamily: 'var(--font-sans)',
                       }}
                     >
                       {node.item.title.length > 24

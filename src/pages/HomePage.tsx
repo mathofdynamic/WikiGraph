@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Copy, Check, Sparkles, AlertCircle, BookOpen } from 'lucide-react';
+import { ArrowRight, Copy, Check, Sparkles, AlertCircle, BookOpen, Bot } from 'lucide-react';
 import { useRepository } from '../services/RepositoryContext';
 import { useLocale } from '../locales/useLocale';
+import { useToast } from '../context/ToastContext';
 import { Collection, ContextResult, KnowledgeItem } from '../types';
 import { formatContextMarkdown } from '../shared/retrieval';
+import { renderAgentPrompt } from '../shared/agentSkill';
+import { Container } from '../components/layout/Container';
+import { PageGrid } from '../components/layout/PageGrid';
 
 export const HomePage: React.FC = () => {
   const { repository } = useRepository();
   const { t, locale } = useLocale();
+  const { showToast } = useToast();
 
   const [taskQuery, setTaskQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -81,19 +86,20 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-[76ch] mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-16">
-      {/* 1. Prominent Task Box */}
-      <section className="space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
-            {t('home.taskHeading')}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">
-            {locale === 'fa'
-              ? 'وظیفه یا هدف خود را بنویسید تا موتور بازیابی قطعی، مرتبط‌ترین واحدهای دانشی را همراه با استنادها و وابستگی‌ها آماده کند.'
-              : 'State what you are building or solving. The deterministic retrieval engine compiles the minimal, cited reading packet for your AI agent.'}
-          </p>
-        </div>
+    <Container className="py-12 sm:py-16">
+      <PageGrid className="gap-y-16">
+        {/* 1. Prominent Task Box: Columns 1-8 */}
+        <section className="col-span-12 lg:col-span-8 space-y-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
+              {t('home.taskHeading')}
+            </h1>
+            <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed max-w-[70ch]">
+              {locale === 'fa'
+                ? 'وظیفه یا هدف خود را بنویسید تا موتور بازیابی قطعی، مرتبط‌ترین واحدهای دانشی را همراه با استنادها و وابستگی‌ها آماده کند.'
+                : 'State what you are building or solving. The deterministic retrieval engine compiles the minimal, cited reading packet for your AI agent.'}
+            </p>
+          </div>
 
         <form onSubmit={handleTaskSubmit} className="space-y-3">
           <div className="relative">
@@ -136,6 +142,34 @@ export const HomePage: React.FC = () => {
           </div>
         </form>
 
+        {/* Quiet Link under the task box */}
+        <div className="mt-3.5 flex items-center justify-between text-xs text-[var(--muted)]">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const prompt = renderAgentPrompt(window.location.origin, 'install');
+                await navigator.clipboard.writeText(prompt);
+                showToast({ type: 'success', message: t('agentPrompt.promptCopied') });
+              } catch {
+                showToast({ type: 'error', message: 'Failed to copy to clipboard' });
+              }
+            }}
+            className="inline-flex items-center gap-1.5 hover:text-[var(--foreground)] transition-colors cursor-pointer group"
+          >
+            <Bot className="w-3.5 h-3.5 text-[var(--accent)] group-hover:scale-110 transition-transform" />
+            <span className="underline underline-offset-4 decoration-[var(--border)] group-hover:decoration-[var(--foreground)]">
+              {t('agentPrompt.homeQuietLink')}
+            </span>
+          </button>
+          <Link
+            to="/for-agents"
+            className="hover:text-[var(--foreground)] transition-colors hidden sm:inline"
+          >
+            {t('nav.forAgents')} →
+          </Link>
+        </div>
+
         {/* 2. Reading List Results (when task submitted) */}
         {contextResult && (
           <div className="mt-8 pt-8 border-t border-[var(--separator)] space-y-6">
@@ -156,8 +190,8 @@ export const HomePage: React.FC = () => {
               >
                 {copiedMarkdown ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-600 font-semibold">{t('home.copied')}</span>
+                    <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    <span className="text-[var(--accent)] font-semibold">{t('home.copied')}</span>
                   </>
                 ) : (
                   <>
@@ -248,14 +282,14 @@ export const HomePage: React.FC = () => {
         )}
       </section>
 
-      {/* 3. Collections as Short Descriptive Shelves */}
-      <section className="space-y-4 pt-4 border-t border-[var(--separator)]">
+      {/* 3. Collections as Short Descriptive Shelves: Spans all 12 columns */}
+      <section className="col-span-12 space-y-4 pt-4 border-t border-[var(--separator)]">
         <div className="flex items-baseline justify-between">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
               {t('home.collectionsHeading')}
             </h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5">
+            <p className="text-xs text-[var(--muted)] mt-0.5 max-w-[70ch]">
               {t('home.collectionsSubheading')}
             </p>
           </div>
@@ -282,7 +316,7 @@ export const HomePage: React.FC = () => {
                   {col.count !== undefined ? `${col.count}` : ''}
                 </span>
               </div>
-              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed" dir="auto">
+              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed max-w-[70ch]" dir="auto">
                 {locale === 'fa' && col.descriptionFa ? col.descriptionFa : (col.description || 'Curated subject shelf.')}
               </p>
             </Link>
@@ -290,14 +324,14 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. "Recently Added" Plain List (No cards, quiet metadata line) */}
-      <section className="space-y-4 pt-4 border-t border-[var(--separator)]">
+      {/* 4. "Recently Added" Plain List: Spans all 12 columns */}
+      <section className="col-span-12 space-y-4 pt-4 border-t border-[var(--separator)]">
         <div className="flex items-baseline justify-between">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
               {t('home.recentlyAddedHeading')}
             </h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5">
+            <p className="text-xs text-[var(--muted)] mt-0.5 max-w-[70ch]">
               {t('home.recentlyAddedSubheading')}
             </p>
           </div>
@@ -333,13 +367,14 @@ export const HomePage: React.FC = () => {
                 <span>{new Date(item.updatedAt || item.createdAt).toLocaleDateString()}</span>
               </div>
 
-              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed" dir="auto">
+              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed max-w-[70ch]" dir="auto">
                 {item.summary}
               </p>
             </article>
           ))}
         </div>
       </section>
-    </div>
+    </PageGrid>
+  </Container>
   );
 };

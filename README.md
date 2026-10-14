@@ -17,6 +17,7 @@ The site reads like a documentation/publication site (~72ch reading column, typo
 1. **Bundle Publishing by Offline Skill (`wikigraph.bundle/1`)**:
    - An offline tool (a local AI skill) digests deep-research documents and publishes standardized packages to `POST /api/v1/import/bundle` using a `read_write` Bearer token.
    - Bundle review status is preserved (`needs_review` or `reviewed`). Items imported as `reviewed` get `reviewedAt = import time`. Unknown top-level fields are tolerated.
+   - Optional `source.origin` records upstream provenance (URL, repository, path, author, license, version, retrieval date, and notes).
 2. **Outcome Reporting by AI Agents (`report_outcome`)**:
    - Downstream AI agents report empirical task execution results via `POST /api/v1/outcomes` using Bearer tokens with `read_write` scope.
    - Canonical fields: `task`, `appliedKnowledgeIds`, optional `appliedRevisionIds` (recording exact versions used), `result` (`success` | `failure` | `uncertain`), `notes`, and optional `reportedBy`. Rate limited to 60 req/min.
@@ -59,12 +60,80 @@ npm run dev
 # Run TypeScript verification / linter
 npm run lint
 
-# Run automated test suite (bundle validation & deterministic retrieval tests)
+# Run automated test suite (bundle validation, deterministic retrieval, & layout grid tests)
 npm run test
 
 # Build production bundle for static hosting
 npm run build
 ```
+
+---
+
+## Shared 12-Column Layout Grid & Verification Overlay
+
+WikiGraph enforces a single shared layout grid system across the top navigation bar, footer, and every application route.
+
+### Canonical Layout Tokens
+The layout system is governed by a single source of truth (`src/shared/layout.ts` and CSS token `--container` in `src/index.css`):
+- **Container Max-Width**: `--container: 72rem` (1152px)
+- **Grid Columns**: 12 equal-fraction columns (`grid-cols-12`)
+- **Gutters / Gaps**: Constant 16px on mobile (`gap-4`), 24px on desktop (`md:gap-6`)
+- **Horizontal Viewport Padding**: Constant 16px on mobile (`px-4`), 24px on desktop (`sm:px-6`)
+- **Line Length**: Max 70ch (`max-w-[70ch]`), left-aligned to column starts (never centered)
+- **Logical Flow**: Mirrored naturally for Persian (RTL) using CSS logical properties (`start-`, `end-`, `ps-`, `pe-`, `ms-`, `me-`, `text-start`, `text-end`).
+
+### Grid Verification Overlay (`?grid=1` & `G` Toggle)
+A non-intrusive verification overlay is built into the application layout shell:
+1. **Activate**: Append `?grid=1` to any URL in the browser (e.g. `http://localhost:3000/?grid=1` or `http://localhost:3000/library?grid=1`).
+2. **Visual Inspection**: Draws the 12 semi-transparent columns with exact gutters and column indicators (1 through 12) directly over the page. Pointer events are disabled (`pointer-events: none`), so all links, inputs, and buttons remain clickable.
+3. **Interactive Toggle**: Press the `G` key at any time to toggle the overlay on or off (the toggle ignores keypresses inside input fields and textareas).
+
+### Automated & Manual Verification Procedures
+
+#### Automated Token & Layout Test
+Run the automated layout verification suite via:
+```bash
+npx tsx src/shared/layout.test.ts
+# or as part of the full test suite:
+npm test
+```
+The test asserts that:
+- Container and grid tokens (`--container`, 12 columns, 16px/24px gaps, 70ch line length) are defined in one place only.
+- `<Container>` and `<PageGrid>` are used across all page routes.
+- No obsolete ad-hoc centered column wrappers (`max-w-6xl mx-auto`, `max-w-[72ch] mx-auto`, etc.) remain in the codebase.
+
+#### Manual Visual Verification Check
+Open each route with `?grid=1` in the browser and confirm the following alignments:
+1. **`/` (Home)**:
+   - Wordmark starts on Column 1.
+   - Task box, prompt chips, and submit button span Columns 1–8.
+   - Collections shelf and Recent Additions list span all 12 columns; section headings align to Column 1, right-aligned links ("View all...") align to Column 12.
+2. **`/library` (Library)**:
+   - Page header and filter row align to Column 1.
+   - Catalog entries reading list sits in Columns 1–8.
+3. **`/collections` (Collections Index)**:
+   - Page header aligns to Column 1.
+   - Collection shelves list sits in Columns 1–8.
+4. **`/collections/:id` (Collection Detail)**:
+   - Breadcrumb and collection title align to Column 1; action buttons align to Column 12.
+   - Entries list sits in Columns 1–8.
+5. **`/search` (Search)**:
+   - Search form and query matches sit in Columns 1–8; left edge aligns to Column 1.
+6. **`/knowledge/:id` (Entry Detail)**:
+   - Main article reading text sits in Columns 1–8 (left-aligned with wordmark, max 70ch lines).
+   - "Use with an AI" side panel sits in Columns 9–12 (right edge aligns to Column 12 / top-bar controls; stacks below main article on mobile).
+7. **`/documents/:id` (Source Document Detail)**:
+   - Main source reading text sits in Columns 1–8.
+   - Extracted knowledge units side panel sits in Columns 9–12 (stacks below on mobile).
+8. **`/graph` (Knowledge Network Graph)**:
+   - Top toolbar wraps in `<Container>`; back button and title align to Column 1; search, filters, and zoom controls end at Column 12.
+9. **`/for-agents` (For Agents & API Tokens)**:
+   - Overview, Base URL, MCP tool specs, `/llms.txt` preview, code examples, simulator, and token manager all sit in Columns 1–8, aligned to Column 1.
+10. **`/login` (Single-Owner Login)**:
+    - Login card sits in Columns 1–6 (left-aligned with Column 1, no centered narrow columns).
+    - Grid verification overlay activates with `?grid=1` and toggles with `G`.
+11. **Persian Mode (RTL)**:
+    - Switch language to FA; verify that the grid and columns mirror cleanly from inline-start to inline-end.
 
 ---
 

@@ -1,4 +1,9 @@
+@import "./fonts.css";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-latin), var(--font-persian), ui-sans-serif, system-ui, sans-serif;
+}
 
 @layer base {
   :root {
@@ -16,7 +21,7 @@
 
     --muted: #64748b;
 
-    --accent: #006FEE;
+    --accent: #006fee;
     --accent-foreground: #ffffff;
 
     --field-background: #ffffff;
@@ -24,17 +29,41 @@
     --field-foreground: #111827;
     --field-placeholder: #94a3b8;
 
-    --radius: 12px;
-    --field-radius: 8px;
+    /* Appearance & Shape tokens */
+    --radius-base: 8px;
+    --radius: var(--radius-base);
+    --field-radius: 6px;
 
-    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif;
+    /* Glass Effect tokens */
+    --glass-blur: 0px;
+    --surface-alpha: 1;
+
+    /* Font stack and typography tokens */
+    --font-latin: Inter;
+    --font-persian: "IRANYekanX NoEn";
+    --font-persian-digits: "IRANYekanX FaNum";
+    --font-sans: var(--font-latin), var(--font-persian), ui-sans-serif, system-ui, sans-serif;
     --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --font-scale: 1;
+    --leading: 1.8;
 
     /* Global Appearance Tokens */
-    --ui-font-scale: 1;
-    --ui-backdrop-blur: 8px;
-    --ui-module-opacity: 0.96;
+    --container: 72rem;
+    --ui-font-scale: var(--font-scale);
+    --ui-backdrop-blur: var(--glass-blur);
+    --ui-module-opacity: var(--surface-alpha);
     --ui-motion-duration: 160ms;
+
+    /* Shared Entrance-Motion System Tokens */
+    --motion-duration: 100ms;
+    --motion-easing: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-transform-initial: translate3d(0, 20px, 0);
+    --motion-transform-final: translate3d(0, 0, 0);
+
+    /* Transient Surfaces Exit Tokens */
+    --motion-exit-duration: 66ms;
+    --motion-exit-easing: cubic-bezier(0.4, 0, 1, 1);
+    --motion-exit-transform: translate3d(0, 8px, 0);
   }
 
   :root.dark,
@@ -53,7 +82,7 @@
 
     --muted: #8e8e93;
 
-    --accent: #006FEE;
+    --accent: #006fee;
     --accent-foreground: #ffffff;
 
     --field-background: #0f1013;
@@ -61,15 +90,17 @@
     --field-foreground: #ededed;
     --field-placeholder: #636366;
 
-    --radius: 12px;
-    --field-radius: 8px;
+    --radius-base: 8px;
+    --radius: var(--radius-base);
+    --field-radius: 6px;
   }
 
   html {
-    font-size: calc(16px * var(--ui-font-scale, 1));
+    font-size: calc(16px * var(--font-scale, 1));
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    line-height: var(--leading, 1.8);
     transition: background-color var(--ui-motion-duration, 0.15s) ease, color var(--ui-motion-duration, 0.15s) ease;
   }
 
@@ -77,11 +108,69 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    line-height: var(--leading, 1.8);
     letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
     margin: 0;
+  }
+
+  /* Form controls and headings inherit the unified font stack */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  /* Persian Typography Rules */
+  :root[dir="rtl"],
+  [dir="rtl"],
+  :lang(fa),
+  .font-persian {
+    line-height: 1.8;
+  }
+
+  [dir="rtl"] body,
+  body[dir="rtl"],
+  body:lang(fa) {
+    line-height: 1.8;
+  }
+
+  :root[dir="rtl"] h1, :root[dir="rtl"] h2, :root[dir="rtl"] h3, :root[dir="rtl"] h4, :root[dir="rtl"] h5, :root[dir="rtl"] h6,
+  [dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3, [dir="rtl"] h4, [dir="rtl"] h5, [dir="rtl"] h6,
+  :lang(fa) h1, :lang(fa) h2, :lang(fa) h3, :lang(fa) h4, :lang(fa) h5, :lang(fa) h6,
+  .font-persian h1, .font-persian h2, .font-persian h3, .font-persian h4, .font-persian h5, .font-persian h6 {
+    line-height: 1.5;
+    letter-spacing: normal !important;
+  }
+
+  /* No letter-spacing on Persian text (prevents cursive glyph disconnection) */
+  [dir="rtl"],
+  [dir="rtl"] *,
+  :lang(fa),
+  :lang(fa) *,
+  .font-persian,
+  .font-persian * {
+    letter-spacing: normal !important;
+  }
+
+  /* Medium weight (500) for UI labels */
+  label,
+  .ui-label,
+  .ui-badge,
+  .ui-segment-item,
+  .ui-button,
+  nav a,
+  th {
+    font-weight: 500;
   }
 
   /* Compact scrollbar */
@@ -101,12 +190,35 @@
   }
 }
 
-/* WikiGraph Neutral UI Primitives */
+/* WikiGraph Neutral UI Primitives & Glass Surface */
+
+.glass-surface,
+.ui-card,
+.ui-panel,
+.ui-drawer,
+.ui-popover,
+.ui-modal,
+header.app-topbar,
+header.sticky {
+  background-color: color-mix(in srgb, var(--surface) calc(var(--surface-alpha, 1) * 100%), transparent);
+  backdrop-filter: blur(var(--glass-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-surface,
+  .ui-card,
+  .ui-panel,
+  .ui-drawer,
+  .ui-popover,
+  .ui-modal,
+  header.app-topbar,
+  header.sticky {
+    background-color: var(--surface) !important;
+  }
+}
 
 .ui-card {
-  background-color: color-mix(in srgb, var(--surface) calc(var(--ui-module-opacity, 0.96) * 100%), transparent);
-  backdrop-filter: blur(var(--ui-backdrop-blur, 8px));
-  -webkit-backdrop-filter: blur(var(--ui-backdrop-blur, 8px));
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--foreground);
@@ -115,9 +227,6 @@
 }
 
 .ui-panel {
-  background-color: color-mix(in srgb, var(--surface) calc(var(--ui-module-opacity, 0.96) * 100%), transparent);
-  backdrop-filter: blur(var(--ui-backdrop-blur, 8px));
-  -webkit-backdrop-filter: blur(var(--ui-backdrop-blur, 8px));
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--foreground);
@@ -125,12 +234,54 @@
 }
 
 /* Global Application Surfaces inherit backdrop blur & translucency */
-aside > div,
-header,
 [role="dialog"] > div {
-  background-color: color-mix(in srgb, var(--surface) calc(var(--ui-module-opacity, 0.96) * 100%), transparent) !important;
-  backdrop-filter: blur(var(--ui-backdrop-blur, 8px));
-  -webkit-backdrop-filter: blur(var(--ui-backdrop-blur, 8px));
+  background-color: color-mix(in srgb, var(--surface) calc(var(--surface-alpha, 1) * 100%), transparent);
+  backdrop-filter: blur(var(--glass-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  [role="dialog"] > div {
+    background-color: var(--surface) !important;
+  }
+}
+
+/* Soft accent glow backdrop */
+html[data-glow="true"] body::before {
+  content: "";
+  position: fixed;
+  top: -12vh;
+  left: 20vw;
+  width: 60vw;
+  height: 50vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+  opacity: 0.15;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+html.dark[data-glow="true"] body::before {
+  opacity: 0.22;
+}
+
+/* Dynamic Motion Settings consumed by data-motion */
+html[data-motion="reduced"],
+html[data-motion="reduced"] * {
+  --ui-motion-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-motion="full"] {
+  --ui-motion-duration: 250ms;
+}
+
+html[data-motion="system"] {
+  --ui-motion-duration: 160ms;
 }
 
 .ui-button {
@@ -304,4 +455,94 @@ textarea:focus-visible {
   outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
 }
+
+/* ==========================================================================
+   Shared Entrance-Motion System
+   Contract:
+   1. Content is visible by default (no hidden content without JS confirmation).
+   2. Hidden initial styles apply ONLY behind html.motion-enabled.
+   3. Properties animated: opacity and transform ONLY.
+   ========================================================================== */
+
+html.motion-enabled [data-motion-state="pending"] {
+  opacity: 0;
+  transform: var(--motion-transform-initial);
+  will-change: opacity, transform;
+}
+
+html.motion-enabled [data-motion-state="entering"] {
+  opacity: 1;
+  transform: var(--motion-transform-final);
+  transition: opacity var(--motion-duration) var(--motion-easing),
+              transform var(--motion-duration) var(--motion-easing);
+  will-change: opacity, transform;
+}
+
+[data-motion-seen="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Transient surfaces (mobile menu, Appearance panel, modals, ConfirmModal) */
+.motion-transient-overlay {
+  transition: opacity var(--motion-duration) var(--motion-easing);
+}
+.motion-transient-overlay.closing {
+  opacity: 0 !important;
+  transition: opacity var(--motion-exit-duration) var(--motion-exit-easing) !important;
+}
+
+.motion-transient-card {
+  opacity: 1;
+  transform: var(--motion-transform-final);
+  transition: opacity var(--motion-duration) var(--motion-easing),
+              transform var(--motion-duration) var(--motion-easing);
+  will-change: opacity, transform;
+}
+
+.motion-transient-card.entering {
+  animation: motionCardEnter var(--motion-duration) var(--motion-easing) forwards;
+}
+
+.motion-transient-card.closing {
+  opacity: 0 !important;
+  transform: var(--motion-exit-transform) !important;
+  transition: opacity var(--motion-exit-duration) var(--motion-exit-easing),
+              transform var(--motion-exit-duration) var(--motion-exit-easing) !important;
+}
+
+@keyframes motionCardEnter {
+  from {
+    opacity: 0;
+    transform: var(--motion-transform-initial);
+  }
+  to {
+    opacity: 1;
+    transform: var(--motion-transform-final);
+  }
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  * {
+    --ui-motion-duration: 0ms !important;
+    --motion-duration: 0.01ms !important;
+    --motion-exit-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  html.motion-enabled [data-motion-state="pending"],
+  html.motion-enabled [data-motion-state="entering"],
+  .motion-transient-card.entering,
+  .motion-transient-card.closing {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 

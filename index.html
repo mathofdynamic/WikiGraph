@@ -9,9 +9,40 @@
     <meta property="og:description" content="WikiGraph - knowledge library for AI agents" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        try {
+          var root = document.documentElement;
+          var rawVars = localStorage.getItem('wikigraph.appearance.vars.v1');
+          if (rawVars) {
+            var vars = JSON.parse(rawVars);
+            for (var key in vars) {
+              root.style.setProperty(key, vars[key]);
+            }
+          }
+          var rawApp = localStorage.getItem('wikigraph.appearance.v1');
+          var theme = 'system';
+          var motion = 'system';
+          var glow = false;
+          if (rawApp) {
+            var app = JSON.parse(rawApp);
+            if (app.theme) theme = app.theme;
+            if (app.motion) motion = app.motion;
+            if (app.backdropGlow) glow = true;
+          }
+          var dark = theme === 'dark' || (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            root.classList.add('dark');
+            root.classList.remove('light');
+          } else {
+            root.classList.remove('dark');
+            root.classList.add('light');
+          }
+          root.setAttribute('data-motion', motion);
+          root.setAttribute('data-glow', glow ? 'true' : 'false');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

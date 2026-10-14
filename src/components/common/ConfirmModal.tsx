@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { useLocale } from '../../locales/useLocale';
 import { AlertTriangle, X } from 'lucide-react';
 import { useFocusTrap } from '../../lib/useFocusTrap';
+import { useTransientSurface } from '../../lib/useTransientSurface';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -29,20 +30,29 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   const { t } = useLocale();
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useFocusTrap(modalRef, isOpen, onCancel);
+  const { isRendered, isClosing, requestClose } = useTransientSurface(isOpen, onCancel);
 
-  if (!isOpen) return null;
+  useFocusTrap(modalRef, isRendered, requestClose);
+
+  if (!isRendered) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs motion-transient-overlay ${
+        isClosing ? 'closing' : ''
+      }`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) requestClose();
+      }}
     >
       <div
         ref={modalRef}
-        className="w-full max-w-md rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+        className={`w-full max-w-md rounded-xl bg-[var(--surface)] border border-[var(--border)] overflow-hidden shadow-2xl motion-transient-card ${
+          isClosing ? 'closing' : 'entering'
+        }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--separator)]">
           <div className="flex items-center gap-2 text-[var(--foreground)] font-medium text-sm">
@@ -51,7 +61,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onCancel}
+            onClick={requestClose}
             className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] cursor-pointer transition-colors"
             aria-label={t('common.close')}
           >
@@ -67,7 +77,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-[var(--surface-secondary)]/50 border-t border-[var(--separator)]">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={requestClose}
             className="ui-button ui-button-secondary text-xs"
           >
             {cancelLabel || t('common.cancel')}

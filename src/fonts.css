@@ -1,0 +1,83 @@
+/* Self-hosted IRANYekanX Font Definitions */
+
+/* IRANYekanX NoEn (Persian glyphs only, falls through from Latin) */
+@font-face {
+  font-family: 'IRANYekanX NoEn';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXNoEn-Light.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX NoEn';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXNoEn-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX NoEn';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXNoEn-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX NoEn';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXNoEn-DemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX NoEn';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXNoEn-Bold.woff2') format('woff2');
+}
+
+/* IRANYekanX FaNum (Persian digits) */
+@font-face {
+  font-family: 'IRANYekanX FaNum';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXFaNum-Light.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX FaNum';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXFaNum-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX FaNum';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXFaNum-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX FaNum';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXFaNum-DemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IRANYekanX FaNum';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/iranyekanx/IRANYekanXFaNum-Bold.woff2') format('woff2');
+}
