@@ -524,17 +524,17 @@ print(data["contextPacket"])`;
           <button
             type="button"
             onClick={handleCopyInstallPrompt}
-            className="px-3.5 py-2 rounded-lg bg-[var(--foreground)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 shrink-0 shadow-xs"
+            className="px-3.5 py-2 rounded-lg bg-[var(--foreground)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 shrink-0 shadow-xs whitespace-nowrap"
           >
             {copiedInstallPrompt ? (
               <>
-                <Check className="w-3.5 h-3.5 text-[var(--accent)]" />
-                <span>{t('common.copied')}</span>
+                <Check className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                <span className="whitespace-nowrap">{t('common.copied')}</span>
               </>
             ) : (
               <>
-                <Bot className="w-3.5 h-3.5" />
-                <span>{t('agentPrompt.copyPrompt')}</span>
+                <Bot className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                <span className="whitespace-nowrap">{t('agentPrompt.copyPrompt')}</span>
               </>
             )}
           </button>

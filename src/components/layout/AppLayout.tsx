@@ -151,9 +151,9 @@ export const AppLayout: React.FC = () => {
       {/* Slim Top Navigation Bar */}
       <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] app-topbar glass-surface">
         <Container>
-          <PageGrid className="items-center h-13">
-            {/* Brand Wordmark: starts at Column 1 */}
-            <div className="col-span-5 sm:col-span-3 md:col-span-2 flex items-center">
+          <div className="flex items-center justify-between h-13 gap-3 md:gap-4 w-full">
+            {/* Brand Wordmark */}
+            <div className="flex items-center shrink-0">
               <Link
                 to="/"
                 className="flex items-center gap-2.5 text-[var(--foreground)] hover:opacity-90 transition-opacity font-semibold tracking-tight text-base shrink-0"
@@ -165,9 +165,9 @@ export const AppLayout: React.FC = () => {
               </Link>
             </div>
 
-            {/* Desktop Inline Search Field: sits on Column 3 */}
-            <div className="hidden md:block md:col-span-3 lg:col-span-4">
-              <form onSubmit={handleSearchSubmit} className="relative w-full max-w-xs">
+            {/* Desktop Inline Search Field */}
+            <div className="hidden md:block w-44 lg:w-60 xl:w-72 shrink-0">
+              <form onSubmit={handleSearchSubmit} className="relative w-full">
                 <Search className="w-3.5 h-3.5 absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
                 <input
                   type="search"
@@ -179,8 +179,8 @@ export const AppLayout: React.FC = () => {
               </form>
             </div>
 
-            {/* Desktop Nav Links: sits on Column start */}
-            <nav className="hidden md:flex md:col-span-4 lg:col-span-3 items-center gap-6">
+            {/* Desktop Nav Links */}
+            <nav className="hidden md:flex items-center gap-4 lg:gap-6 shrink-0">
               {navLinks.map((link) => (
                 <NavLink
                   key={link.to}
@@ -188,7 +188,7 @@ export const AppLayout: React.FC = () => {
                   onMouseEnter={() => prefetchRoute(link.to)}
                   onFocus={() => prefetchRoute(link.to)}
                   className={({ isActive }) =>
-                    `text-[13px] font-medium transition-colors hover:text-[var(--foreground)] ${
+                    `text-[13px] font-medium transition-colors hover:text-[var(--foreground)] whitespace-nowrap ${
                       isActive
                         ? 'text-[var(--foreground)] font-semibold border-b-2 border-[var(--foreground)] -mb-[1px] pb-3.5 pt-4'
                         : 'text-[var(--muted)]'
@@ -200,8 +200,8 @@ export const AppLayout: React.FC = () => {
               ))}
             </nav>
 
-            {/* Right Controls: ends at Column 12 */}
-            <div className="col-span-7 sm:col-span-9 md:col-span-3 lg:col-span-3 flex items-center justify-end gap-1.5 shrink-0">
+            {/* Right Controls */}
+            <div className="flex items-center justify-end gap-1.5 shrink-0 ms-auto">
               {/* Mobile Search Icon Trigger */}
               <button
                 type="button"
@@ -212,23 +212,24 @@ export const AppLayout: React.FC = () => {
                 <Search className="w-4 h-4" />
               </button>
 
-              {/* Copy Agent Prompt Button (icon button; label visible from md breakpoint up) */}
+              {/* Copy Agent Prompt Button (icon button; label visible from md breakpoint up, strictly single-line) */}
               <button
                 type="button"
                 onClick={handleCopyAgentPrompt}
-                className="p-1.5 md:px-2.5 md:py-1 rounded text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="p-1.5 md:px-2.5 md:py-1 rounded text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                 aria-label={t('agentPrompt.copyPrompt')}
                 title={t('agentPrompt.copyPrompt')}
               >
-                <Bot className="w-4 h-4 text-[var(--accent)]" />
-                <span className="hidden md:inline">{t('agentPrompt.copyPrompt')}</span>
+                <Bot className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                <span className="hidden xl:inline whitespace-nowrap">{t('agentPrompt.copyPrompt')}</span>
+                <span className="hidden md:inline xl:hidden whitespace-nowrap">{t('agentPrompt.copyPromptShort')}</span>
               </button>
 
               {/* Language Toggle */}
               <button
                 type="button"
                 onClick={() => setLocale(locale === 'en' ? 'fa' : 'en')}
-                className="px-2 py-1 rounded text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors flex items-center gap-1"
+                className="px-2 py-1 rounded text-xs font-medium text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors flex items-center gap-1 shrink-0"
                 title="Toggle language (English / فارسی)"
               >
                 <Languages className="w-3.5 h-3.5" />
@@ -239,7 +240,7 @@ export const AppLayout: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors"
+                className="p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors shrink-0"
                 title={isDark ? 'Light mode' : 'Dark mode'}
               >
                 {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -250,7 +251,7 @@ export const AppLayout: React.FC = () => {
                 type="button"
                 data-appearance-trigger="true"
                 onClick={() => setAppearanceOpen(true)}
-                className="p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+                className="p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer shrink-0"
                 aria-label={t('appearance.title')}
                 title={t('appearance.title')}
               >
@@ -262,7 +263,7 @@ export const AppLayout: React.FC = () => {
                 <button
                   type="button"
                   onClick={logout}
-                  className="p-1.5 rounded text-[var(--muted)] hover:text-rose-600 hover:bg-[var(--surface-secondary)] transition-colors"
+                  className="p-1.5 rounded text-[var(--muted)] hover:text-rose-600 hover:bg-[var(--surface-secondary)] transition-colors shrink-0"
                   title="Sign out"
                 >
                   <LogOut className="w-4 h-4" />
@@ -279,13 +280,13 @@ export const AppLayout: React.FC = () => {
                     setMobileMenuOpen(true);
                   }
                 }}
-                className="md:hidden p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+                className="md:hidden p-1.5 rounded text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer shrink-0"
                 aria-label="Toggle navigation menu"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             </div>
-          </PageGrid>
+          </div>
         </Container>
 
         {/* Mobile Dropdown Menu (Transient Surface: 100ms entrance, 66ms exit) */}

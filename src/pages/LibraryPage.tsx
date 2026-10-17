@@ -115,7 +115,7 @@ export const LibraryPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
             {t('library.title')}
           </h1>
-          <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed max-w-[70ch]">
+          <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed w-full">
             {t('library.subtitle')}
           </p>
         </header>
@@ -186,8 +186,8 @@ export const LibraryPage: React.FC = () => {
           )}
         </div>
 
-        {/* Reading List of Entries: Columns 1-8 */}
-        <div className="col-span-12 lg:col-span-8 space-y-6">
+        {/* Reading List of Entries: Spans all 12 columns */}
+        <div className="col-span-12 space-y-6 w-full">
           {loading ? (
             <div className="py-16 text-center text-xs text-[var(--muted)]">
               {t('common.loading')}
@@ -200,7 +200,7 @@ export const LibraryPage: React.FC = () => {
             <>
               <div className="divide-y divide-[var(--separator)]">
                 {items.map((item) => (
-                  <article key={item.id} className="py-4 space-y-1.5">
+                  <article key={item.id} className="py-4 space-y-1.5 w-full">
                     <Link
                       to={`/knowledge/${item.id}`}
                       className="text-base font-semibold text-[var(--foreground)] hover:text-[var(--accent)] transition-colors block"
@@ -228,7 +228,7 @@ export const LibraryPage: React.FC = () => {
                       )}
                     </div>
 
-                    <p className="text-xs text-[var(--muted)] leading-relaxed line-clamp-2 max-w-[70ch]" dir="auto">
+                    <p className="text-xs text-[var(--muted)] leading-relaxed line-clamp-2 w-full" dir="auto">
                       {item.summary}
                     </p>
                   </article>

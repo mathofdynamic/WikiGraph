@@ -137,7 +137,7 @@ export const CollectionPage: React.FC = () => {
           </div>
 
           {description && (
-            <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed max-w-[70ch]" dir="auto">
+            <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed w-full" dir="auto">
               {description}
             </p>
           )}
@@ -147,8 +147,8 @@ export const CollectionPage: React.FC = () => {
           </div>
         </header>
 
-        {/* Plain List of Entries: Columns 1-8 */}
-        <div className="col-span-12 lg:col-span-8 space-y-4">
+        {/* Plain List of Entries: Spans all 12 columns */}
+        <div className="col-span-12 space-y-4 w-full">
           <div className="divide-y divide-[var(--separator)]">
             {entries.length === 0 ? (
               <p className="py-8 text-xs text-[var(--muted)] italic">
@@ -156,7 +156,7 @@ export const CollectionPage: React.FC = () => {
               </p>
             ) : (
               entries.map((item) => (
-                <article key={item.id} className="py-4 space-y-1.5">
+                <article key={item.id} className="py-4 space-y-1.5 w-full">
                   <Link
                     to={`/knowledge/${item.id}`}
                     className="text-base font-semibold text-[var(--foreground)] hover:text-[var(--accent)] transition-colors block"
@@ -176,7 +176,7 @@ export const CollectionPage: React.FC = () => {
                     <span>{new Date(item.updatedAt || item.createdAt).toLocaleDateString()}</span>
                   </div>
 
-                  <p className="text-xs text-[var(--muted)] leading-relaxed line-clamp-2 max-w-[70ch]" dir="auto">
+                  <p className="text-xs text-[var(--muted)] leading-relaxed line-clamp-2 w-full" dir="auto">
                     {item.summary}
                   </p>
                 </article>

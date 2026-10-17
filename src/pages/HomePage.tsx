@@ -88,13 +88,13 @@ export const HomePage: React.FC = () => {
   return (
     <Container className="py-12 sm:py-16">
       <PageGrid className="gap-y-16">
-        {/* 1. Prominent Task Box: Columns 1-8 */}
-        <section className="col-span-12 lg:col-span-8 space-y-6">
+        {/* 1. Prominent Task Box: Spans all 12 columns */}
+        <section className="col-span-12 space-y-6 w-full">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
               {t('home.taskHeading')}
             </h1>
-            <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed max-w-[70ch]">
+            <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed w-full">
               {locale === 'fa'
                 ? 'وظیفه یا هدف خود را بنویسید تا موتور بازیابی قطعی، مرتبط‌ترین واحدهای دانشی را همراه با استنادها و وابستگی‌ها آماده کند.'
                 : 'State what you are building or solving. The deterministic retrieval engine compiles the minimal, cited reading packet for your AI agent.'}
@@ -289,7 +289,7 @@ export const HomePage: React.FC = () => {
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
               {t('home.collectionsHeading')}
             </h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5 max-w-[70ch]">
+            <p className="text-xs text-[var(--muted)] mt-0.5 w-full">
               {t('home.collectionsSubheading')}
             </p>
           </div>
@@ -316,7 +316,7 @@ export const HomePage: React.FC = () => {
                   {col.count !== undefined ? `${col.count}` : ''}
                 </span>
               </div>
-              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed max-w-[70ch]" dir="auto">
+              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed w-full" dir="auto">
                 {locale === 'fa' && col.descriptionFa ? col.descriptionFa : (col.description || 'Curated subject shelf.')}
               </p>
             </Link>
@@ -331,7 +331,7 @@ export const HomePage: React.FC = () => {
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
               {t('home.recentlyAddedHeading')}
             </h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5 max-w-[70ch]">
+            <p className="text-xs text-[var(--muted)] mt-0.5 w-full">
               {t('home.recentlyAddedSubheading')}
             </p>
           </div>
@@ -367,7 +367,7 @@ export const HomePage: React.FC = () => {
                 <span>{new Date(item.updatedAt || item.createdAt).toLocaleDateString()}</span>
               </div>
 
-              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed max-w-[70ch]" dir="auto">
+              <p className="text-xs text-[var(--muted)] line-clamp-2 leading-relaxed w-full" dir="auto">
                 {item.summary}
               </p>
             </article>
